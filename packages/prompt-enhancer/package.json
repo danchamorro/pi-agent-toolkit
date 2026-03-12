@@ -1,0 +1,21 @@
+{
+  "name": "pi-prompt-enhancer",
+  "version": "1.0.0",
+  "description": "Enhance prompts to be clearer, more specific, and more actionable before sending",
+  "keywords": ["pi-package"],
+  "license": "MIT",
+  "author": "Daniel Chamorro",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/danchamorro/pi-toolkit",
+    "directory": "packages/prompt-enhancer"
+  },
+  "type": "module",
+  "pi": {
+    "extensions": ["./index.ts"]
+  },
+  "peerDependencies": {
+    "@mariozechner/pi-ai": "*",
+    "@mariozechner/pi-coding-agent": "*"
+  }
+}
