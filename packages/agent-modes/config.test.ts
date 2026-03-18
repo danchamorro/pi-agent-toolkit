@@ -27,7 +27,7 @@ describe("loadModes", () => {
 		assert.equal(modes.code.bash, "all");
 		assert.equal(modes.architect.bash, "restricted");
 		assert.deepEqual(modes.architect.editableExtensions, [".md", ".mdx"]);
-		assert.equal(modes.ask.bash, "none");
+		assert.equal(modes.ask.bash, "restricted");
 		assert.equal(modes.review.bash, "restricted");
 		assert.equal(modes.debug.tools, "all");
 	});
@@ -103,7 +103,8 @@ describe("loadModes", () => {
 
 		const modes = loadModes(projectDir);
 		assert.equal(modes.ask.tools, "all");
-		assert.equal(modes.ask.bash, "none");
+		// bash stays "restricted" since we didn't override it
+		assert.equal(modes.ask.bash, "restricted");
 	});
 
 	it("can override prompt to a custom string", () => {

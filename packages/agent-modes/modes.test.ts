@@ -52,14 +52,14 @@ describe("BUILTIN_MODES", () => {
 		assert.ok(m.prompt.length > 0);
 	});
 
-	it("ask has read-only tools and no bash", () => {
+	it("ask has read tools with restricted bash, no edit or write", () => {
 		const m = BUILTIN_MODES.ask;
 		assert.ok(Array.isArray(m.tools));
 		assert.ok((m.tools as string[]).includes("read"));
-		assert.ok(!(m.tools as string[]).includes("bash"));
+		assert.ok((m.tools as string[]).includes("bash"));
 		assert.ok(!(m.tools as string[]).includes("edit"));
 		assert.ok(!(m.tools as string[]).includes("write"));
-		assert.equal(m.bash, "none");
+		assert.equal(m.bash, "restricted");
 		assert.ok(m.prompt.length > 0);
 	});
 

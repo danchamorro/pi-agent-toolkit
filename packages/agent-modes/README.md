@@ -9,7 +9,7 @@ Agent modes for [pi](https://github.com/badlogic/pi-mono) -- switch between focu
 | **Code** | All | Unrestricted | All files | Default. Write, modify, or refactor code. |
 | **Architect** | read, bash, edit, write, grep, find, ls | Read-only allowlist | `.md`, `.mdx` only | Plan, design, and strategize before implementation. |
 | **Debug** | All | Unrestricted | All files | Systematic problem diagnosis and resolution. |
-| **Ask** | read, grep, find, ls | None | None | Read-only Q&A -- explanations and documentation. |
+| **Ask** | read, bash, grep, find, ls | Read-only allowlist | None | Q&A -- explanations, research, and documentation. |
 | **Review** | read, bash, grep, find, ls | Review-safe allowlist | None | Code review with structured feedback. |
 
 Each mode has a distinct PI persona and mode-specific custom instructions that guide the agent's behavior.

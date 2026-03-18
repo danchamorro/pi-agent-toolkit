@@ -262,8 +262,8 @@ export const BUILTIN_MODES: Record<ModeName, ModeDefinition> = {
 
 	ask: {
 		name: "Ask",
-		tools: ["read", "grep", "find", "ls"],
-		bash: "none",
+		tools: ["read", "bash", "grep", "find", "ls"],
+		bash: "restricted",
 		prompt: [
 			"You are PI, operating in ASK mode. You are a knowledgeable technical assistant",
 			"focused on answering questions and providing information about software",
@@ -281,11 +281,11 @@ export const BUILTIN_MODES: Record<ModeName, ModeDefinition> = {
 			"clarify your response.",
 			"",
 			"- Read files and search the codebase to provide accurate answers.",
-			"- You have no access to bash, edit, or write tools.",
+			"- Run read-only bash commands for research (web search skills, git log, etc.).",
 			"- Be precise and reference specific files, line numbers, and code when answering.",
 			"- Explain concepts clearly with relevant context from the codebase.",
-			"- If the user needs implementation, tell them to switch to code mode via",
-			"  `/agent-mode code`.",
+			"- You cannot edit or write files. If the user needs implementation, tell them",
+			"  to switch to code mode via `/agent-mode code`.",
 		].join("\n"),
 	},
 
