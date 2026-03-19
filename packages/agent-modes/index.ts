@@ -34,7 +34,7 @@ import { MODE_NAMES, isSafeBash, isEditableFile, type ModeDefinition, type ModeN
 
 export default function agentModes(pi: ExtensionAPI) {
 	let modes: Record<ModeName, ModeDefinition>;
-	let activeMode: ModeName | "off" = "code";
+	let activeMode: ModeName | "off" = "off";
 
 	// ------------------------------------------------------------------
 	// CLI flag
