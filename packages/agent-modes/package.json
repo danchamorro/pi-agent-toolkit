@@ -1,6 +1,6 @@
 {
   "name": "@danchamorro/pi-agent-modes",
-  "version": "1.0.8",
+  "version": "1.1.0",
   "description": "Agent modes for pi - switch between code, architect, debug, ask, and review modes with enforced tool and bash restrictions",
   "keywords": ["pi-package", "pi", "pi-extension", "agent-modes", "modes", "architect", "debug", "review", "coding-agent"],
   "license": "MIT",

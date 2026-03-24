@@ -5,6 +5,8 @@ import {
 	MODE_NAMES,
 	isSafeBash,
 	isEditableFile,
+	modeHasOverride,
+	type ModeDefinition,
 	type ModeName,
 } from "./modes.ts";
 
@@ -257,5 +259,60 @@ describe("isEditableFile", () => {
 
 	it("allows all files in debug mode (no editableExtensions)", () => {
 		assert.equal(isEditableFile("index.ts", BUILTIN_MODES.debug), true);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// modeHasOverride
+// ---------------------------------------------------------------------------
+
+describe("modeHasOverride", () => {
+	it("returns false for built-in modes with no overrides", () => {
+		for (const name of MODE_NAMES) {
+			assert.equal(modeHasOverride(BUILTIN_MODES[name]), false);
+		}
+	});
+
+	it("returns true when both provider and model are set", () => {
+		const mode: ModeDefinition = {
+			...BUILTIN_MODES.debug,
+			provider: "openai",
+			model: "gpt-5.4",
+		};
+		assert.equal(modeHasOverride(mode), true);
+	});
+
+	it("returns true when thinkingLevel is set", () => {
+		const mode: ModeDefinition = {
+			...BUILTIN_MODES.code,
+			thinkingLevel: "high",
+		};
+		assert.equal(modeHasOverride(mode), true);
+	});
+
+	it("returns true when both model and thinkingLevel are set", () => {
+		const mode: ModeDefinition = {
+			...BUILTIN_MODES.review,
+			provider: "anthropic",
+			model: "claude-sonnet-4-5",
+			thinkingLevel: "medium",
+		};
+		assert.equal(modeHasOverride(mode), true);
+	});
+
+	it("returns false when only provider is set (no model)", () => {
+		const mode: ModeDefinition = {
+			...BUILTIN_MODES.code,
+			provider: "openai",
+		};
+		assert.equal(modeHasOverride(mode), false);
+	});
+
+	it("returns false when only model is set (no provider)", () => {
+		const mode: ModeDefinition = {
+			...BUILTIN_MODES.code,
+			model: "gpt-5.4",
+		};
+		assert.equal(modeHasOverride(mode), false);
 	});
 });

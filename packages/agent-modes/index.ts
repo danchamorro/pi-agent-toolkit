@@ -26,7 +26,7 @@ import type { ExtensionAPI, ExtensionContext, ToolCallEventResult } from "@mario
 import { DynamicBorder, getAgentDir, isToolCallEventType } from "@mariozechner/pi-coding-agent";
 import { Container, Key, type SelectItem, SelectList, Text } from "@mariozechner/pi-tui";
 import { loadModes, type ModesConfig } from "./config.ts";
-import { MODE_NAMES, isSafeBash, isEditableFile, type ModeDefinition, type ModeName } from "./modes.ts";
+import { MODE_NAMES, isSafeBash, isEditableFile, modeHasOverride, type ModeDefinition, type ModeName } from "./modes.ts";
 
 // ---------------------------------------------------------------------------
 // Extension
@@ -35,6 +35,11 @@ import { MODE_NAMES, isSafeBash, isEditableFile, type ModeDefinition, type ModeN
 export default function agentModes(pi: ExtensionAPI) {
 	let modes: Record<ModeName, ModeDefinition>;
 	let activeMode: ModeName | "off" = "off";
+
+	// Baseline model/thinking state -- captured before entering a mode with
+	// model or thinking overrides. Restored when switching to a non-overriding
+	// mode or turning off.
+	let baseline: { model: any; thinkingLevel: any } | null = null;
 
 	// ------------------------------------------------------------------
 	// CLI flag
@@ -75,15 +80,48 @@ export default function agentModes(pi: ExtensionAPI) {
 		return [...result];
 	}
 
-	function turnOff(ctx: ExtensionContext): void {
+	async function restoreBaseline(ctx: ExtensionContext): Promise<void> {
+		if (!baseline) return;
+		const saved = baseline;
+		baseline = null;
+
+		if (saved.model) {
+			const ok = await pi.setModel(saved.model);
+			if (!ok) {
+				ctx.ui.notify("Could not restore previous model (no API key)", "warning");
+			}
+		}
+		pi.setThinkingLevel(saved.thinkingLevel);
+	}
+
+	async function turnOff(ctx: ExtensionContext): Promise<void> {
+		await restoreBaseline(ctx);
 		activeMode = "off";
 		pi.setActiveTools(pi.getAllTools().map((t) => t.name));
 		updateStatus(ctx);
 	}
 
-	async function applyMode(name: ModeName, ctx: ExtensionContext): Promise<void> {
+	async function applyMode(name: ModeName, ctx: ExtensionContext, options?: { saveBaseline?: boolean }): Promise<void> {
+		const mode = modes[name];
+		const shouldSave = options?.saveBaseline !== false;
+
+		// Handle baseline save/restore for model/thinking overrides
+		if (shouldSave) {
+			if (modeHasOverride(mode)) {
+				// Entering an overriding mode -- save baseline if not already saved
+				if (!baseline) {
+					baseline = {
+						model: ctx.model,
+						thinkingLevel: pi.getThinkingLevel(),
+					};
+				}
+			} else {
+				// Entering a non-overriding mode -- restore baseline if saved
+				await restoreBaseline(ctx);
+			}
+		}
+
 		activeMode = name;
-		const mode = getMode()!;
 
 		// Set active tools
 		pi.setActiveTools(resolveTools(mode));
@@ -216,7 +254,7 @@ export default function agentModes(pi: ExtensionAPI) {
 		if (!result) return;
 
 		if (result === "off") {
-			turnOff(ctx);
+			await turnOff(ctx);
 			ctx.ui.notify("Agent modes disabled", "info");
 			persistState();
 			return;
@@ -239,7 +277,7 @@ export default function agentModes(pi: ExtensionAPI) {
 		const next = cycle[nextIdx];
 
 		if (next === "off") {
-			turnOff(ctx);
+			await turnOff(ctx);
 			ctx.ui.notify("Agent modes disabled", "info");
 		} else {
 			await applyMode(next, ctx);
@@ -397,7 +435,7 @@ export default function agentModes(pi: ExtensionAPI) {
 			}
 
 			if (arg === "off") {
-				turnOff(ctx);
+				await turnOff(ctx);
 				ctx.ui.notify("Agent modes disabled", "info");
 				persistState();
 				return;
@@ -528,9 +566,9 @@ export default function agentModes(pi: ExtensionAPI) {
 			.pop() as { data?: { mode: ModeName } } | undefined;
 
 		if (stateEntry?.data?.mode === "off") {
-			turnOff(ctx);
+			await turnOff(ctx);
 		} else if (stateEntry?.data?.mode && MODE_NAMES.includes(stateEntry.data.mode)) {
-			await applyMode(stateEntry.data.mode, ctx);
+			await applyMode(stateEntry.data.mode, ctx, { saveBaseline: false });
 		} else {
 			updateStatus(ctx);
 		}
