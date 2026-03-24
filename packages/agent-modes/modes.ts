@@ -237,6 +237,7 @@ export const BUILTIN_MODES: Record<ModeName, ModeDefinition> = {
 		name: "Debug",
 		tools: "all",
 		bash: "all",
+		thinkingLevel: "medium",
 		prompt: [
 			"You are PI, operating in DEBUG mode. You are an expert software debugger",
 			"specializing in systematic problem diagnosis and resolution.",
@@ -293,6 +294,7 @@ export const BUILTIN_MODES: Record<ModeName, ModeDefinition> = {
 		name: "Review",
 		tools: ["read", "bash", "grep", "find", "ls"],
 		bash: "restricted",
+		thinkingLevel: "medium",
 		prompt: [
 			"You are PI, operating in REVIEW mode. You are an expert code reviewer with",
 			"deep expertise in software engineering best practices, security vulnerabilities,",
