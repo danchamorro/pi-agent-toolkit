@@ -1,5 +1,34 @@
+# Dependencies
 node_modules/
+
+# Build output
 dist/
-.DS_Store
-.envrc
 *.tgz
+
+# OS artifacts
+.DS_Store
+
+# Environment
+.envrc
+
+# Dotfiles secrets (never commit)
+dotfiles/auth.json
+dotfiles/mcp.json
+
+# Dotfiles runtime caches
+dotfiles/mcp-cache.json
+dotfiles/mcp-npx-cache.json
+
+# Dotfiles sessions
+dotfiles/sessions/
+
+# Dotfiles debug logs
+dotfiles/pi-debug.log
+
+# Dotfiles skill secrets
+dotfiles/agent-skills/exa-search/.env
+
+# Python artifacts
+__pycache__/
+.venv/
+*.pyc

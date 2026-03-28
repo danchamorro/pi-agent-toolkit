@@ -1,0 +1,12 @@
+{
+  "debug": {
+    "provider": "openai-codex",
+    "model": "gpt-5.4",
+    "thinkingLevel": "medium"
+  },
+  "review": {
+    "provider": "openai-codex",
+    "model": "gpt-5.4",
+    "thinkingLevel": "medium"
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "anthropic": "sk-ant-YOUR_ANTHROPIC_API_KEY",
+  "openai-codex": "YOUR_OPENAI_API_KEY",
+  "google-antigravity": "YOUR_GOOGLE_API_KEY"
+}

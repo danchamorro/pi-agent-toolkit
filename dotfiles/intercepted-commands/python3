@@ -1,0 +1,104 @@
+#!/bin/bash
+
+# Check for disallowed module invocations
+for arg in "$@"; do
+    case "$arg" in
+        -mpip|-m\ pip|pip)
+            echo "Error: 'python3 -m pip' is disabled. Use uv instead:" >&2
+            echo "" >&2
+            echo "  To install a package for a script: uv run --with PACKAGE python script.py" >&2
+            echo "  To add a dependency to the project: uv add PACKAGE" >&2
+            echo "" >&2
+            exit 1
+            ;;
+        -mvenv|-m\ venv|venv)
+            echo "Error: 'python3 -m venv' is disabled. Use uv instead:" >&2
+            echo "" >&2
+            echo "  To create a virtual environment: uv venv" >&2
+            echo "" >&2
+            exit 1
+            ;;
+        -mpy_compile|-m\ py_compile|py_compile)
+            echo "Error: 'python3 -m py_compile' is disabled because it writes .pyc files to __pycache__." >&2
+            echo "" >&2
+            echo "  To verify syntax without bytecode output: uv run python -m ast path/to/file.py >/dev/null" >&2
+            echo "" >&2
+            exit 1
+            ;;
+    esac
+done
+
+# Check for -m flag followed by pip or venv
+prev=""
+for arg in "$@"; do
+    if [ "$prev" = "-m" ]; then
+        case "$arg" in
+            pip)
+                echo "Error: 'python3 -m pip' is disabled. Use uv instead:" >&2
+                echo "" >&2
+                echo "  To install a package for a script: uv run --with PACKAGE python script.py" >&2
+                echo "  To add a dependency to the project: uv add PACKAGE" >&2
+                echo "" >&2
+                exit 1
+                ;;
+            venv)
+                echo "Error: 'python3 -m venv' is disabled. Use uv instead:" >&2
+                echo "" >&2
+                echo "  To create a virtual environment: uv venv" >&2
+                echo "" >&2
+                exit 1
+                ;;
+            py_compile)
+                echo "Error: 'python3 -m py_compile' is disabled because it writes .pyc files to __pycache__." >&2
+                echo "" >&2
+                echo "  To verify syntax without bytecode output: uv run python -m ast path/to/file.py >/dev/null" >&2
+                echo "" >&2
+                exit 1
+                ;;
+        esac
+    fi
+    prev="$arg"
+done
+
+# Resolve a Python interpreter for uv. Prefer uv-managed Python to match
+# `uv run python` defaults, while still avoiding shim recursion.
+resolve_uv_python() {
+    local shim_dir candidate candidate_dir
+    shim_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+    candidate="$(uv python find --managed-python 2>/dev/null || true)"
+    if [ -n "$candidate" ] && [ -x "$candidate" ]; then
+        candidate_dir="$(cd "$(dirname "$candidate")" && pwd)"
+        if [ "$candidate_dir" != "$shim_dir" ]; then
+            echo "$candidate"
+            return 0
+        fi
+    fi
+
+    while IFS= read -r candidate; do
+        [ -n "$candidate" ] || continue
+        candidate_dir="$(cd "$(dirname "$candidate")" && pwd)"
+        [ "$candidate_dir" = "$shim_dir" ] && continue
+        echo "$candidate"
+        return 0
+    done < <(type -aP python3 2>/dev/null)
+
+    while IFS= read -r candidate; do
+        [ -n "$candidate" ] || continue
+        candidate_dir="$(cd "$(dirname "$candidate")" && pwd)"
+        [ "$candidate_dir" = "$shim_dir" ] && continue
+        echo "$candidate"
+        return 0
+    done < <(type -aP python 2>/dev/null)
+
+    return 1
+}
+
+UV_PYTHON="$(resolve_uv_python)"
+if [ -z "$UV_PYTHON" ]; then
+    echo "Error: Unable to locate a Python interpreter outside intercepted-commands." >&2
+    exit 1
+fi
+
+# Dispatch through uv with an explicit interpreter path to avoid recursion.
+exec uv run --python "$UV_PYTHON" python "$@"

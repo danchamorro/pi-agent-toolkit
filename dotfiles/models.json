@@ -1,0 +1,27 @@
+{
+  "providers": {
+    "mlx-local": {
+      "baseUrl": "http://127.0.0.1:8880/v1",
+      "api": "openai-completions",
+      "apiKey": "mlx-local",
+      "compat": {
+        "supportsDeveloperRole": false,
+        "supportsReasoningEffort": false,
+        "supportsUsageInStreaming": false,
+        "maxTokensField": "max_tokens",
+        "thinkingFormat": "qwen-chat-template"
+      },
+      "models": [
+        {
+          "id": "mlx-community/qwen3-coder-next-4bit",
+          "name": "Qwen3 Coder Next (MLX Local)",
+          "reasoning": true,
+          "input": ["text"],
+          "contextWindow": 262144,
+          "maxTokens": 32768,
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
+        }
+      ]
+    }
+  }
+}

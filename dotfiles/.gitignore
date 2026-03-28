@@ -1,0 +1,22 @@
+# Secrets (never commit)
+auth.json
+mcp.json
+
+# Runtime caches
+mcp-cache.json
+mcp-npx-cache.json
+
+# Sessions
+sessions/
+
+# Debug logs
+pi-debug.log
+
+# Dependencies
+node_modules/
+
+# Skill secrets
+agent-skills/exa-search/.env
+
+# OS artifacts
+.DS_Store
