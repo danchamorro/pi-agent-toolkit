@@ -12,6 +12,8 @@
 export interface ModeDefinition {
 	/** Display name */
 	name: string;
+	/** One-line description shown on the mode status card */
+	description: string;
 	/** Tools visible to the model. "all" means every registered tool. */
 	tools: string[] | "all";
 	/** System prompt addition (empty string = none) */
@@ -149,6 +151,7 @@ export function isEditableFile(path: string, mode: ModeDefinition): boolean {
 export const BUILTIN_MODES: Record<ModeName, ModeDefinition> = {
 	code: {
 		name: "Code",
+		description: "Write, modify, or refactor code",
 		tools: "all",
 		bash: "all",
 		prompt: [
@@ -171,6 +174,7 @@ export const BUILTIN_MODES: Record<ModeName, ModeDefinition> = {
 
 	architect: {
 		name: "Architect",
+		description: "Plan, design, and strategize before implementation",
 		tools: ["read", "bash", "edit", "write", "grep", "find", "ls"],
 		bash: "restricted",
 		editableExtensions: [".md", ".mdx"],
@@ -235,6 +239,7 @@ export const BUILTIN_MODES: Record<ModeName, ModeDefinition> = {
 
 	debug: {
 		name: "Debug",
+		description: "Troubleshoot issues and diagnose problems",
 		tools: "all",
 		bash: "all",
 		prompt: [
@@ -262,6 +267,7 @@ export const BUILTIN_MODES: Record<ModeName, ModeDefinition> = {
 
 	ask: {
 		name: "Ask",
+		description: "Answer questions and explain concepts (read-only)",
 		tools: ["read", "bash", "grep", "find", "ls"],
 		bash: "restricted",
 		prompt: [
@@ -291,6 +297,7 @@ export const BUILTIN_MODES: Record<ModeName, ModeDefinition> = {
 
 	review: {
 		name: "Review",
+		description: "Review code changes and provide feedback (read-only)",
 		tools: ["read", "bash", "grep", "find", "ls"],
 		bash: "restricted",
 		prompt: [

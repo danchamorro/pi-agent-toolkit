@@ -162,6 +162,9 @@ export default function agentModes(pi: ExtensionAPI) {
 		// Header
 		lines.push(t.fg("accent", t.bold(mode.name.toUpperCase())) + t.fg("dim", " mode"));
 
+		// Description
+		lines.push(t.fg("dim", mode.description));
+
 		// Restrictions summary
 		const parts: string[] = [];
 

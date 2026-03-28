@@ -1,6 +1,6 @@
 # @danchamorro/pi-agent-modes
 
-Agent modes for [pi](https://github.com/badlogic/pi-mono) -- switch between focused operational modes with enforced tool restrictions and distinct behavioral prompts.
+Agent modes for [pi](https://github.com/badlogic/pi-mono). Switch between focused operational modes with enforced tool restrictions and distinct behavioral prompts.
 
 ## Modes
 
@@ -9,10 +9,22 @@ Agent modes for [pi](https://github.com/badlogic/pi-mono) -- switch between focu
 | **Code** | All | Unrestricted | All files | Default. Write, modify, or refactor code. |
 | **Architect** | read, bash, edit, write, grep, find, ls | Read-only allowlist | `.md`, `.mdx` only | Plan, design, and strategize before implementation. |
 | **Debug** | All | Unrestricted | All files | Systematic problem diagnosis and resolution. |
-| **Ask** | read, bash, grep, find, ls | Read-only allowlist | None | Q&A -- explanations, research, and documentation. |
+| **Ask** | read, bash, grep, find, ls | Read-only allowlist | None | Q&A: explanations, research, and documentation. |
 | **Review** | read, bash, grep, find, ls | Review-safe allowlist | None | Code review with structured feedback. |
 
-Each mode has a distinct PI persona and mode-specific custom instructions that guide the agent's behavior.
+Each mode has a distinct PI persona, a short description shown on the status card, and mode-specific custom instructions that guide the agent's behavior.
+
+### Status card
+
+The active mode displays a status card in the UI:
+
+```
+  CODE mode
+  Write, modify, or refactor code
+  bash:all | edit:all
+```
+
+The first line shows the mode name. The second line is a built-in description summarizing the mode's purpose. The third line shows the current tool restrictions. When model or thinking-level overrides are active, those appear as additional entries on the restrictions line.
 
 ## Install
 
@@ -44,7 +56,7 @@ Or add to `~/.pi/agent/settings.json`:
 
 **Keyboard shortcut:**
 
-`Ctrl+Shift+M` -- cycle through modes.
+`Ctrl+Shift+M` to cycle through modes.
 
 **CLI flag:**
 
@@ -54,7 +66,7 @@ pi --agent-mode architect
 
 ## How enforcement works
 
-Enforcement is three-layered, not just prompt guidance:
+Enforcement is layered, not just prompt guidance:
 
 1. **Tool visibility:** `setActiveTools()` controls which tools the model can see. In ask mode, bash/edit/write don't exist for the model.
 2. **Bash restrictions:** For architect and review modes, bash commands are validated against an allowlist at the `tool_call` level. Destructive commands (rm, git push, npm install, etc.) are blocked before execution. Piped and chained commands are also checked.
