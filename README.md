@@ -1,9 +1,13 @@
 # pi-toolkit
 
-A complete, shareable setup for the
-[Pi](https://github.com/badlogic/pi-mono) coding agent. Includes installable
-npm packages, 22 extensions, 30 skills, MCP server configurations, and
-safety guardrails.
+My personal [Pi](https://github.com/badlogic/pi-mono) coding agent setup,
+combined with Pi packages I've built. This repo serves two purposes: it's
+my versioned backup so I can restore or sync my setup across machines, and
+it's a reference for anyone looking to customize their own Pi environment.
+
+Includes installable npm packages, 22 extensions, 30 skills, MCP server
+configurations, and safety guardrails. Use all of it, fork it as a
+starting point, or cherry-pick the pieces you want.
 
 ---
 
