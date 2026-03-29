@@ -9,7 +9,10 @@ configurations, and safety guardrails.
 
 ## Install
 
+Run once with `npx`, or install globally:
+
 ```bash
+npx pi-agent-toolkit install
 npm install -g pi-agent-toolkit
 ```
 
@@ -55,6 +58,15 @@ pi-agent-toolkit status
 pi-agent-toolkit update
 ```
 
+### Sync unmanaged work back into the repo
+
+Contributor workflow for absorbing unmanaged components created under
+`~/.pi/agent/` or `~/.agents/skills/`:
+
+```bash
+pi-agent-toolkit sync --repo-path /path/to/pi-agent-toolkit
+```
+
 ## What's included
 
 ### Extensions (22)
@@ -97,8 +109,9 @@ Pre-configured servers for code indexing (jCodeMunch), database access
 
 ### Config files
 
-AGENTS.md, system prompt, settings, custom models, agent modes, and
-safety rules.
+AGENTS.md, system prompt, settings, custom models, agent modes, safety
+rules, plus starter `auth.json` and `mcp.json` files created from
+templates.
 
 ## For contributors
 
@@ -108,6 +121,16 @@ Clone the repo and symlink so edits flow back:
 git clone https://github.com/danchamorro/pi-agent-toolkit.git
 cd pi-agent-toolkit
 pi-agent-toolkit install --all --override-configs --link --repo-path .
+```
+
+Template configs such as `auth.json` and `mcp.json` are still copied,
+not symlinked, so local secrets stay machine-specific.
+
+When you create unmanaged extensions, skills, prompts, agents, or themes,
+absorb them back into the repo with:
+
+```bash
+pi-agent-toolkit sync --repo-path .
 ```
 
 ## License

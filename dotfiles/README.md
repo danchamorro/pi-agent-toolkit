@@ -23,7 +23,7 @@ Installation is handled by the `pi-agent-toolkit` CLI. See
 |---------|---------|
 | `pi-agent-toolkit install` | Interactive picker or `--all` for everything |
 | `pi-agent-toolkit install --all --override-configs --link --repo-path .` | Contributor setup with symlinks |
-| `pi-agent-toolkit sync --repo-path .` | Absorb new extensions/skills from `~/.pi/agent/` into the repo (contributors only) |
+| `pi-agent-toolkit sync --repo-path .` | Absorb unmanaged extensions, skills, prompts, agents, and themes from `~/.pi/agent/`, plus global skills from `~/.agents/skills/`, into the repo (contributors only) |
 
 ---
 
@@ -37,6 +37,8 @@ Installation is handled by the `pi-agent-toolkit` CLI. See
 | `models.json` | Custom model/provider definitions (e.g., local MLX models via OpenAI-compatible API) |
 | `agent-modes.json` | Per-mode overrides: which provider/model/thinking level to use in debug, review, etc. |
 | `damage-control-rules.yaml` | Safety guardrails (see section below) |
+| `auth.json.template` | Template for `auth.json`, which stores provider API keys after install |
+| `mcp.json.template` | Template for `mcp.json`, which stores MCP server configuration after install |
 
 ---
 
@@ -153,6 +155,11 @@ These skills are maintained by their original authors and installed
 by the `pi-agent-toolkit` CLI via the
 [skills CLI](https://github.com/vercel-labs/skills). They are not committed
 to this repo.
+
+When you run `pi-agent-toolkit sync`, the command scans unmanaged items in
+`~/.pi/agent/` and `~/.agents/skills/`, copies selected files into
+`dotfiles/`, replaces the originals with symlinks, and then prints the next
+steps for adding the new items to `packages/cli/src/lib/registry.ts`.
 
 | Skill | Source | Install command |
 |-------|--------|-----------------|

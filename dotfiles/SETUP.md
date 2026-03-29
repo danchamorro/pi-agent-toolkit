@@ -29,9 +29,12 @@ Full walkthrough for setting up pi-agent-toolkit.
 
 ### For users (recommended)
 
-Install the CLI globally and use the interactive picker:
+Run once with `npx`, or install the CLI globally for repeated use:
 
 ```bash
+npx pi-agent-toolkit install
+
+# or
 npm install -g pi-agent-toolkit
 pi-agent-toolkit install
 ```
@@ -60,6 +63,9 @@ cd pi-agent-toolkit
 pi-agent-toolkit install --all --override-configs --link --repo-path .
 ```
 
+Template configs such as `auth.json` and `mcp.json` are still copied, not
+symlinked, so local secrets and machine-specific server settings stay local.
+
 ### Managing your setup
 
 ```bash
@@ -70,15 +76,16 @@ pi-agent-toolkit update    # Update the CLI to the latest version
 
 ### Syncing new work (contributors only)
 
-When pi creates a new extension or skill in `~/.pi/agent/`, absorb it
-into the repo:
+When pi creates a new extension, skill, prompt, agent, or theme in
+`~/.pi/agent/`, or when you add a global skill under `~/.agents/skills/`,
+absorb it into the repo:
 
 ```bash
 pi-agent-toolkit sync --repo-path ~/path/to/pi-agent-toolkit
 ```
 
-This copies the new file into `dotfiles/`, replaces the original with a
-symlink, and prompts you to add it to the registry.
+This copies the selected item into `dotfiles/`, replaces the original with a
+symlink, and prints the next steps for adding it to the registry.
 
 ---
 
@@ -98,8 +105,9 @@ Edit `~/.pi/agent/auth.json` with your provider API keys:
 
 ### MCP servers (`mcp.json`)
 
-Edit `~/.pi/agent/mcp.json` to configure your MCP servers. The template
-includes a skeleton for:
+Edit `~/.pi/agent/mcp.json` to configure your MCP servers. The installed
+file is created from `mcp.json.template` and uses a top-level `mcpServers`
+object. The template includes a skeleton for:
 
 - **jcodemunch**: Code indexing/exploration (works out of the box with `uvx`)
 - **Postgres MCP**: Database access via Docker
@@ -132,9 +140,11 @@ indexing, symbol search, and context-aware code exploration.
 
 ```json
 {
-  "jcodemunch": {
-    "command": "uvx",
-    "args": ["jcodemunch-mcp@latest"]
+  "mcpServers": {
+    "jcodemunch": {
+      "command": "uvx",
+      "args": ["jcodemunch-mcp@latest"]
+    }
   }
 }
 ```
@@ -156,18 +166,20 @@ running in Docker with `--access-mode=restricted` for read-only safety.
 
 ```json
 {
-  "pg-your-db": {
-    "command": "docker",
-    "args": [
-      "run", "-i", "--rm",
-      "-e", "DATABASE_URI",
-      "crystaldba/postgres-mcp",
-      "--access-mode=restricted"
-    ],
-    "env": {
-      "DATABASE_URI": "postgresql://USER:PASSWORD@HOST:PORT/DATABASE"
-    },
-    "lifecycle": "lazy"
+  "mcpServers": {
+    "pg-your-db": {
+      "command": "docker",
+      "args": [
+        "run", "-i", "--rm",
+        "-e", "DATABASE_URI",
+        "crystaldba/postgres-mcp",
+        "--access-mode=restricted"
+      ],
+      "env": {
+        "DATABASE_URI": "postgresql://USER:PASSWORD@HOST:PORT/DATABASE"
+      },
+      "lifecycle": "lazy"
+    }
   }
 }
 ```
@@ -185,9 +197,11 @@ connects to Chrome DevTools for browser automation.
 
 ```json
 {
-  "chrome-devtools": {
-    "command": "npx",
-    "args": ["-y", "chrome-devtools-mcp@latest", "--autoConnect"]
+  "mcpServers": {
+    "chrome-devtools": {
+      "command": "npx",
+      "args": ["-y", "chrome-devtools-mcp@latest", "--autoConnect"]
+    }
   }
 }
 ```

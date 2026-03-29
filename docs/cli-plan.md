@@ -1,4 +1,9 @@
-# pi-agent-toolkit CLI: Design Plan
+# pi-agent-toolkit CLI: Historical Design Plan
+
+> Historical note: this file captures the original CLI design and the rationale
+> behind it. It is no longer the primary source of truth for behavior. For the
+> current implementation, see `README.md`, `packages/cli/README.md`,
+> `dotfiles/SETUP.md`, and `packages/cli/src/lib/registry.ts`.
 
 ## Overview
 
@@ -40,7 +45,9 @@ needing to clone the repo.
 - **Arg parsing:** Citty (lightweight, from the UnJS ecosystem)
 - **Interactive prompts:** @clack/prompts (polished multi-select, spinners, confirm steps)
 
-## Commands (v1)
+## Commands
+
+The current CLI ships these commands:
 
 ```bash
 # Interactive picker (first-time or add more)
@@ -53,9 +60,9 @@ pi-agent-toolkit install --all
 pi-agent-toolkit install --all --override-configs
 
 # Direct install by category
-pi-agent-toolkit install --extensions damage-control commit-approval
-pi-agent-toolkit install --skills brainstorm docx
-pi-agent-toolkit install --packages agent-modes
+pi-agent-toolkit install --extensions "damage-control commit-approval"
+pi-agent-toolkit install --skills "brainstorm docx"
+pi-agent-toolkit install --packages "agent-modes"
 
 # Personal symlink mode (requires local repo clone)
 pi-agent-toolkit install --link --repo-path ~/Code/pi-agent-toolkit
@@ -65,14 +72,12 @@ pi-agent-toolkit list
 
 # Show what's installed, what's available, detect drift
 pi-agent-toolkit status
-```
 
-### Shipped post-v1
+# Absorb unmanaged components from ~/.pi/agent or ~/.agents/skills
+pi-agent-toolkit sync --repo-path ~/Code/pi-agent-toolkit
 
-`update` has been implemented and ships with the CLI:
-
-```bash
-pi-agent-toolkit update               # Update the CLI to the latest npm version
+# Update the CLI to the latest npm version
+pi-agent-toolkit update
 ```
 
 ### Future commands
@@ -100,19 +105,24 @@ $ pi-agent-toolkit install
 │  ◻ dirty-repo-guard     Warn on uncommitted changes
 │  ...
 │
-◇  Select skills to install:
+◇  Select bundled skills to install:
 │  ◼ brainstorm           Interview-driven planning
 │  ◼ exa-search           Semantic web search via Exa
 │  ...
 │
-◇  Select packages to install:
+◇  Select external skills to install (fetched from source repos):
+│  ◼ docx                 Word document support
+│  ◼ pdf                  PDF support
+│  ...
+│
+◇  Select pi packages to install:
 │  ◼ agent-modes          Switch between code, architect, debug modes
 │  ...
 │
-◇  Install starter configs? (copied as templates, not symlinked)
-│  ● Yes, as starting templates
+◇  Select starter configs (copied as templates, won't overwrite existing):
+│  ● Yes
 │
-◆  Installing 12 extensions, 8 skills, 2 packages, 5 configs...
+◆  Installing 12 extensions, 10 skills, 2 packages, 5 configs...
 ```
 
 ## Component Categories and Groups
@@ -155,11 +165,13 @@ $ pi-agent-toolkit install
 |------------------|--------------------------|----------------------------|
 | Bundled extensions | Copy from npm package  | Symlink to repo clone      |
 | Bundled skills     | Copy from npm package  | Symlink to repo clone      |
-| Configs            | Copy as templates      | Symlink to repo clone      |
+| Configs            | Copy as templates      | Copy as templates          |
 | External skills    | `npx skills add`       | `npx skills add`           |
 | Packages           | `pi install`           | `pi install`               |
 
-Configs are never overwritten unless `--override-configs` is passed.
+Configs are never overwritten unless `--override-configs` is passed. Template
+configs such as `auth.json` and `mcp.json` are always copied, never symlinked,
+so local secrets and machine-specific settings stay local.
 
 ## State Tracking
 
@@ -168,17 +180,21 @@ installed, when, and from which CLI version.
 
 ```json
 {
-  "version": "1.0.0",
+  "version": "0.5.4",
   "installed": {
     "extensions": ["damage-control", "commit-approval", "exa-search-tool"],
     "skills": {
       "bundled": ["brainstorm"],
       "external": ["docx", "pdf"]
     },
+    "prompts": [],
+    "agents": [],
+    "themes": [],
     "packages": ["agent-modes"],
     "configs": ["AGENTS.md", "damage-control-rules.yaml"]
   },
-  "installedAt": "2026-03-29T00:00:00.000Z"
+  "installedAt": "2026-03-29T00:00:00.000Z",
+  "updatedAt": "2026-03-29T00:00:00.000Z"
 }
 ```
 
@@ -196,7 +212,7 @@ source of truth for the picker, `list`, and `status` commands.
   category: "extensions",
   group: "safety",
   description: "Safety guardrail engine: blocks destructive commands",
-  method: "symlink",       // or "copy", "skills-cli", "pi-install"
+  method: "copy",          // runtime may symlink when --link is used
   source: "extensions/damage-control",
   recommends: ["damage-control-rules.yaml"]
 }
@@ -217,6 +233,6 @@ No hard blocks. The user can always proceed.
 ## Transition Plan (completed)
 
 - ~~Delete `dotfiles/install.sh` when the CLI ships~~ Done.
-- ~~Update the repo README to point to `npx pi-agent-toolkit install`~~ Done.
+- ~~Update the repo README to document the CLI-based install flow~~ Done.
 - Clean break, no deprecation period (no existing user base relying on
   install.sh beyond the author)

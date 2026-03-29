@@ -107,7 +107,7 @@ safety patterns.
 [skills CLI](https://github.com/vercel-labs/skills)):
 
 Maintained by their original authors. Installed automatically by
-`install.sh`, not committed to this repo.
+`pi-agent-toolkit install`, not committed to this repo.
 
 | Skill | Source |
 |-------|--------|
@@ -132,14 +132,17 @@ Maintained by their original authors. Installed automatically by
 | `models.json` | Custom provider definitions (e.g., local MLX models) |
 | `agent-modes.json` | Per-mode model/thinking overrides for debug, review, etc. |
 | `damage-control-rules.yaml` | Safety rules: bash patterns, path access, delete protection |
+| `auth.json` | Provider API keys, created from template during install |
+| `mcp.json` | MCP server configuration, created from template during install |
 
 ---
 
 ## Quick start
 
-Install the CLI globally:
+Run once with `npx`, or install the CLI globally:
 
 ```bash
+npx pi-agent-toolkit install
 npm install -g pi-agent-toolkit
 ```
 
@@ -189,6 +192,16 @@ Clone the repo and symlink so edits flow back:
 git clone https://github.com/danchamorro/pi-agent-toolkit.git
 cd pi-agent-toolkit
 pi-agent-toolkit install --all --override-configs --link --repo-path .
+```
+
+Template configs such as `auth.json` and `mcp.json` are still copied, not
+symlinked, so machine-specific secrets stay local.
+
+To absorb unmanaged extensions, skills, prompts, agents, or themes back
+into the repo:
+
+```bash
+pi-agent-toolkit sync --repo-path .
 ```
 
 See [dotfiles/SETUP.md](dotfiles/SETUP.md) for detailed configuration.
