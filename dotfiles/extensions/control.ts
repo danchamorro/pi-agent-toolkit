@@ -472,7 +472,9 @@ function getMessagesSinceLastPrompt(ctx: ExtensionContext): ExtractedMessage[] {
 		if (entry.type === "message") {
 			const msg = entry.message;
 			if ("role" in msg && (msg.role === "user" || msg.role === "assistant")) {
-				const textParts = msg.content
+				const content = msg.content;
+				if (typeof content === "string") continue;
+				const textParts = content
 					.filter((c): c is { type: "text"; text: string } => c.type === "text")
 					.map((c) => c.text);
 				if (textParts.length > 0) {
@@ -764,7 +766,7 @@ async function handleCommand(
 		return;
 	}
 
-	respond(false, command.type, undefined, `Unsupported command: ${command.type}`);
+	respond(false, (command as { type: string }).type, undefined, `Unsupported command: ${(command as { type: string }).type}`);
 }
 
 // ============================================================================
@@ -836,7 +838,7 @@ async function sendRpcCommand(
 		}, timeout);
 
 		let buffer = "";
-		let response: RpcResponse | null = null;
+		let response: RpcResponse | undefined;
 
 		const cleanup = () => {
 			clearTimeout(timeoutHandle);
@@ -868,7 +870,7 @@ async function sendRpcCommand(
 					// Handle response
 					if (msg.type === "response") {
 						if (msg.command === command.type) {
-							response = msg;
+							response = msg as RpcResponse;
 							// If not waiting for event, we're done
 							if (!waitForEvent) {
 								cleanup();
@@ -1407,7 +1409,7 @@ Messages automatically include sender session info for replies. When you want a 
 
 		renderResult(result, { expanded }, theme) {
 			const details = result.details as Record<string, unknown> | undefined;
-			const isError = result.isError === true;
+			const isError = "isError" in result && result.isError === true;
 
 			// Error case
 			if (isError || details?.error) {

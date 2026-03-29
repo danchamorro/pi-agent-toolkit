@@ -292,6 +292,7 @@ export default function exaSearchTool(pi: ExtensionAPI): void {
 
 			onUpdate?.({
 				content: [{ type: "text", text: `Searching Exa (${label}): ${queryPreview}` }],
+				details: undefined,
 			});
 
 			const payload = buildPayload(params);

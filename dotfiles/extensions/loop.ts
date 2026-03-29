@@ -212,6 +212,7 @@ export default function loopExtension(pi: ExtensionAPI): void {
 		if (!loopState.active || !loopState.mode || !loopState.prompt) return;
 		if (ctx.hasPendingMessages()) return;
 
+		const prompt = loopState.prompt;
 		const loopCount = (loopState.loopCount ?? 0) + 1;
 		loopState = { ...loopState, loopCount };
 		persistState(loopState);
@@ -219,7 +220,7 @@ export default function loopExtension(pi: ExtensionAPI): void {
 
 		pi.sendMessage({
 			customType: "loop",
-			content: loopState.prompt,
+			content: prompt,
 			display: true
 		}, {
 			deliverAs: "followUp",
@@ -408,7 +409,7 @@ export default function loopExtension(pi: ExtensionAPI): void {
 			.join("\n\n");
 
 		try {
-			const compaction = await compact(event.preparation, ctx.model, auth.apiKey!, instructionParts, event.signal);
+			const compaction = await compact(event.preparation, ctx.model, auth.apiKey!, auth.headers, instructionParts, event.signal);
 			return { compaction };
 		} catch (error) {
 			if (ctx.hasUI) {

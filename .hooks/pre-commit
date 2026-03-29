@@ -24,7 +24,8 @@ npx prettier --check packages/cli/ || fail "Format check failed. Run 'npm run fo
 pass "Formatting OK."
 
 step "Running typecheck..."
-npm run typecheck --workspace=packages/cli || fail "Typecheck failed."
+npm run typecheck --workspace=packages/cli || fail "Typecheck failed (packages/cli)."
+npm run typecheck:dotfiles || fail "Typecheck failed (dotfiles)."
 pass "Typecheck passed."
 
 step "Running tests..."

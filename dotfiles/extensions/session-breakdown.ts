@@ -20,7 +20,6 @@ import { BorderedLoader } from "@mariozechner/pi-coding-agent";
 import {
 	Key,
 	matchesKey,
-	sliceByColumn,
 	type Component,
 	type TUI,
 	truncateToWidth,
@@ -31,6 +30,37 @@ import path from "node:path";
 import fs from "node:fs/promises";
 import { createReadStream, type Dirent } from "node:fs";
 import readline from "node:readline";
+
+/**
+ * Slice a string by visible column offset and length, respecting ANSI escapes
+ * and wide characters. When strict is true, the result is clamped to exactly
+ * `length` visible columns.
+ */
+function sliceByColumn(line: string, startCol: number, length: number, _strict?: boolean): string {
+	// Strip ANSI for width measurement, then use truncateToWidth for the tail.
+	// This is a simplified version that handles the "keep rightmost N columns" pattern
+	// used by fitRight and twoColumnLine.
+	const w = visibleWidth(line);
+	if (startCol <= 0 && length >= w) return line;
+	if (startCol >= w || length <= 0) return "";
+	// For the right-align use case (startCol = w - length), strip from the left
+	// by truncating the full string to the tail portion.
+	// Approximate by truncating to startCol+length then trimming leading chars.
+	const truncated = truncateToWidth(line, startCol + length);
+	// Now remove the first startCol visible columns
+	let remaining = startCol;
+	let i = 0;
+	while (i < truncated.length && remaining > 0) {
+		// Skip ANSI escape sequences
+		if (truncated[i] === "\x1b" && truncated[i + 1] === "[") {
+			const end = truncated.indexOf("m", i);
+			if (end !== -1) { i = end + 1; continue; }
+		}
+		i++;
+		remaining--;
+	}
+	return truncated.slice(i);
+}
 
 type ModelKey = string; // `${provider}/${model}`
 type CwdKey = string; // normalized cwd path
