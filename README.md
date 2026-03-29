@@ -4,6 +4,10 @@ A CLI to selectively install curated extensions, skills, and configs for
 the [Pi](https://github.com/badlogic/pi-mono) coding agent. Pick and
 choose what you want, or install everything at once.
 
+This repo serves two purposes: it's my versioned backup so I can restore
+or sync my setup across machines, and it's a reference for anyone looking
+to customize their own Pi environment.
+
 Includes 22 extensions, 31 skills, 2 installable npm packages, MCP server
 configurations, and safety guardrails.
 
