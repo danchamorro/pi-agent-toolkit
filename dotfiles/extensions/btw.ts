@@ -17,7 +17,6 @@ import {
 	type AgentSession,
 	type AgentSessionEvent,
 	type ExtensionAPI,
-	type ExtensionCommandContext,
 	type ExtensionContext,
 	type ResourceLoader,
 } from "@mariozechner/pi-coding-agent";
@@ -25,6 +24,7 @@ import { type AssistantMessage, type Message, type ThinkingLevel as AiThinkingLe
 import {
 	Container,
 	Input,
+	Key,
 	Markdown,
 	matchesKey,
 	truncateToWidth,
@@ -130,9 +130,7 @@ function extractEventAssistantText(message: unknown): string {
 	}
 
 	return maybeMessage.content
-		.filter((part): part is { type: "text"; text: string } => {
-			return !!part && typeof part === "object" && (part as { type?: unknown }).type === "text";
-		})
+		.filter((part): part is { type: "text"; text: string } => part?.type === "text")
 		.map((part) => part.text)
 		.join("\n")
 		.trim();
@@ -197,12 +195,11 @@ function formatThread(thread: BtwDetails[]): string {
 		.join("\n\n---\n\n");
 }
 
-function notify(ctx: ExtensionContext | ExtensionCommandContext, message: string, level: "info" | "warning" | "error"): void {
+function notify(ctx: ExtensionContext, message: string, level: "info" | "warning" | "error"): void {
 	if (ctx.hasUI) {
 		ctx.ui.notify(message, level);
 	}
 }
-
 
 export function matchesBtwDismissKey(keybindings: KeybindingsManager, data: string): boolean {
 	const legacyKeybindings = keybindings as KeybindingsManager & {
@@ -413,8 +410,7 @@ export default function (pi: ExtensionAPI) {
 	const mdTheme = getMarkdownTheme();
 
 	function getModelKey(ctx: ExtensionContext): string {
-		const {model} = ctx;
-		return model ? `${model.provider}/${model.id}` : "none";
+		return ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : "none";
 	}
 
 	function renderMarkdownLines(text: string, width: number): string[] {
@@ -581,7 +577,7 @@ export default function (pi: ExtensionAPI) {
 		}
 	}
 
-	async function resetThread(ctx: ExtensionContext | ExtensionCommandContext, persist = true): Promise<void> {
+	async function resetThread(ctx: ExtensionContext, persist = true): Promise<void> {
 		thread = [];
 		pendingQuestion = null;
 		pendingAnswer = "";
@@ -631,7 +627,7 @@ export default function (pi: ExtensionAPI) {
 		syncOverlay();
 	}
 
-	async function createSideSession(ctx: ExtensionCommandContext): Promise<SideSessionRuntime | null> {
+	async function createSideSession(ctx: ExtensionContext): Promise<SideSessionRuntime | null> {
 		if (!ctx.model) {
 			return null;
 		}
@@ -709,7 +705,7 @@ export default function (pi: ExtensionAPI) {
 		};
 	}
 
-	async function ensureSideSession(ctx: ExtensionCommandContext): Promise<SideSessionRuntime | null> {
+	async function ensureSideSession(ctx: ExtensionContext): Promise<SideSessionRuntime | null> {
 		if (!ctx.model) {
 			return null;
 		}
@@ -724,7 +720,7 @@ export default function (pi: ExtensionAPI) {
 		return activeSideSession;
 	}
 
-	async function ensureOverlay(ctx: ExtensionCommandContext | ExtensionContext): Promise<void> {
+	async function ensureOverlay(ctx: ExtensionContext): Promise<void> {
 		if (!ctx.hasUI) {
 			return;
 		}
@@ -859,7 +855,7 @@ export default function (pi: ExtensionAPI) {
 		}
 	}
 
-	async function injectSummaryIntoMain(ctx: ExtensionContext | ExtensionCommandContext): Promise<void> {
+	async function injectSummaryIntoMain(ctx: ExtensionContext): Promise<void> {
 		if (thread.length === 0) {
 			notify(ctx, "No BTW thread to summarize.", "warning");
 			return;
@@ -882,7 +878,7 @@ export default function (pi: ExtensionAPI) {
 		}
 	}
 
-	async function closeOverlayFlow(ctx: ExtensionContext | ExtensionCommandContext): Promise<void> {
+	async function closeOverlayFlow(ctx: ExtensionContext): Promise<void> {
 		dismissOverlay();
 		if (!ctx.hasUI) {
 			return;
@@ -898,7 +894,7 @@ export default function (pi: ExtensionAPI) {
 		}
 	}
 
-	async function runBtwPrompt(ctx: ExtensionCommandContext, question: string): Promise<void> {
+	async function runBtwPrompt(ctx: ExtensionContext, question: string): Promise<void> {
 		const {model} = ctx;
 		if (!model) {
 			setOverlayStatus("No active model selected.");
@@ -976,7 +972,7 @@ export default function (pi: ExtensionAPI) {
 		}
 	}
 
-	async function submitFromOverlay(ctx: ExtensionContext | ExtensionCommandContext, rawValue: string): Promise<void> {
+	async function submitFromOverlay(ctx: ExtensionContext, rawValue: string): Promise<void> {
 		const question = rawValue.trim();
 		if (!question) {
 			setOverlayStatus("Enter a question first.");
@@ -984,13 +980,15 @@ export default function (pi: ExtensionAPI) {
 		}
 
 		setOverlayDraft("");
-		if (!("waitForIdle" in ctx)) {
-			setOverlayStatus("BTW submit requires command context. Re-open with /btw.");
-			return;
-		}
-
 		await runBtwPrompt(ctx, question);
 	}
+
+	pi.registerShortcut(Key.ctrlShift("b"), {
+		description: "Open BTW side chat",
+		handler: async (ctx) => {
+			await ensureOverlay(ctx);
+		},
+	});
 
 	pi.registerCommand("btw", {
 		description: "Open a simple BTW side-chat popover. `/btw <text>` asks immediately, `/btw` opens the side thread.",
