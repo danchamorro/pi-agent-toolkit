@@ -6,6 +6,7 @@ import { runInstall } from "./commands/install.ts";
 import { runList } from "./commands/list.ts";
 import { runStatus } from "./commands/status.ts";
 import { runSync } from "./commands/sync.ts";
+import { runUpdate } from "./commands/update.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const CLI_VERSION: string = JSON.parse(
@@ -119,6 +120,16 @@ const sync = defineCommand({
   },
 });
 
+const update = defineCommand({
+  meta: {
+    name: "update",
+    description: "Update pi-agent-toolkit to the latest version",
+  },
+  run() {
+    runUpdate(CLI_VERSION);
+  },
+});
+
 const main = defineCommand({
   meta: {
     name: "pi-agent-toolkit",
@@ -131,6 +142,7 @@ const main = defineCommand({
     list,
     status,
     sync,
+    update,
   },
 });
 
