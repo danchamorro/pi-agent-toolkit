@@ -123,7 +123,9 @@ function installLocal(
   }
 
   try {
-    if (options.link) {
+    // Template configs (auth.json, mcp.json) are always copied, never linked.
+    // Users customize these with secrets; linking would point to placeholder templates.
+    if (options.link && !component.isTemplate) {
       linkComponent(source, target);
       return { success: true, message: "linked" };
     } else {
