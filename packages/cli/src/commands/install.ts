@@ -106,7 +106,7 @@ export async function runInstall(args: InstallArgs): Promise<void> {
   // Validate --link requires --repo-path
   if (args.link && !args.repoPath) {
     p.log.error("--link requires --repo-path to be set.");
-    p.log.info("Example: pi-toolkit install --link --repo-path ~/Code/pi-toolkit");
+    p.log.info("Example: pi-agent-toolkit install --link --repo-path ~/Code/pi-agent-toolkit");
     process.exit(1);
   }
 

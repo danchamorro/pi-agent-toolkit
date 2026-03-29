@@ -1,4 +1,4 @@
-# pi-toolkit
+# pi-agent-toolkit
 
 A CLI to selectively install curated extensions, skills, and configs for
 the [Pi](https://github.com/badlogic/pi-mono) coding agent. Pick and

@@ -90,7 +90,7 @@ export function runStatus(): void {
   console.log();
 
   if (!manifest.installedAt) {
-    console.log(pc.dim("No pi-toolkit manifest found. Nothing has been installed yet."));
+    console.log(pc.dim("No pi-agent-toolkit manifest found. Nothing has been installed yet."));
     console.log(pc.dim('Run "pi-agent-toolkit install" to get started.'));
     console.log();
     return;

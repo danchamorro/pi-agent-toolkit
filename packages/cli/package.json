@@ -4,7 +4,7 @@
   "description": "CLI to selectively install curated extensions, skills, and configs for the pi coding agent",
   "keywords": [
     "pi",
-    "pi-toolkit",
+    "pi-agent-toolkit",
     "coding-agent",
     "extensions",
     "skills",

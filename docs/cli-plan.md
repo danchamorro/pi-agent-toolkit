@@ -1,9 +1,9 @@
-# pi-toolkit CLI: Design Plan
+# pi-agent-toolkit CLI: Design Plan
 
 ## Overview
 
 Replace `dotfiles/install.sh` with a proper CLI that lets users selectively
-install components from the pi-toolkit. The CLI acts as an orchestrator on
+install components from the pi-agent-toolkit. The CLI acts as an orchestrator on
 top of existing install mechanisms (`npx skills add`, `pi install`,
 file copy/symlink) rather than reinventing them.
 
@@ -21,7 +21,7 @@ and configs.
 ## Repo Structure
 
 ```
-pi-toolkit/
+pi-agent-toolkit/
   packages/cli/              # The CLI package (name: "pi-agent-toolkit")
   packages/agent-modes/      # Existing package
   packages/prompt-enhancer/  # Existing package
@@ -58,7 +58,7 @@ pi-agent-toolkit install --skills brainstorm docx
 pi-agent-toolkit install --packages agent-modes
 
 # Personal symlink mode (requires local repo clone)
-pi-agent-toolkit install --link --repo-path ~/Code/pi-toolkit
+pi-agent-toolkit install --link --repo-path ~/Code/pi-agent-toolkit
 
 # Browse the full catalog without installing
 pi-agent-toolkit list
@@ -156,7 +156,7 @@ Configs are never overwritten unless `--override-configs` is passed.
 
 ## State Tracking
 
-A manifest file at `~/.pi/agent/.pi-toolkit.json` tracks what was
+A manifest file at `~/.pi/agent/.pi-agent-toolkit.json` tracks what was
 installed, when, and from which CLI version.
 
 ```json

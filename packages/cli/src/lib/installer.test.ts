@@ -67,11 +67,11 @@ describe("resolveSource", () => {
     };
     const result = resolveSource(component, {
       link: true,
-      repoPath: "/home/user/pi-toolkit",
+      repoPath: "/home/user/pi-agent-toolkit",
       overrideConfigs: false,
       cliVersion: "1.0",
     });
-    assert.equal(result, "/home/user/pi-toolkit/dotfiles/extensions/tilldone.ts");
+    assert.equal(result, "/home/user/pi-agent-toolkit/dotfiles/extensions/tilldone.ts");
   });
 });
 

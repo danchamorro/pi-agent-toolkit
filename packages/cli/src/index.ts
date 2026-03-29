@@ -36,7 +36,7 @@ const install = defineCommand({
     },
     "repo-path": {
       type: "string",
-      description: "Path to local pi-toolkit repo clone (required with --link)",
+      description: "Path to local pi-agent-toolkit repo clone (required with --link)",
     },
     extensions: {
       type: "string",
@@ -103,7 +103,7 @@ const sync = defineCommand({
   args: {
     "repo-path": {
       type: "string",
-      description: "Path to local pi-toolkit repo clone",
+      description: "Path to local pi-agent-toolkit repo clone",
       required: true,
     },
     all: {

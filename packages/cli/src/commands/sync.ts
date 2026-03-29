@@ -134,7 +134,7 @@ export async function runSync(options: SyncOptions): Promise<void> {
 
   if (!existsSync(dotfilesPath)) {
     p.log.error(`dotfiles/ not found at ${dotfilesPath}`);
-    p.log.info("Make sure --repo-path points to your pi-toolkit repo clone.");
+    p.log.info("Make sure --repo-path points to your pi-agent-toolkit repo clone.");
     process.exit(1);
   }
 

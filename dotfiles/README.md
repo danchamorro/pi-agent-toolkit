@@ -1,4 +1,4 @@
-# pi-toolkit dotfiles
+# pi-agent-toolkit dotfiles
 
 Complete [Pi](https://github.com/badlogic/pi-mono) coding agent configuration:
 extensions, skills, config files, and safety guardrails.
