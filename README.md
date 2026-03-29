@@ -4,7 +4,7 @@ A CLI to selectively install curated extensions, skills, and configs for
 the [Pi](https://github.com/badlogic/pi-mono) coding agent. Pick and
 choose what you want, or install everything at once.
 
-Includes 22 extensions, 30 skills, 2 installable npm packages, MCP server
+Includes 22 extensions, 31 skills, 2 installable npm packages, MCP server
 configurations, and safety guardrails.
 
 ---
@@ -27,8 +27,10 @@ pi install npm:@danchamorro/pi-prompt-enhancer
 
 ### Extensions (22 total)
 
-All extensions live in `dotfiles/extensions/` and are symlinked into
-`~/.pi/agent/extensions/` by the installer.
+All extensions live in `dotfiles/extensions/` and are copied into
+`~/.pi/agent/extensions/` by the installer. Developers can use
+`--link --repo-path` to symlink them instead, so edits to the repo
+are reflected immediately.
 
 **Safety and workflow:**
 
@@ -77,14 +79,18 @@ are the MCP servers this setup uses:
 | [jCodeMunch](https://github.com/jcodemunch/jcodemunch-mcp) | Code indexing, symbol search, context-aware exploration. Auto-indexes repos on session start. | `uvx jcodemunch-mcp@latest` |
 | [Postgres MCP](https://github.com/crystaldba/postgres-mcp) | Read-only database access via Docker. Runs with `--access-mode=restricted` and `lazy` lifecycle. | `crystaldba/postgres-mcp` |
 | [chrome-devtools](https://github.com/nicobailon/chrome-devtools-mcp) | Browser automation via Chrome DevTools Protocol. | `npx chrome-devtools-mcp@latest` |
-| [pi-mcp-adapter](https://github.com/nicobailon/pi-mcp-adapter) | Improves MCP tool response display in Pi (collapsible output). Installed as a pi package, not an MCP server. | `pi install npm:pi-mcp-adapter` |
+
+[pi-mcp-adapter](https://github.com/nicobailon/pi-mcp-adapter) is not an
+MCP server. It is a Pi package that improves how MCP tool responses are
+displayed (collapsible output for large results). Install with
+`pi install npm:pi-mcp-adapter`.
 
 See [dotfiles/SETUP.md](dotfiles/SETUP.md) for configuration details and
 safety patterns.
 
 ### Skills
 
-**My skills** (7, bundled in this repo):
+**My skills** (8, bundled in this repo):
 
 | Skill | Description |
 |-------|-------------|

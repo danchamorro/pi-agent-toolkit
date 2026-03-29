@@ -12,18 +12,18 @@ dotfiles/
   intercepted-commands/ Python/pip shims (uv.ts dependency)
   agent-skills/ ....... Pi-specific skills  (-> ~/.pi/agent/skills/)
   global-skills/ ...... Agent-agnostic skills (-> ~/.agents/skills/)
-  install.sh .......... Setup, update, and sync script
 ```
 
-See [SETUP.md](SETUP.md) for the full installation walkthrough.
+Installation is handled by the `pi-agent-toolkit` CLI. See
+[SETUP.md](SETUP.md) for the full walkthrough.
 
-### install.sh modes
+### CLI commands (replaced install.sh)
 
 | Command | Purpose |
 |---------|---------|
-| `./install.sh` | First-time setup: symlinks everything, installs external skills, creates secret templates, installs dependencies |
-| `./install.sh --update` | After `git pull`: picks up new files, reinstalls external skills, skips secrets |
-| `./install.sh --sync` | Finds new extensions/skills you built in pi and absorbs them into the repo (for maintainers and forks only) |
+| `pi-agent-toolkit install` | Interactive picker or `--all` for everything |
+| `pi-agent-toolkit install --all --override-configs --link --repo-path .` | Contributor setup with symlinks |
+| `pi-agent-toolkit sync --repo-path .` | Absorb new extensions/skills from `~/.pi/agent/` into the repo (contributors only) |
 
 ---
 
@@ -134,12 +134,13 @@ pi install npm:pi-mcp-adapter
 
 ### My skills (bundled in this repo)
 
-Skills I built or heavily customized. Installed via symlink by `install.sh`.
+Skills I built or heavily customized. Installed by the `pi-agent-toolkit` CLI.
 
 | Skill | Description |
 |-------|-------------|
 | `brainstorm` | Interview-driven plan stress-testing |
 | `cli-detector` | Scan repos for external service integrations and their CLIs |
+| `code-review` | AI-powered code review using CodeRabbit CLI |
 | `exa-search` | Semantic web search and structured research using Exa API |
 | `gh-issue-creator` | Create GitHub issues via `gh` CLI |
 | `google-chat-cards-v2` | Google Chat Cards v2 rich alert notifications |
@@ -148,8 +149,8 @@ Skills I built or heavily customized. Installed via symlink by `install.sh`.
 
 ### External skills (installed from source repos)
 
-These skills are maintained by their original authors and installed directly
-from their repositories by `install.sh` via the
+These skills are maintained by their original authors and installed
+by the `pi-agent-toolkit` CLI via the
 [skills CLI](https://github.com/vercel-labs/skills). They are not committed
 to this repo.
 
@@ -179,6 +180,6 @@ to this repo.
 | `firecrawl` | [firecrawl/cli](https://github.com/firecrawl/cli) | `npx skills add firecrawl/cli -s firecrawl -g -y` |
 | `excalidraw-diagram` | [coleam00/excalidraw-diagram-skill](https://github.com/coleam00/excalidraw-diagram-skill) | `npx skills add coleam00/excalidraw-diagram-skill -g -y` |
 
-You don't need to run these commands manually. `install.sh` handles all of
-them. The commands are listed here for cherry-pickers who want individual
-skills without the full setup.
+You don't need to run these commands manually.
+`pi-agent-toolkit install` handles all of them. The commands are listed
+here for cherry-pickers who want individual skills without the full setup.

@@ -1,4 +1,4 @@
-# pi-prompt-enhancer
+# @danchamorro/pi-prompt-enhancer
 
 A [Pi](https://github.com/badlogic/pi-mono) extension that rewrites your prompts to be clearer, more specific, and more actionable before sending them to the agent.
 

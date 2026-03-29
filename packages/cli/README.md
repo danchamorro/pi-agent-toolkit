@@ -4,7 +4,7 @@ A CLI to selectively install curated extensions, skills, and configs for
 the [Pi](https://github.com/badlogic/pi-mono) coding agent. Pick and
 choose what you want, or install everything at once.
 
-Includes 22 extensions, 30 skills, 2 installable npm packages, MCP server
+Includes 22 extensions, 31 skills, 2 installable npm packages, MCP server
 configurations, and safety guardrails.
 
 ## Install
@@ -73,7 +73,7 @@ management. Highlights:
 
 See the [full extension list](https://github.com/danchamorro/pi-agent-toolkit#extensions-22-total) in the repo README.
 
-### Skills (30)
+### Skills (31)
 
 8 bundled skills (brainstorm, code-review, cli-detector, exa-search,
 gh-issue-creator, google-chat-cards-v2, technical-docs, whats-new) plus

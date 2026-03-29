@@ -67,12 +67,19 @@ pi-agent-toolkit list
 pi-agent-toolkit status
 ```
 
-### Future commands (not in v1)
+### Shipped post-v1
+
+`update` has been implemented and ships with the CLI:
+
+```bash
+pi-agent-toolkit update               # Update the CLI to the latest npm version
+```
+
+### Future commands
 
 ```bash
 pi-agent-toolkit uninstall            # Interactive picker to remove components
 pi-agent-toolkit uninstall --extensions damage-control
-pi-agent-toolkit update               # Pull latest versions of installed components
 ```
 
 These will be added later based on real need.
@@ -124,8 +131,8 @@ $ pi-agent-toolkit install
 
 ### Skills
 
-- **Bundled (7):** brainstorm, cli-detector, exa-search, gh-issue-creator,
-  google-chat-cards-v2, technical-docs, whats-new
+- **Bundled (8):** brainstorm, cli-detector, code-review, exa-search,
+  gh-issue-creator, google-chat-cards-v2, technical-docs, whats-new
 - **External (23):** Installed via `npx skills add` from source repos.
   Includes docx, pdf, pptx, xlsx, frontend-design, skill-creator,
   agent-browser, playwright-cli, systematic-debugging, and more.
@@ -207,9 +214,9 @@ the `recommends` map and flags missing companions:
 
 No hard blocks. The user can always proceed.
 
-## Transition Plan
+## Transition Plan (completed)
 
-- Delete `dotfiles/install.sh` when the CLI ships
-- Update the repo README to point to `npx pi-agent-toolkit install`
+- ~~Delete `dotfiles/install.sh` when the CLI ships~~ Done.
+- ~~Update the repo README to point to `npx pi-agent-toolkit install`~~ Done.
 - Clean break, no deprecation period (no existing user base relying on
   install.sh beyond the author)

@@ -19,7 +19,7 @@ Full walkthrough for setting up pi-agent-toolkit.
   for the jCodeMunch MCP server (`uvx`). Install: `brew install uv`
 - **[Docker](https://www.docker.com/)**: Required for Postgres MCP servers
   (runs `crystaldba/postgres-mcp` in containers).
-- **[cmux](https://github.com/nicobailon/cmux)**: Ghostty-based terminal
+- **[cmux](https://github.com/manaflow-ai/cmux)**: Ghostty-based terminal
   multiplexer. Several extensions and skills integrate with cmux for
   notifications, split panes, and browser automation.
 
@@ -90,9 +90,9 @@ Edit `~/.pi/agent/auth.json` with your provider API keys:
 
 ```json
 {
-  "anthropic": "sk-ant-YOUR_KEY",
-  "openai-codex": "YOUR_OPENAI_KEY",
-  "google-antigravity": "YOUR_GOOGLE_KEY"
+  "anthropic": "sk-ant-YOUR_ANTHROPIC_API_KEY",
+  "openai-codex": "YOUR_OPENAI_API_KEY",
+  "google-antigravity": "YOUR_GOOGLE_API_KEY"
 }
 ```
 
@@ -109,12 +109,15 @@ See the [MCP Server Setup](#mcp-server-setup) section below for details.
 
 ### Exa API key
 
-If you use the `exa-search` skill, add your API key:
+If you use the `exa-search` skill, set your API key using one of these
+methods (checked in order):
 
-```bash
-cp dotfiles/agent-skills/exa-search/.env.example dotfiles/agent-skills/exa-search/.env
-# Edit .env and set EXA_API_KEY=your_key
-```
+1. **Environment variable** (recommended): export `EXA_API_KEY` in your
+   shell profile.
+2. **`.env` file** in the installed skill directory:
+   ```bash
+   echo 'EXA_API_KEY=your_key' > ~/.pi/agent/skills/exa-search/.env
+   ```
 
 ---
 
@@ -238,7 +241,9 @@ pi install npm:pi-mcp-adapter
 The damage-control system may block commands that match its safety patterns.
 If a legitimate command is blocked:
 
-1. Check `dotfiles/damage-control-rules.yaml` for the matching pattern
+1. Check the rules file for the matching pattern:
+   `~/.pi/agent/damage-control-rules.yaml` (installed) or
+   `dotfiles/damage-control-rules.yaml` (repo clone)
 2. Patterns with `ask: true` will prompt for confirmation
 3. Patterns without `ask` are hard blocks
 4. You can add `allow: true` patterns that take precedence over blocks
@@ -261,6 +266,9 @@ The `damage-control/` extension has its own `package.json`. If `npm install`
 fails:
 
 ```bash
-cd dotfiles/extensions/damage-control
-npm install
+# If installed via CLI:
+cd ~/.pi/agent/extensions/damage-control && npm install
+
+# If using a repo clone with symlinks:
+cd dotfiles/extensions/damage-control && npm install
 ```
