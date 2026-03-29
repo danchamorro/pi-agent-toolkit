@@ -1,6 +1,8 @@
 /**
  * BTW Side Chat Extension
  *
+ * Shortcut: Ctrl+Shift+B — opens the BTW side chat overlay.
+ *
  * Adds a /btw command that opens an overlay side-chat panel for quick,
  * focused questions without interrupting the main conversation. Supports
  * multi-turn threaded dialogue, tool use in the side session, scroll

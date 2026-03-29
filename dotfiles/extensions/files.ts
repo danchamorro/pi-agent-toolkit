@@ -1,6 +1,11 @@
 /**
  * Files Extension
  *
+ * Shortcuts:
+ *   Ctrl+Shift+O — browse files mentioned in the session.
+ *   Ctrl+Shift+F — reveal the latest file reference in Finder.
+ *   Ctrl+Shift+R — Quick Look the latest file reference.
+ *
  * /files command lists files in the current git tree (plus session-referenced files)
  * and offers quick actions like reveal, open, edit, or diff.
  * /diff is kept as an alias to the same picker.

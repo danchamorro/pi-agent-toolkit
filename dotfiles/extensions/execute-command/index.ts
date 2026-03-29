@@ -1,3 +1,14 @@
+/**
+ * Execute Command Extension
+ *
+ * Registers an `execute_command` tool that lets the agent self-invoke
+ * slash commands or send follow-up messages as if the user typed them.
+ * Commands are queued during the agent turn and dispatched after it ends.
+ *
+ * Common uses: self-invoking /answer, running /reload after creating
+ * skills, or sending programmatic follow-up prompts.
+ */
+
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 

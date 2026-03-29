@@ -1,6 +1,8 @@
 /**
  * Q&A extraction hook - extracts questions from assistant responses
  *
+ * Shortcut: Ctrl+. — extract and answer questions.
+ *
  * Custom interactive TUI for answering questions.
  *
  * Demonstrates the "prompt generator" pattern with custom TUI:

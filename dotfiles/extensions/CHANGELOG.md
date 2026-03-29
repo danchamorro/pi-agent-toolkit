@@ -4,6 +4,15 @@ All notable changes to extensions in `~/.pi/agent/extensions/`.
 
 ## 2026-03-29
 
+### qna-interactive.ts
+
+- Documented `Ctrl+.` shortcut key in the file header comment.
+
+### files.ts
+
+- Documented `Ctrl+Shift+O`, `Ctrl+Shift+F`, and `Ctrl+Shift+R` shortcut
+  keys in the file header comment.
+
 ### btw.ts
 
 - Added `Ctrl+Shift+B` keyboard shortcut to open the BTW side chat overlay
