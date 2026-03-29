@@ -130,36 +130,42 @@ Maintained by their original authors. Installed automatically by
 
 ## Quick start
 
+Install the CLI globally:
+
+```bash
+npm install -g pi-agent-toolkit
+```
+
 Interactive picker (choose what you want):
 
 ```bash
-npx pi-agent-toolkit install
+pi-agent-toolkit install
 ```
 
 Install everything:
 
 ```bash
-npx pi-agent-toolkit install --all
+pi-agent-toolkit install --all
 ```
 
 Install specific components:
 
 ```bash
-npx pi-agent-toolkit install --extensions "damage-control commit-approval exa-search-tool"
-npx pi-agent-toolkit install --skills "brainstorm systematic-debugging"
-npx pi-agent-toolkit install --packages "agent-modes prompt-enhancer"
+pi-agent-toolkit install --extensions "damage-control commit-approval exa-search-tool"
+pi-agent-toolkit install --skills "brainstorm systematic-debugging"
+pi-agent-toolkit install --packages "agent-modes prompt-enhancer"
 ```
 
 Browse the full catalog:
 
 ```bash
-npx pi-agent-toolkit list
+pi-agent-toolkit list
 ```
 
 Check what's installed:
 
 ```bash
-npx pi-agent-toolkit status
+pi-agent-toolkit status
 ```
 
 ### For contributors / personal setup
@@ -169,7 +175,7 @@ back to the repo:
 
 ```bash
 git clone https://github.com/danchamorro/pi-toolkit.git
-npx pi-agent-toolkit install --all --override-configs --link --repo-path ./pi-toolkit
+pi-agent-toolkit install --all --override-configs --link --repo-path ./pi-toolkit
 ```
 
 Or install globally for a persistent command:
