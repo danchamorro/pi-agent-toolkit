@@ -439,6 +439,22 @@ const externalSkills: Component[] = [
     remoteSkills: ["cmux-browser"],
   },
   {
+    name: "cmux-debug-windows",
+    category: "skills-external",
+    description: "Manage cmux debug windows and debug menu wiring",
+    method: "skills-cli",
+    remote: "manaflow-ai/cmux",
+    remoteSkills: ["cmux-debug-windows"],
+  },
+  {
+    name: "cmux-markdown",
+    category: "skills-external",
+    description: "Open markdown files in a formatted viewer panel with live reload",
+    method: "skills-cli",
+    remote: "manaflow-ai/cmux",
+    remoteSkills: ["cmux-markdown"],
+  },
+  {
     name: "vue-best-practices",
     category: "skills-external",
     description: "Vue 3 Composition API with TypeScript best practices",

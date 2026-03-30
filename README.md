@@ -107,7 +107,7 @@ safety patterns.
 | `technical-docs` | Technical documentation standards |
 | `whats-new` | Git changelog generation between branches |
 
-**External skills** (23, installed from source repos via
+**External skills** (25, installed from source repos via
 [skills CLI](https://github.com/vercel-labs/skills)):
 
 Maintained by their original authors. Installed automatically by
@@ -118,7 +118,7 @@ Maintained by their original authors. Installed automatically by
 | `docx`, `pdf`, `pptx`, `xlsx`, `frontend-design`, `skill-creator`, `agent-browser` | [anthropics/skills](https://github.com/anthropics/skills) |
 | `vercel-react-best-practices`, `web-design-guidelines`, `find-skills` | [vercel-labs/skills](https://github.com/vercel-labs/skills) |
 | `learn-codebase`, `self-improve` | [HazAT/pi-config](https://github.com/HazAT/pi-config) |
-| `cmux`, `cmux-and-worktrees`, `cmux-browser` | [manaflow-ai/cmux](https://github.com/manaflow-ai/cmux) |
+| `cmux`, `cmux-and-worktrees`, `cmux-browser`, `cmux-debug-windows`, `cmux-markdown` | [manaflow-ai/cmux](https://github.com/manaflow-ai/cmux) |
 | `vue-best-practices` | [hyf0/vue-skills](https://github.com/hyf0/vue-skills) |
 | `systematic-debugging`, `writing-skills` | [obra/superpowers](https://github.com/obra/superpowers) |
 | `code-simplifier`, `iterate-pr` | [getsentry/skills](https://github.com/getsentry/skills) |
