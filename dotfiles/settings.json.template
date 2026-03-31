@@ -10,8 +10,7 @@
     "anthropic/claude-haiku-4-5",
     "openai-codex/gpt-5.4",
     "google-antigravity/gemini-3.1-pro-low",
-    "google-antigravity/gemini-3.1-pro-high",
-    "ollama/qwen3-coder-next:latest"
+    "google-antigravity/gemini-3.1-pro-high"
   ],
   "compaction": {
     "enabled": true,

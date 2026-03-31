@@ -565,7 +565,7 @@ const configs: Component[] = [
     category: "configs",
     description: "Pi settings: default provider, model, compaction",
     method: "copy",
-    source: "settings.json",
+    source: "settings.json.template",
     isTemplate: true,
   },
   {
