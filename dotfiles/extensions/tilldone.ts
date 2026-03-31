@@ -521,7 +521,4 @@ export default function (pi: ExtensionAPI) {
 		restoreFromBranch(ctx);
 	});
 
-	pi.on("session_fork", async (_event, ctx) => {
-		restoreFromBranch(ctx);
-	});
 }

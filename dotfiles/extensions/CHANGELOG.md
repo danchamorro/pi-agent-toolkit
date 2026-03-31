@@ -4,6 +4,15 @@ All notable changes to extensions in `~/.pi/agent/extensions/`.
 
 ## 2026-03-31
 
+### btw.ts, control.ts, loop.ts, question-mode.ts, review.ts, tilldone.ts, tools.ts
+
+- Removed deprecated `session_switch` and `session_fork` event handlers
+  across all seven extensions. Pi now fires `session_start` with an
+  `event.reason` field (`"new"`, `"resume"`, `"fork"`) for all session
+  transitions, making the separate handlers redundant. Each extension
+  already had a `session_start` handler calling the same function.
+- Removed the `SessionSwitchEvent` type import from `loop.ts`.
+
 ### commit-approval.ts
 
 - Added staged-file previews to the commit approval dialog so approvals show

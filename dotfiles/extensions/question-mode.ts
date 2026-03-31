@@ -245,7 +245,4 @@ export default function questionModeExtension(pi: ExtensionAPI): void {
 		restoreFromBranch(ctx);
 	});
 
-	pi.on("session_fork", async (_event, ctx) => {
-		restoreFromBranch(ctx);
-	});
 }
