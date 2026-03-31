@@ -77,6 +77,12 @@ bashToolPatterns:
     reason: git gc --prune=now (can lose dangling commits)
   - pattern: '\bgit\s+filter-branch\b'
     reason: git filter-branch (rewrites entire history)
+  - pattern: '\bgit\s+(?:-c\s+core\.[Ee]xcludes[Ff]ile=|-ccore\.[Ee]xcludes[Ff]ile=|--config-env=core\.[Ee]xcludes[Ff]ile=)\S*\s[^\n]*\badd\b'
+    reason: git add with core.excludesFile override bypasses global ignore protections
+  - pattern: '\bgit\s+add\b[^\n]*\s--force(\s|$)'
+    reason: git add --force bypasses gitignore protections
+  - pattern: '\bgit\s+add\b[^\n]*\s-[A-Za-z]*f[A-Za-z]*(\s|$)'
+    reason: git add -f bypasses gitignore protections
   - pattern: '\bgit\b.*--no-verify'
     reason: git --no-verify bypasses all hooks
   - pattern: '\bgit\s+checkout\s+--\s*\.'

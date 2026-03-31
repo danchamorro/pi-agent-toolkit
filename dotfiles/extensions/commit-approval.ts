@@ -2,9 +2,10 @@
  * Commit Approval Extension
  *
  * Intercepts git commit commands (both agent tool calls and user bash) to
- * validate the commit message against Conventional Commits standards and
- * require interactive approval before the commit proceeds. Blocks commits
- * with missing bodies or malformed subjects.
+ * validate the commit message against Conventional Commits standards,
+ * preview staged files, warn when staged files still match gitignore rules,
+ * and require interactive approval before the commit proceeds. Blocks
+ * commits with missing bodies or malformed subjects.
  */
 
 import { basename } from "node:path";
@@ -16,7 +17,7 @@ import type {
   ToolCallEventResult,
   Theme,
 } from "@mariozechner/pi-coding-agent";
-import { isToolCallEventType, keyHint } from "@mariozechner/pi-coding-agent";
+import { isToolCallEventType } from "@mariozechner/pi-coding-agent";
 import type { TUI, KeybindingsManager } from "@mariozechner/pi-tui";
 import { matchesKey } from "@mariozechner/pi-tui";
 
@@ -50,6 +51,11 @@ interface CommitInvocation {
 interface CommitMetadata {
   messages: string[];
   hasNoEdit: boolean;
+}
+
+interface CommitReviewDetails {
+  stagedFiles: string[];
+  ignoredStagedFiles: string[];
 }
 
 function shellSplit(input: string): string[] {
@@ -333,6 +339,86 @@ function getCommitMessagePreview(metadata: CommitMetadata): string {
   return PREVIEW_EDITOR_FALLBACK;
 }
 
+function splitNullSeparated(input: string): string[] {
+  return input.split("\0").filter(Boolean);
+}
+
+async function getGitRoot(pi: ExtensionAPI, cwd: string): Promise<string | null> {
+  const result = await pi.exec("git", ["rev-parse", "--show-toplevel"], { cwd });
+  if (result.code !== 0) {
+    return null;
+  }
+
+  const gitRoot = result.stdout?.trim();
+  return gitRoot ? gitRoot : null;
+}
+
+async function getCommitReviewDetails(
+  pi: ExtensionAPI,
+  cwd: string,
+): Promise<CommitReviewDetails> {
+  const gitRoot = await getGitRoot(pi, cwd);
+  if (!gitRoot) {
+    return { stagedFiles: [], ignoredStagedFiles: [] };
+  }
+
+  const stagedResult = await pi.exec(
+    "git",
+    ["diff", "--cached", "--name-only", "-z"],
+    { cwd: gitRoot },
+  );
+
+  const stagedFiles = stagedResult.code === 0 && stagedResult.stdout
+    ? splitNullSeparated(stagedResult.stdout)
+    : [];
+
+  if (stagedFiles.length === 0) {
+    return { stagedFiles, ignoredStagedFiles: [] };
+  }
+
+  const ignoredResult = await pi.exec(
+    "git",
+    ["ls-files", "-ci", "--exclude-standard", "-z", "--", ...stagedFiles],
+    { cwd: gitRoot },
+  );
+
+  const ignoredStagedFiles = ignoredResult.code === 0 && ignoredResult.stdout
+    ? [...new Set(splitNullSeparated(ignoredResult.stdout))]
+    : [];
+
+  return { stagedFiles, ignoredStagedFiles };
+}
+
+function getCommitReviewIssues(review: CommitReviewDetails): ValidationIssue[] {
+  if (review.ignoredStagedFiles.length === 0) {
+    return [];
+  }
+
+  const noun = review.ignoredStagedFiles.length === 1
+    ? "file still matches"
+    : "files still match";
+
+  return [{
+    level: "warning",
+    message: `${review.ignoredStagedFiles.length} staged ${noun} gitignore rules. Review carefully because ignored files often reach the index through git add -f or git add --force.`,
+  }];
+}
+
+function appendFilePreview(lines: string[], files: string[], maxFiles = 12): void {
+  if (files.length === 0) {
+    lines.push("  (none detected)");
+    return;
+  }
+
+  for (const file of files.slice(0, maxFiles)) {
+    lines.push(`  ${file}`);
+  }
+
+  if (files.length > maxFiles) {
+    lines.push(`  ... ${files.length - maxFiles} more`);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Commit message validation
 // ---------------------------------------------------------------------------
@@ -410,32 +496,10 @@ function formatValidationIssues(issues: ValidationIssue[]): string {
 // Approval prompt
 // ---------------------------------------------------------------------------
 
-function buildApprovalPrompt(
-  metadata: CommitMetadata,
-  issues?: ValidationIssue[],
-): string {
-  const messagePreview = getCommitMessagePreview(metadata);
-
-  const lines = [
-    "Commit message preview:",
-    "",
-    messagePreview,
-  ];
-
-  if (issues && issues.length > 0) {
-    lines.push("");
-    lines.push("Issues:");
-    lines.push(formatValidationIssues(issues));
-  }
-
-  lines.push("");
-  lines.push("Approve this commit?");
-  return lines.join("\n");
-}
-
 async function requestApproval(
   ctx: ExtensionContext,
   metadata: CommitMetadata,
+  review: CommitReviewDetails,
   issues?: ValidationIssue[],
 ): Promise<boolean> {
   const messagePreview = getCommitMessagePreview(metadata);
@@ -457,6 +521,20 @@ async function requestApproval(
         lines.push("");
         for (const line of messagePreview.split("\n")) {
           lines.push("  " + line);
+        }
+
+        lines.push("");
+        lines.push(rule);
+        lines.push(theme.bold(`Staged files (${review.stagedFiles.length}):`));
+        appendFilePreview(lines, review.stagedFiles);
+
+        if (review.ignoredStagedFiles.length > 0) {
+          lines.push("");
+          lines.push(theme.fg(
+            "warning",
+            `Still matched by gitignore rules (${review.ignoredStagedFiles.length}):`,
+          ));
+          appendFilePreview(lines, review.ignoredStagedFiles, 8);
         }
 
         if (issueLines) {
@@ -556,7 +634,10 @@ export default function commitApprovalExtension(pi: ExtensionAPI) {
       };
     }
 
-    const approved = await requestApproval(ctx, metadata, validation.issues);
+    const review = await getCommitReviewDetails(pi, ctx.cwd);
+    const approvalIssues = [...validation.issues, ...getCommitReviewIssues(review)];
+
+    const approved = await requestApproval(ctx, metadata, review, approvalIssues);
     if (!approved) {
       return {
         block: true,
@@ -589,7 +670,10 @@ export default function commitApprovalExtension(pi: ExtensionAPI) {
       return userBashBlocked(REASON_INTERACTIVE_APPROVAL_REQUIRED);
     }
 
-    const approved = await requestApproval(ctx, metadata, validation.issues);
+    const review = await getCommitReviewDetails(pi, ctx.cwd);
+    const approvalIssues = [...validation.issues, ...getCommitReviewIssues(review)];
+
+    const approved = await requestApproval(ctx, metadata, review, approvalIssues);
     if (!approved) {
       return userBashBlocked(REASON_APPROVAL_DENIED);
     }

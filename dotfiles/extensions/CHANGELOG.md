@@ -2,6 +2,23 @@
 
 All notable changes to extensions in `~/.pi/agent/extensions/`.
 
+## 2026-03-31
+
+### commit-approval.ts
+
+- Added staged-file previews to the commit approval dialog so approvals show
+  what is about to be committed, not just the message.
+- Added warnings when staged files still match gitignore rules, which helps
+  surface files that were likely staged with `git add -f` or `git add --force`.
+
+### damage-control
+
+- Blocked `git add -f` and `git add --force` in the shared damage-control
+  rules so ignored files cannot be force-staged accidentally.
+- Blocked `git add` commands that override `core.excludesFile`, such as
+  `git -c core.excludesFile=/dev/null add ...`, to prevent bypassing global
+  gitignore rules without editing ignore files.
+
 ## 2026-03-29
 
 ### qna-interactive.ts
