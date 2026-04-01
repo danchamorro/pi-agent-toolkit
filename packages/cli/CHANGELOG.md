@@ -5,6 +5,13 @@ All notable changes to `pi-agent-toolkit` will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/).
 
+## [0.5.7] - 2026-04-01
+
+### Added
+
+- Bundled `1password-developer` skill for 1Password SSH agent, Environments,
+  and op CLI workflows.
+
 ## [0.5.6] - 2026-03-29
 
 ### Fixed

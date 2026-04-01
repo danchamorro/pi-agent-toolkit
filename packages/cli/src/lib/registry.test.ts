@@ -19,11 +19,11 @@ describe("registry", () => {
     const configs = getByCategory("configs");
 
     assert.equal(extensions.length, 22);
-    assert.equal(bundled.length, 8);
+    assert.equal(bundled.length, 9);
     assert.equal(external.length, 25);
     assert.equal(packages.length, 2);
     assert.equal(configs.length, 8);
-    assert.equal(registry.length, 65);
+    assert.equal(registry.length, 66);
   });
 
   it("has unique names across all components", () => {

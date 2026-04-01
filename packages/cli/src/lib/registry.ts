@@ -240,6 +240,15 @@ const extensions: Component[] = [
 
 const bundledSkills: Component[] = [
   {
+    name: "1password-developer",
+    category: "skills-bundled",
+    description: "1Password SSH agent, Environments, and op CLI workflows",
+    method: "copy",
+    source: "global-skills/1password-developer",
+    target: "global-skills",
+    isDirectory: true,
+  },
+  {
     name: "brainstorm",
     category: "skills-bundled",
     description: "Interview-driven plan stress-testing",

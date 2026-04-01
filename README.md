@@ -8,7 +8,7 @@ This repo serves two purposes: it's my versioned backup so I can restore
 or sync my setup across machines, and it's a reference for anyone looking
 to customize their own Pi environment.
 
-Includes 22 extensions, 31 skills, 2 installable npm packages, MCP server
+Includes 22 extensions, 32 skills, 2 installable npm packages, MCP server
 configurations, and safety guardrails.
 
 ---
@@ -94,10 +94,11 @@ safety patterns.
 
 ### Skills
 
-**My skills** (8, bundled in this repo):
+**My skills** (9, bundled in this repo):
 
 | Skill | Description |
 |-------|-------------|
+| `1password-developer` | 1Password SSH agent, Environments, and op CLI workflows |
 | `brainstorm` | Interview-driven plan stress-testing |
 | `cli-detector` | Scan repos for service integrations and their CLIs |
 | `code-review` | AI-powered code review using CodeRabbit CLI |
