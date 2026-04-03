@@ -5,6 +5,23 @@ All notable changes to `pi-agent-toolkit` will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/).
 
+## [0.6.0] - 2026-04-03
+
+### Added
+
+- Bundled a new `clean-sessions` extension that previews old, low-value
+  session files, moves confirmed matches into session trash, and provides
+  `/empty-session-trash` for permanent cleanup.
+
+### Changed
+
+- Updated the bundled system prompt additions to prefer installed CLI tools
+  such as `rg`, `fd`, `sd`, `jq`, `yq`, and `gh` when available.
+- Added guidance for year-specific web searches so sessions use the current
+  date instead of anchoring recommendations to stale training-era years.
+- Refreshed published package documentation to match the current extension
+  and skill counts shipped by the toolkit.
+
 ## [0.5.8] - 2026-04-01
 
 ### Changed

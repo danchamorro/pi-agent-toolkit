@@ -4,7 +4,7 @@ A CLI to selectively install curated extensions, skills, and configs for
 the [Pi](https://github.com/badlogic/pi-mono) coding agent. Pick and
 choose what you want, or install everything at once.
 
-Includes 22 extensions, 31 skills, 2 installable npm packages, MCP server
+Includes 23 extensions, 34 skills, 2 installable npm packages, MCP server
 configurations, and safety guardrails.
 
 ## Install
@@ -69,7 +69,7 @@ pi-agent-toolkit sync --repo-path /path/to/pi-agent-toolkit
 
 ## What's included
 
-### Extensions (22)
+### Extensions (23)
 
 Safety and workflow guardrails, search tools, UI panels, and session
 management. Highlights:
@@ -79,17 +79,19 @@ management. Highlights:
 | `damage-control` | Blocks destructive commands, enforces path access rules |
 | `commit-approval` | Interactive review before git commits |
 | `exa-search-tool` | Semantic web search via Exa |
+| `clean-sessions` | Cleans up old, low-value session files via trash-first workflow |
 | `tilldone` | Task list management with progress tracking |
 | `review` | Code review for PRs, branch diffs, uncommitted changes |
 | `session-breakdown` | Session cost/usage analytics with calendar heatmap |
 
-See the [full extension list](https://github.com/danchamorro/pi-agent-toolkit#extensions-22-total) in the repo README.
+See the [full extension list](https://github.com/danchamorro/pi-agent-toolkit#extensions-23-total) in the repo README.
 
-### Skills (31)
+### Skills (34)
 
-8 bundled skills (brainstorm, code-review, cli-detector, exa-search,
-gh-issue-creator, google-chat-cards-v2, technical-docs, whats-new) plus
-23 external skills auto-installed from their source repos.
+9 bundled skills (`1password-developer`, `brainstorm`, `code-review`,
+`cli-detector`, `exa-search`, `gh-issue-creator`,
+`google-chat-cards-v2`, `technical-docs`, `whats-new`) plus 25 external
+skills auto-installed from their source repos.
 
 See the [full skill list](https://github.com/danchamorro/pi-agent-toolkit#skills) in the repo README.
 

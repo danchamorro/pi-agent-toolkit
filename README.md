@@ -8,7 +8,7 @@ This repo serves two purposes: it's my versioned backup so I can restore
 or sync my setup across machines, and it's a reference for anyone looking
 to customize their own Pi environment.
 
-Includes 22 extensions, 32 skills, 2 installable npm packages, MCP server
+Includes 23 extensions, 34 skills, 2 installable npm packages, MCP server
 configurations, and safety guardrails.
 
 ---
@@ -29,7 +29,7 @@ pi install npm:@danchamorro/pi-prompt-enhancer
 | [agent-modes](packages/agent-modes) | Switch between code, architect, debug, ask, and review modes with enforced tool restrictions, bash allowlists, and per-mode model assignment | [![npm](https://img.shields.io/npm/v/@danchamorro/pi-agent-modes)](https://www.npmjs.com/package/@danchamorro/pi-agent-modes) |
 | [prompt-enhancer](packages/prompt-enhancer) | Rewrite prompts to be clearer and more actionable before sending | [![npm](https://img.shields.io/npm/v/@danchamorro/pi-prompt-enhancer)](https://www.npmjs.com/package/@danchamorro/pi-prompt-enhancer) |
 
-### Extensions (22 total)
+### Extensions (23 total)
 
 All extensions live in `dotfiles/extensions/` and are copied into
 `~/.pi/agent/extensions/` by the installer. Developers can use
@@ -71,6 +71,7 @@ are reflected immediately.
 | `qna-interactive.ts` | Structured Q&A mode |
 | `question-mode.ts` | Read-only question mode (no file changes) |
 | `require-session-name-on-exit.ts` | Prompts for session name before exit |
+| `clean-sessions.ts` | Prunes old, low-value session files into trash, with a separate command for permanent cleanup |
 | `uv.ts` | Intercepts pip/python calls and redirects to uv |
 
 ### MCP Servers
