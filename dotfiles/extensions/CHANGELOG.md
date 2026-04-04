@@ -2,6 +2,19 @@
 
 All notable changes to extensions in `~/.pi/agent/extensions/`.
 
+## 2026-04-04
+
+### find-session.ts
+
+- Added a new `find-session` extension with `/find-session [query]` to open a
+  dedicated TUI for searching saved Pi sessions across all projects.
+- The search flow scans session metadata plus the first and last user
+  messages, preserves refinement history, and ranks the best candidates with
+  the active model via `completeSimple` before resume.
+- The result view supports iterative refinement, arrow-key navigation,
+  exact-session switching via `ctx.switchSession()`, and `Ctrl+L` to clear
+  the accumulated query history.
+
 ## 2026-04-03
 
 ### clean-sessions.ts

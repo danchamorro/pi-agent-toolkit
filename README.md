@@ -8,7 +8,7 @@ This repo serves two purposes: it's my versioned backup so I can restore
 or sync my setup across machines, and it's a reference for anyone looking
 to customize their own Pi environment.
 
-Includes 23 extensions, 34 skills, 2 installable npm packages, MCP server
+Includes 24 extensions, 34 skills, 2 installable npm packages, MCP server
 configurations, and safety guardrails.
 
 ---
@@ -29,7 +29,7 @@ pi install npm:@danchamorro/pi-prompt-enhancer
 | [agent-modes](packages/agent-modes) | Switch between code, architect, debug, ask, and review modes with enforced tool restrictions, bash allowlists, and per-mode model assignment | [![npm](https://img.shields.io/npm/v/@danchamorro/pi-agent-modes)](https://www.npmjs.com/package/@danchamorro/pi-agent-modes) |
 | [prompt-enhancer](packages/prompt-enhancer) | Rewrite prompts to be clearer and more actionable before sending | [![npm](https://img.shields.io/npm/v/@danchamorro/pi-prompt-enhancer)](https://www.npmjs.com/package/@danchamorro/pi-prompt-enhancer) |
 
-### Extensions (23 total)
+### Extensions (24 total)
 
 All extensions live in `dotfiles/extensions/` and are copied into
 `~/.pi/agent/extensions/` by the installer. Developers can use
@@ -66,6 +66,7 @@ are reflected immediately.
 | `files.ts` | File picker with quick actions (reveal, open, edit, diff) |
 | `review.ts` | Code review: PR review, branch diffs, uncommitted changes |
 | `session-breakdown.ts` | Session cost/usage analytics with calendar heatmap |
+| `find-session.ts` | Search past Pi sessions with LLM ranking, refinement, and one-step resume |
 | `todos.ts` | File-based todo management |
 | `term-notify.ts` | Desktop notifications on agent completion (cmux + OSC 777) |
 | `qna-interactive.ts` | Structured Q&A mode |

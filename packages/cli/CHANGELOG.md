@@ -5,6 +5,22 @@ All notable changes to `pi-agent-toolkit` will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/).
 
+## [0.7.0] - 2026-04-04
+
+### Added
+
+- Bundled a new `find-session` extension that opens a dedicated TUI for
+  searching past Pi sessions, surfaces strong matches with positive-only
+  explanations, and resumes directly into the selected session.
+
+### Changed
+
+- Improved session search quality before release by filtering noisy
+  session metadata, showing deeper user-message snippets, and hiding weak
+  near-miss matches from the result list.
+- Updated CLI package documentation and registry metadata so
+  `pi-agent-toolkit install` exposes the new extension consistently.
+
 ## [0.6.1] - 2026-04-03
 
 ### Fixed

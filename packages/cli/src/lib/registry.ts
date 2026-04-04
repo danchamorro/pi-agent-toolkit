@@ -213,6 +213,14 @@ const extensions: Component[] = [
     method: "copy",
     source: "extensions/clean-sessions.ts",
   },
+  {
+    name: "find-session",
+    category: "extensions",
+    group: "workflow",
+    description: "Searches past Pi sessions with LLM ranking and resume",
+    method: "copy",
+    source: "extensions/find-session.ts",
+  },
 
   // Tools
   {

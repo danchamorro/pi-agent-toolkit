@@ -4,7 +4,7 @@ A CLI to selectively install curated extensions, skills, and configs for
 the [Pi](https://github.com/badlogic/pi-mono) coding agent. Pick and
 choose what you want, or install everything at once.
 
-Includes 23 extensions, 34 skills, 2 installable npm packages, MCP server
+Includes 24 extensions, 34 skills, 2 installable npm packages, MCP server
 configurations, and safety guardrails.
 
 ## Install
@@ -69,7 +69,7 @@ pi-agent-toolkit sync --repo-path /path/to/pi-agent-toolkit
 
 ## What's included
 
-### Extensions (23)
+### Extensions (24)
 
 Safety and workflow guardrails, search tools, UI panels, and session
 management. Highlights:
@@ -80,11 +80,12 @@ management. Highlights:
 | `commit-approval` | Interactive review before git commits |
 | `exa-search-tool` | Semantic web search via Exa |
 | `clean-sessions` | Cleans up old, low-value session files via trash-first workflow |
+| `find-session` | Searches past Pi sessions with LLM ranking and one-step resume |
 | `tilldone` | Task list management with progress tracking |
 | `review` | Code review for PRs, branch diffs, uncommitted changes |
 | `session-breakdown` | Session cost/usage analytics with calendar heatmap |
 
-See the [full extension list](https://github.com/danchamorro/pi-agent-toolkit#extensions-23-total) in the repo README.
+See the [full extension list](https://github.com/danchamorro/pi-agent-toolkit#extensions-24-total) in the repo README.
 
 ### Skills (34)
 
