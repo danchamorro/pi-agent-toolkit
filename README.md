@@ -172,7 +172,7 @@ Not committed to this repo. Maintained by their original authors.
 |------|---------|
 | `AGENTS.md` | Global agent rules: git safety, commit style, code style, path discipline |
 | `APPEND_SYSTEM.md` | System prompt: reasoning quality, jCodeMunch policy, documentation lookup, writing style |
-| `settings.json` | Pi settings: default provider/model, enabled models, compaction |
+| `settings.json` | Pi settings: default provider/model, enabled models, compaction. Mutated by Pi at runtime; gitignored. |
 | `models.json` | Custom provider definitions (e.g., local models via Ollama) |
 | `agent-modes.json` | Per-mode model/thinking overrides for debug, review, etc. |
 | `damage-control-rules.yaml` | Safety rules: bash patterns, path access, delete protection |

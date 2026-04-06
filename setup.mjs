@@ -84,7 +84,6 @@ const LINKABLE_CONFIGS = [
   "damage-control-rules.yaml",
   "models.json",
   "agent-modes.json",
-  "settings.json",
 ];
 
 // Template configs: always copied, never symlinked, only if target missing.

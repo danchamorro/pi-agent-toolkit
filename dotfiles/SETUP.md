@@ -46,12 +46,6 @@ includes skeletons for jCodeMunch, Postgres MCP, and chrome-devtools.
 `mcp.json` is always local-only: it is created from the template on first
 run and is never symlinked or committed.
 
-### Tracked settings (`settings.json`)
-
-`settings.json` is now the canonical tracked config in this repo. Unlike
-`auth.json` and `mcp.json`, it is installed directly by `setup.mjs`
-(copy mode) or symlinked in development (`--link` mode).
-
 ### Exa API key
 
 If you use the `exa-search` skill, set your API key:

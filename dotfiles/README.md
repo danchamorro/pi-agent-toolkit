@@ -13,7 +13,7 @@ dotfiles/
   agent-skills/ ........... Pi-scoped skills     (-> ~/.pi/agent/skills/)
   global-skills/ .......... Cross-agent skills   (-> ~/.agents/skills/)
   intercepted-commands/ ... Python/pip shims (uv.ts dependency)
-  Config files ............ AGENTS.md, APPEND_SYSTEM.md, settings.json, etc.
+  Config files ............ AGENTS.md, APPEND_SYSTEM.md, models.json, etc.
 ```
 
 `setup.mjs` also supports `dotfiles/prompts/`, `dotfiles/agents/`, and
@@ -30,7 +30,7 @@ Pi.
 |------|---------|
 | `AGENTS.md` | Global agent rules: git safety, commit style, PR style, code style, path discipline, cmux integration |
 | `APPEND_SYSTEM.md` | System prompt additions: reasoning quality, jCodeMunch policy, documentation lookup, writing style |
-| `settings.json` | Canonical tracked Pi settings: default provider/model, enabled models, compaction, installed packages |
+| `settings.json` | Pi settings: default provider/model, enabled models, compaction, installed packages. Mutated by Pi at runtime, so it is gitignored and not installed by `setup.mjs`. |
 | `models.json` | Custom model/provider definitions (e.g., local models via Ollama) |
 | `agent-modes.json` | Per-mode overrides: which provider/model/thinking level to use in debug, review, etc. |
 | `damage-control-rules.yaml` | Safety guardrails (see section below) |
