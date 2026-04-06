@@ -1,21 +1,29 @@
 {
   "providers": {
-    "mlx-local": {
-      "baseUrl": "http://127.0.0.1:8880/v1",
+    "ollama": {
+      "baseUrl": "http://localhost:11434/v1",
       "api": "openai-completions",
-      "apiKey": "mlx-local",
+      "apiKey": "ollama",
       "compat": {
         "supportsDeveloperRole": false,
         "supportsReasoningEffort": false,
         "supportsUsageInStreaming": false,
-        "maxTokensField": "max_tokens",
-        "thinkingFormat": "qwen-chat-template"
+        "maxTokensField": "max_tokens"
       },
       "models": [
         {
-          "id": "mlx-community/qwen3-coder-next-4bit",
-          "name": "Qwen3 Coder Next (MLX Local)",
+          "id": "gemma4:26b",
+          "name": "Gemma 4 26B (Ollama Local)",
           "reasoning": true,
+          "input": ["text", "image"],
+          "contextWindow": 262144,
+          "maxTokens": 32768,
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
+        },
+        {
+          "id": "qwen3-coder-next:latest",
+          "name": "Qwen3 Coder Next 80B (Ollama Local)",
+          "reasoning": false,
           "input": ["text"],
           "contextWindow": 262144,
           "maxTokens": 32768,
