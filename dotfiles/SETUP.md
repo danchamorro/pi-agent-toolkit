@@ -1,7 +1,8 @@
 # Setup Guide
 
-Post-install configuration and troubleshooting. For installation
-instructions, see the [root README](../README.md).
+Post-install configuration and troubleshooting for the `setup.mjs`
+workflow. For installation instructions, see the [root README](../README.md).
+Run all `node setup.mjs ...` commands from the repo root.
 
 ## Prerequisites
 
@@ -42,6 +43,14 @@ Edit `~/.pi/agent/auth.json` with your provider API keys:
 
 Edit `~/.pi/agent/mcp.json` to configure your MCP servers. The template
 includes skeletons for jCodeMunch, Postgres MCP, and chrome-devtools.
+`mcp.json` is always local-only: it is created from the template on first
+run and is never symlinked or committed.
+
+### Tracked settings (`settings.json`)
+
+`settings.json` is now the canonical tracked config in this repo. Unlike
+`auth.json` and `mcp.json`, it is installed directly by `setup.mjs`
+(copy mode) or symlinked in development (`--link` mode).
 
 ### Exa API key
 
@@ -76,22 +85,24 @@ runs fast.
 [crystaldba/postgres-mcp](https://github.com/crystaldba/postgres-mcp)
 runs in Docker with `--access-mode=restricted` for read-only safety.
 
-Add your database connection string to `mcp.json`:
+Add your database connection string under `mcpServers` in `mcp.json`:
 
 ```json
 {
-  "pg-your-db": {
-    "command": "docker",
-    "args": [
-      "run", "-i", "--rm",
-      "-e", "DATABASE_URI",
-      "crystaldba/postgres-mcp",
-      "--access-mode=restricted"
-    ],
-    "env": {
-      "DATABASE_URI": "postgresql://USER:PASSWORD@HOST:PORT/DATABASE"
-    },
-    "lifecycle": "lazy"
+  "mcpServers": {
+    "pg-your-db": {
+      "command": "docker",
+      "args": [
+        "run", "-i", "--rm",
+        "-e", "DATABASE_URI",
+        "crystaldba/postgres-mcp",
+        "--access-mode=restricted"
+      ],
+      "env": {
+        "DATABASE_URI": "postgresql://USER:PASSWORD@HOST:PORT/DATABASE"
+      },
+      "lifecycle": "lazy"
+    }
   }
 }
 ```
@@ -122,8 +133,9 @@ with `npx`.
    find ~/.pi/agent/extensions -maxdepth 1 -type l ! -exec test -e {} \; -print
    ```
 
-3. Re-run `node setup.mjs --link` to recreate symlinks and clean up
-   dangling ones.
+3. If you use development symlinks, re-run `node setup.mjs --link` to
+   recreate symlinks and clean up dangling ones.
+4. If you use copy mode, re-run `node setup.mjs` from the repo root.
 
 ### damage-control blocking a command
 
@@ -142,12 +154,16 @@ If a legitimate command is blocked:
    ls -la ~/.agents/skills/
    ```
 
-2. Each skill directory must contain a `SKILL.md` file.
-3. Restart Pi after adding new skills.
+2. External skills are not copied from `dotfiles/`. They are installed
+   from `manifest.json` unless you used `--skip-external`.
+3. Each skill directory must contain a `SKILL.md` file.
+4. Restart Pi after adding new skills.
 
 ### npm install fails in damage-control
 
-The `damage-control/` extension has its own `package.json`. If deps fail:
+The `damage-control/` extension has its own `package.json`. `setup.mjs`
+runs `npm install` for extension subdirectories that declare deps. If
+that fails:
 
 ```bash
 cd dotfiles/extensions/damage-control && npm install

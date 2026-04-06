@@ -1,22 +1,28 @@
 # pi-agent-toolkit dotfiles
 
-Pi coding agent configuration: extensions, skills, config files, and
-safety guardrails. Everything in this directory is managed by `setup.mjs`
-at the repo root.
+Installable Pi configuration: extensions, bundled skills, config files,
+and safety guardrails. `setup.mjs` installs the content in this directory
+into the appropriate Pi paths. External skills are tracked separately in
+`manifest.json` and installed via `npx skills add`.
 
 ## Directory layout
 
 ```
 dotfiles/
   extensions/ ............. 24 extensions (.ts files and subdirectories)
-  agent-skills/ ........... Pi-scoped skills    (-> ~/.pi/agent/skills/)
+  agent-skills/ ........... Pi-scoped skills     (-> ~/.pi/agent/skills/)
   global-skills/ .......... Cross-agent skills   (-> ~/.agents/skills/)
   intercepted-commands/ ... Python/pip shims (uv.ts dependency)
-  prompts/ ................ Prompt templates     (-> ~/.pi/agent/prompts/)
-  agents/ ................. Agent configs        (-> ~/.pi/agent/agents/)
-  themes/ ................. TUI themes           (-> ~/.pi/agent/themes/)
   Config files ............ AGENTS.md, APPEND_SYSTEM.md, settings.json, etc.
 ```
+
+`setup.mjs` also supports `dotfiles/prompts/`, `dotfiles/agents/`, and
+`dotfiles/themes/` if those directories are added later, but they are not
+currently present in this repo.
+
+Repo-only files such as `README.md`, `SETUP.md`, and `tsconfig.json` live
+in `dotfiles/` for documentation and tooling, but are not installed into
+Pi.
 
 ## Config files
 
@@ -24,7 +30,7 @@ dotfiles/
 |------|---------|
 | `AGENTS.md` | Global agent rules: git safety, commit style, PR style, code style, path discipline, cmux integration |
 | `APPEND_SYSTEM.md` | System prompt additions: reasoning quality, jCodeMunch policy, documentation lookup, writing style |
-| `settings.json` | Pi settings: default provider/model, enabled models, compaction, installed packages |
+| `settings.json` | Canonical tracked Pi settings: default provider/model, enabled models, compaction, installed packages |
 | `models.json` | Custom model/provider definitions (e.g., local models via Ollama) |
 | `agent-modes.json` | Per-mode overrides: which provider/model/thinking level to use in debug, review, etc. |
 | `damage-control-rules.yaml` | Safety guardrails (see section below) |
@@ -93,7 +99,9 @@ safety system that protects against destructive operations:
 
 ## MCP servers
 
-Configured in `mcp.json` (created from `mcp.json.template` on first run):
+Configured in `mcp.json` (created from `mcp.json.template` on first run).
+The template lives in `dotfiles/`, but the real `mcp.json` stays local and
+is never committed:
 
 | Server | Purpose | How it runs |
 |--------|---------|-------------|
