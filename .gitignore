@@ -15,9 +15,6 @@ dist/
 dotfiles/auth.json
 dotfiles/mcp.json
 
-# Dotfiles runtime settings (use settings.json.template for defaults)
-dotfiles/settings.json
-
 # Dotfiles runtime caches
 dotfiles/mcp-cache.json
 dotfiles/mcp-npx-cache.json
