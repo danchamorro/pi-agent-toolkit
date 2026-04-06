@@ -1,15 +1,73 @@
 # pi-agent-toolkit
 
-A CLI to selectively install curated extensions, skills, and configs for
-the [Pi](https://github.com/badlogic/pi-mono) coding agent. Pick and
-choose what you want, or install everything at once.
-
-This repo serves two purposes: it's my versioned backup so I can restore
-or sync my setup across machines, and it's a reference for anyone looking
-to customize their own Pi environment.
+Extensions, skills, and configs for the
+[Pi](https://github.com/badlogic/pi-mono) coding agent. My versioned
+backup so I can restore or sync my setup across machines, and a reference
+for anyone looking to customize their own Pi environment.
 
 Includes 24 extensions, 34 skills, 2 installable npm packages, MCP server
 configurations, and safety guardrails.
+
+---
+
+## Quick start
+
+### For users (copy mode)
+
+Clone and run:
+
+```bash
+git clone https://github.com/danchamorro/pi-agent-toolkit.git
+cd pi-agent-toolkit
+node setup.mjs
+```
+
+This copies everything into the right Pi directories. Template configs
+(`auth.json`, `mcp.json`) are created only if they don't already exist.
+
+Skip external skills or packages if you don't want them:
+
+```bash
+node setup.mjs --skip-external --skip-packages
+```
+
+### For development (link mode)
+
+Symlink files so edits in the repo are immediately visible to Pi:
+
+```bash
+node setup.mjs --link
+```
+
+Re-run any time to pick up new files or clean dangling symlinks. Template
+configs with secrets are never symlinked.
+
+### Syncing local changes back
+
+Built an extension or skill directly in `~/.pi/agent/`? Pull it into the
+repo:
+
+```bash
+node setup.mjs sync
+```
+
+This finds unmanaged files (not symlinks, not external skills), offers to
+move them into `dotfiles/`, and replaces the original with a symlink.
+Use `--all` to skip the interactive prompts.
+
+### Full usage
+
+```
+node setup.mjs                    Copy mode (for users / new machines)
+node setup.mjs --link             Symlink mode (for development)
+node setup.mjs sync               Absorb local Pi files into the repo
+node setup.mjs sync --all         Absorb all without prompting
+node setup.mjs --help             Show help
+
+Flags (copy and link modes):
+  --skip-external                 Skip installing external skills
+  --skip-packages                 Skip installing Pi packages
+```
 
 ---
 
@@ -29,12 +87,11 @@ pi install npm:@danchamorro/pi-prompt-enhancer
 | [agent-modes](packages/agent-modes) | Switch between code, architect, debug, ask, and review modes with enforced tool restrictions, bash allowlists, and per-mode model assignment | [![npm](https://img.shields.io/npm/v/@danchamorro/pi-agent-modes)](https://www.npmjs.com/package/@danchamorro/pi-agent-modes) |
 | [prompt-enhancer](packages/prompt-enhancer) | Rewrite prompts to be clearer and more actionable before sending | [![npm](https://img.shields.io/npm/v/@danchamorro/pi-prompt-enhancer)](https://www.npmjs.com/package/@danchamorro/pi-prompt-enhancer) |
 
-### Extensions (24 total)
+### Extensions (24)
 
-All extensions live in `dotfiles/extensions/` and are copied into
-`~/.pi/agent/extensions/` by the installer. Developers can use
-`--link --repo-path` to symlink them instead, so edits to the repo
-are reflected immediately.
+All extensions live in `dotfiles/extensions/`. See
+[dotfiles/extensions/README.md](dotfiles/extensions/README.md) for the
+full list with descriptions.
 
 **Safety and workflow:**
 
@@ -62,41 +119,22 @@ are reflected immediately.
 | `control.ts` | Session control and summarization |
 | `loop.ts` | Loop execution with breakout conditions |
 | `context.ts` | TUI showing loaded extensions, skills, token usage |
-| `coach.ts` | Recommends underused PI workflows like /resume, /tree, /fork, and /compact based on recent session habits |
+| `coach.ts` | Recommends underused Pi workflows based on session habits |
 | `files.ts` | File picker with quick actions (reveal, open, edit, diff) |
 | `review.ts` | Code review: PR review, branch diffs, uncommitted changes |
 | `session-breakdown.ts` | Session cost/usage analytics with calendar heatmap |
-| `find-session.ts` | Search past Pi sessions with LLM ranking, refinement, and one-step resume |
+| `find-session.ts` | Search past Pi sessions with LLM ranking and one-step resume |
 | `todos.ts` | File-based todo management |
 | `term-notify.ts` | Desktop notifications on agent completion (cmux + OSC 777) |
 | `qna-interactive.ts` | Structured Q&A mode |
 | `question-mode.ts` | Read-only question mode (no file changes) |
 | `require-session-name-on-exit.ts` | Prompts for session name before exit |
-| `clean-sessions.ts` | Prunes old, low-value session files into trash, with a separate command for permanent cleanup |
+| `clean-sessions.ts` | Prunes old, low-value session files |
 | `uv.ts` | Intercepts pip/python calls and redirects to uv |
-
-### MCP Servers
-
-Configured in `mcp.json` (created from template during install). These
-are the MCP servers this setup uses:
-
-| Server | Purpose | Source |
-|--------|---------|--------|
-| [jCodeMunch](https://github.com/jcodemunch/jcodemunch-mcp) | Code indexing, symbol search, context-aware exploration. Auto-indexes repos on session start. | `uvx jcodemunch-mcp@latest` |
-| [Postgres MCP](https://github.com/crystaldba/postgres-mcp) | Read-only database access via Docker. Runs with `--access-mode=restricted` and `lazy` lifecycle. | `crystaldba/postgres-mcp` |
-| [chrome-devtools](https://github.com/nicobailon/chrome-devtools-mcp) | Browser automation via Chrome DevTools Protocol. | `npx chrome-devtools-mcp@latest` |
-
-[pi-mcp-adapter](https://github.com/nicobailon/pi-mcp-adapter) is not an
-MCP server. It is a Pi package that improves how MCP tool responses are
-displayed (collapsible output for large results). Install with
-`pi install npm:pi-mcp-adapter`.
-
-See [dotfiles/SETUP.md](dotfiles/SETUP.md) for configuration details and
-safety patterns.
 
 ### Skills
 
-**My skills** (9, bundled in this repo):
+**Bundled skills** (9, committed to this repo):
 
 | Skill | Description |
 |-------|-------------|
@@ -110,11 +148,10 @@ safety patterns.
 | `technical-docs` | Technical documentation standards |
 | `whats-new` | Git changelog generation between branches |
 
-**External skills** (25, installed from source repos via
-[skills CLI](https://github.com/vercel-labs/skills)):
+**External skills** (25, installed from source repos):
 
-Maintained by their original authors. Installed automatically by
-`pi-agent-toolkit install`, not committed to this repo.
+Listed in `manifest.json` and installed automatically by `setup.mjs`.
+Not committed to this repo. Maintained by their original authors.
 
 | Skill | Source |
 |-------|--------|
@@ -129,96 +166,53 @@ Maintained by their original authors. Installed automatically by
 | `firecrawl` | [firecrawl/cli](https://github.com/firecrawl/cli) |
 | `excalidraw-diagram` | [coleam00/excalidraw-diagram-skill](https://github.com/coleam00/excalidraw-diagram-skill) |
 
-### Config Files
+### Config files
 
 | File | Purpose |
 |------|---------|
 | `AGENTS.md` | Global agent rules: git safety, commit style, code style, path discipline |
 | `APPEND_SYSTEM.md` | System prompt: reasoning quality, jCodeMunch policy, documentation lookup, writing style |
 | `settings.json` | Pi settings: default provider/model, enabled models, compaction |
-| `models.json` | Custom provider definitions (e.g., local MLX models) |
+| `models.json` | Custom provider definitions (e.g., local models via Ollama) |
 | `agent-modes.json` | Per-mode model/thinking overrides for debug, review, etc. |
 | `damage-control-rules.yaml` | Safety rules: bash patterns, path access, delete protection |
-| `auth.json` | Provider API keys, created from template during install |
-| `mcp.json` | MCP server configuration, created from template during install |
+| `auth.json` | Provider API keys (created from template, never committed) |
+| `mcp.json` | MCP server configuration (created from template, never committed) |
+
+### MCP servers
+
+Configured in `mcp.json` (created from template during setup):
+
+| Server | Purpose | Source |
+|--------|---------|--------|
+| [jCodeMunch](https://github.com/jcodemunch/jcodemunch-mcp) | Code indexing, symbol search, context-aware exploration | `uvx jcodemunch-mcp@latest` |
+| [Postgres MCP](https://github.com/crystaldba/postgres-mcp) | Read-only database access via Docker | `crystaldba/postgres-mcp` |
+| [chrome-devtools](https://github.com/nicobailon/chrome-devtools-mcp) | Browser automation via Chrome DevTools Protocol | `npx chrome-devtools-mcp@latest` |
 
 ---
 
-## Quick start
+## How to add new components
 
-Run once with `npx`, or install the CLI globally:
+### Extensions and skills
 
-```bash
-npx pi-agent-toolkit install
-npm install -g pi-agent-toolkit
-```
+1. Create the file in `dotfiles/extensions/`, `dotfiles/agent-skills/`, or
+   `dotfiles/global-skills/`.
+2. If using `--link` mode, it's already live. Otherwise re-run `setup.mjs`.
+3. Commit and push.
 
-Interactive picker (choose what you want):
+Or build locally in Pi, then absorb with `node setup.mjs sync`.
 
-```bash
-pi-agent-toolkit install
-```
+### External skills
 
-Install everything:
-
-```bash
-pi-agent-toolkit install --all
-```
-
-Install specific components:
-
-```bash
-pi-agent-toolkit install --extensions "damage-control commit-approval exa-search-tool"
-pi-agent-toolkit install --skills "brainstorm systematic-debugging"
-pi-agent-toolkit install --packages "agent-modes prompt-enhancer"
-```
-
-Browse the full catalog:
-
-```bash
-pi-agent-toolkit list
-```
-
-Check what's installed:
-
-```bash
-pi-agent-toolkit status
-```
-
-Update the CLI to the latest version:
-
-```bash
-pi-agent-toolkit update
-```
-
-### For contributors / personal setup
-
-Clone the repo and symlink so edits flow back:
-
-```bash
-git clone https://github.com/danchamorro/pi-agent-toolkit.git
-cd pi-agent-toolkit
-pi-agent-toolkit install --all --override-configs --link --repo-path .
-```
-
-Template configs such as `auth.json` and `mcp.json` are still copied, not
-symlinked, so machine-specific secrets stay local.
-
-To absorb unmanaged extensions, skills, prompts, agents, or themes back
-into the repo:
-
-```bash
-pi-agent-toolkit sync --repo-path .
-```
-
-See [dotfiles/SETUP.md](dotfiles/SETUP.md) for detailed configuration.
+1. Install: `npx skills add someone/repo -s skill-name -g -y`
+2. Add an entry to `manifest.json`.
 
 ---
 
 ## Attribution
 
 Some of these tools and extensions were adopted from other creators and
-modified to suit my needs. Below is an attribution list:
+modified to suit my needs:
 
 - [Anthropic](https://www.anthropic.com)
 - [Vercel](https://vercel.com)
