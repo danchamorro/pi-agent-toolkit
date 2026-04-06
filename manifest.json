@@ -1,0 +1,18 @@
+{
+  "externalSkills": [
+    { "source": "anthropics/skills", "skills": ["docx", "pdf", "pptx", "xlsx", "frontend-design", "skill-creator", "agent-browser"] },
+    { "source": "vercel-labs/skills", "skills": ["find-skills", "vercel-react-best-practices", "web-design-guidelines"] },
+    { "source": "HazAT/pi-config", "skills": ["learn-codebase", "self-improve"] },
+    { "source": "manaflow-ai/cmux", "skills": ["cmux", "cmux-and-worktrees", "cmux-browser", "cmux-debug-windows", "cmux-markdown"] },
+    { "source": "hyf0/vue-skills", "skills": ["vue-best-practices"] },
+    { "source": "obra/superpowers", "skills": ["systematic-debugging", "writing-skills"] },
+    { "source": "getsentry/skills", "skills": ["code-simplifier", "iterate-pr"] },
+    { "source": "microsoft/playwright-cli", "skills": [] },
+    { "source": "firecrawl/cli", "skills": ["firecrawl"] },
+    { "source": "coleam00/excalidraw-diagram-skill", "skills": [] }
+  ],
+  "packages": [
+    "npm:@danchamorro/pi-agent-modes",
+    "npm:@danchamorro/pi-prompt-enhancer"
+  ]
+}

@@ -16,20 +16,20 @@ pass() { echo -e "${GREEN}[pre-commit]${RESET} $*"; }
 fail() { echo -e "${RED}[pre-commit]${RESET} $*"; exit 1; }
 
 step "Running lint..."
-npx eslint packages/cli/ || fail "Lint failed. Run 'npm run lint:fix' to fix."
+npm run lint || fail "Lint failed. Run 'npm run lint:fix' to fix."
 pass "Lint passed."
 
 step "Checking formatting..."
-npx prettier --check packages/cli/ || fail "Format check failed. Run 'npm run format' to fix."
+npm run format:check || fail "Format check failed. Run 'npm run format' to fix."
 pass "Formatting OK."
 
 step "Running typecheck..."
-npm run typecheck --workspace=packages/cli || fail "Typecheck failed (packages/cli)."
+npm run typecheck || fail "Typecheck failed."
 npm run typecheck:dotfiles || fail "Typecheck failed (dotfiles)."
 pass "Typecheck passed."
 
 step "Running tests..."
-npm run test --workspace=packages/cli || fail "Tests failed."
+npm run test || fail "Tests failed."
 pass "Tests passed."
 
 pass "All checks passed."
