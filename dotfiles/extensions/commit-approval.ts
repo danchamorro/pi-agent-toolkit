@@ -5,7 +5,7 @@
  * validate the commit message against Conventional Commits standards,
  * preview staged files, warn when staged files still match gitignore rules,
  * and require interactive approval before the commit proceeds. Blocks
- * commits with missing bodies or malformed subjects.
+ * commits with missing, vague, or overly thin bodies and malformed subjects.
  */
 
 import { basename } from "node:path";
@@ -327,7 +327,7 @@ function parseCommitMetadataFromCommand(
   return parseCommitMetadata(invocation.args);
 }
 
-function formatMessageForPreview(message: string): string {
+function normalizeCommitMessageText(message: string): string {
   return message
     .replace(/\\r\\n/g, "\n")
     .replace(/\\n/g, "\n")
@@ -335,9 +335,13 @@ function formatMessageForPreview(message: string): string {
     .replace(/\\t/g, "\t");
 }
 
+function getNormalizedMessages(metadata: CommitMetadata): string[] {
+  return metadata.messages.map(normalizeCommitMessageText);
+}
+
 function getCommitMessagePreview(metadata: CommitMetadata): string {
   if (metadata.messages.length > 0) {
-    return metadata.messages.map(formatMessageForPreview).join("\n\n");
+    return getNormalizedMessages(metadata).join("\n\n");
   }
 
   if (metadata.hasNoEdit) {
@@ -464,16 +468,54 @@ interface ValidationResult {
 
 const CONVENTIONAL_COMMIT_RE =
   /^(feat|fix|refactor|docs|test|chore|style|perf|ci|build)(\(.+?\))?: .+/;
+const COMMIT_BODY_MIN_CHARS = 32;
+const COMMIT_BODY_MIN_WORDS = 6;
+const COMMIT_BODY_QUALITY_HINT =
+  "Explain why the change was needed, what constraint or problem it addresses, and any important behavior or impact.";
+const COMMIT_BODY_MOTIVATION_RE =
+  /\b(because|so that|to avoid|to prevent|to support|to keep|to reduce|to improve|to make|while keeping|without changing)\b/i;
+const VAGUE_COMMIT_BODY_PATTERNS = [
+  /^(update|change|fix|adjust|cleanup|clean up|refactor|tweak)(?: [a-z]+){0,2}[.!]?$/i,
+  /^(minor|small|misc(?:ellaneous)?) (?:change|changes|cleanup|fix|fixes|update|updates)[.!]?$/i,
+  /^address review comments[.!]?$/i,
+  /^no further details[.!]?$/i,
+];
 
-function messageHasBody(metadata: CommitMetadata): boolean {
-  if (metadata.messages.length >= 2) {
-    return metadata.messages.slice(1).some((m) => m.trim().length > 0);
+function getCommitSubject(metadata: CommitMetadata): string {
+  const firstMessage = getNormalizedMessages(metadata)[0] ?? "";
+  return (firstMessage.split("\n")[0] ?? "").trimEnd();
+}
+
+function getCommitBody(metadata: CommitMetadata): string {
+  const normalizedMessages = getNormalizedMessages(metadata);
+
+  if (normalizedMessages.length >= 2) {
+    return normalizedMessages.slice(1).join("\n\n").trim();
   }
-  if (metadata.messages.length === 1) {
-    const parts = (metadata.messages[0] ?? "").split(/\n\n/);
-    return parts.length > 1 && parts.slice(1).some((p) => p.trim().length > 0);
+
+  if (normalizedMessages.length === 1) {
+    const firstMessage = normalizedMessages[0] ?? "";
+    const firstNewlineIndex = firstMessage.indexOf("\n");
+    if (firstNewlineIndex === -1) {
+      return "";
+    }
+
+    return firstMessage.slice(firstNewlineIndex + 1).trim();
   }
-  return false;
+
+  return "";
+}
+
+function getCompactCommitBody(body: string): string {
+  return body.replace(/\s+/g, " ").trim();
+}
+
+function countCommitBodySentences(body: string): number {
+  return body
+    .split(/[.!?](?:\s|$)/)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .length;
 }
 
 function validateCommitMessage(metadata: CommitMetadata): ValidationResult {
@@ -483,8 +525,7 @@ function validateCommitMessage(metadata: CommitMetadata): ValidationResult {
     return { issues, hasErrors: false };
   }
 
-  const firstMessage = metadata.messages[0] ?? "";
-  const subject = firstMessage.split("\n")[0] ?? "";
+  const subject = getCommitSubject(metadata);
 
   if (!CONVENTIONAL_COMMIT_RE.test(subject)) {
     issues.push({
@@ -501,12 +542,45 @@ function validateCommitMessage(metadata: CommitMetadata): ValidationResult {
     });
   }
 
-  if (!messageHasBody(metadata)) {
+  const body = getCommitBody(metadata);
+  const compactBody = getCompactCommitBody(body);
+
+  if (compactBody.length === 0) {
     issues.push({
       level: "error",
       message:
         "Missing commit body. Add a second -m explaining why this change was made.",
     });
+  } else {
+    const bodyWordCount = compactBody.split(/\s+/).filter(Boolean).length;
+    const bodySentenceCount = countCommitBodySentences(compactBody);
+
+    if (
+      compactBody.length < COMMIT_BODY_MIN_CHARS ||
+      bodyWordCount < COMMIT_BODY_MIN_WORDS
+    ) {
+      issues.push({
+        level: "error",
+        message:
+          `Commit body is too thin (${bodyWordCount} words, ${compactBody.length} chars). Add 2 to 4 sentences explaining why this change was needed.`,
+      });
+    } else if (VAGUE_COMMIT_BODY_PATTERNS.some((pattern) => pattern.test(compactBody))) {
+      issues.push({
+        level: "error",
+        message: `Commit body is too vague. ${COMMIT_BODY_QUALITY_HINT}`,
+      });
+    }
+
+    if (
+      bodySentenceCount < 2 &&
+      !COMMIT_BODY_MOTIVATION_RE.test(compactBody)
+    ) {
+      issues.push({
+        level: "warning",
+        message:
+          `Commit body does not clearly explain motivation or impact. ${COMMIT_BODY_QUALITY_HINT}`,
+      });
+    }
   }
 
   return {

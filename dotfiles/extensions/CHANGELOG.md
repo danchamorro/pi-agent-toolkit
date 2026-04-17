@@ -12,6 +12,11 @@ All notable changes to extensions in `~/.pi/agent/extensions/`.
 - Hardened the commit approval TUI against over-wide render output by wrapping
   commit previews, file lists, validation issues, and footer help text with
   Pi TUI width-safe helpers.
+- Tightened commit validation so thin or vague bodies are blocked, while
+  concise warnings now nudge authors to explain motivation and impact more
+  clearly.
+- Normalized escaped newlines before validation too, so single `-m` commit
+  messages containing `\n\n` are judged on their real subject/body structure.
 
 ### context.ts
 

@@ -74,6 +74,14 @@ When instructions in this file conflict with project-level AGENTS.md rules, this
 - Never use em dashes (--) in responses, written content, or any text the user may copy and paste.
 - Use alternatives instead: commas, parentheses, colons, semicolons, or separate sentences.
 
+## Git commit writing
+
+- When the user explicitly asks to commit, write commit messages with a useful body, not just a valid one.
+- The body must explain why the change was needed, what constraint or problem it addresses, and any important behavior or impact.
+- Avoid vague bodies like "update config", "fix issue", "minor cleanup", or text that merely repeats the subject.
+- Prefer 2 to 4 sentences in wrapped paragraphs, with enough detail that a reviewer can understand the motivation without opening the diff.
+- If the proposed commit body feels thin, revise it before presenting commit approval.
+
 ## Web search date bias
 
 - When searching for year-specific recommendations (e.g., "best CLI tools of YYYY", "top libraries in YYYY"), always derive the year from the `Current date` field in the session context. Do not default to the last year of training data. LLMs tend to anchor on their training cutoff year; override that instinct and use the actual current year.
