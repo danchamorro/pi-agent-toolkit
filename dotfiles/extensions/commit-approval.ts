@@ -19,7 +19,7 @@ import type {
 } from "@mariozechner/pi-coding-agent";
 import { isToolCallEventType } from "@mariozechner/pi-coding-agent";
 import type { TUI, KeybindingsManager } from "@mariozechner/pi-tui";
-import { matchesKey } from "@mariozechner/pi-tui";
+import { matchesKey, wrapTextWithAnsi } from "@mariozechner/pi-tui";
 
 const APPROVE_OPTION = "Approve commit";
 const DENY_OPTION = "Deny commit";
@@ -327,9 +327,17 @@ function parseCommitMetadataFromCommand(
   return parseCommitMetadata(invocation.args);
 }
 
+function formatMessageForPreview(message: string): string {
+  return message
+    .replace(/\\r\\n/g, "\n")
+    .replace(/\\n/g, "\n")
+    .replace(/\\r/g, "\r")
+    .replace(/\\t/g, "\t");
+}
+
 function getCommitMessagePreview(metadata: CommitMetadata): string {
   if (metadata.messages.length > 0) {
-    return metadata.messages.join("\n\n");
+    return metadata.messages.map(formatMessageForPreview).join("\n\n");
   }
 
   if (metadata.hasNoEdit) {
@@ -404,18 +412,39 @@ function getCommitReviewIssues(review: CommitReviewDetails): ValidationIssue[] {
   }];
 }
 
-function appendFilePreview(lines: string[], files: string[], maxFiles = 12): void {
+function appendWrappedText(
+  lines: string[],
+  text: string,
+  width: number,
+  indent = "",
+): void {
+  const availableWidth = Math.max(1, width - indent.length);
+
+  for (const rawLine of text.split("\n")) {
+    if (rawLine.length === 0) {
+      lines.push(indent);
+      continue;
+    }
+
+    const wrappedLines = wrapTextWithAnsi(rawLine, availableWidth);
+    for (const wrappedLine of wrappedLines) {
+      lines.push(indent + wrappedLine);
+    }
+  }
+}
+
+function appendFilePreview(lines: string[], files: string[], width: number, maxFiles = 12): void {
   if (files.length === 0) {
-    lines.push("  (none detected)");
+    appendWrappedText(lines, "(none detected)", width, "  ");
     return;
   }
 
   for (const file of files.slice(0, maxFiles)) {
-    lines.push(`  ${file}`);
+    appendWrappedText(lines, file, width, "  ");
   }
 
   if (files.length > maxFiles) {
-    lines.push(`  ... ${files.length - maxFiles} more`);
+    appendWrappedText(lines, `... ${files.length - maxFiles} more`, width, "  ");
   }
 }
 
@@ -519,30 +548,32 @@ async function requestApproval(
 
         lines.push(theme.bold("Commit message preview:"));
         lines.push("");
-        for (const line of messagePreview.split("\n")) {
-          lines.push("  " + line);
-        }
+        appendWrappedText(lines, messagePreview, width, "  ");
 
         lines.push("");
         lines.push(rule);
         lines.push(theme.bold(`Staged files (${review.stagedFiles.length}):`));
-        appendFilePreview(lines, review.stagedFiles);
+        appendFilePreview(lines, review.stagedFiles, width);
 
         if (review.ignoredStagedFiles.length > 0) {
           lines.push("");
-          lines.push(theme.fg(
-            "warning",
-            `Still matched by gitignore rules (${review.ignoredStagedFiles.length}):`,
-          ));
-          appendFilePreview(lines, review.ignoredStagedFiles, 8);
+          appendWrappedText(
+            lines,
+            theme.fg(
+              "warning",
+              `Still matched by gitignore rules (${review.ignoredStagedFiles.length}):`,
+            ),
+            width,
+          );
+          appendFilePreview(lines, review.ignoredStagedFiles, width, 8);
         }
 
         if (issueLines) {
           lines.push("");
           lines.push(rule);
-          lines.push(theme.fg("warning", "Issues:"));
+          appendWrappedText(lines, theme.fg("warning", "Issues:"), width);
           for (const line of issueLines.split("\n")) {
-            lines.push(theme.fg("warning", line));
+            appendWrappedText(lines, theme.fg("warning", line), width);
           }
         }
 
@@ -561,7 +592,7 @@ async function requestApproval(
         }
 
         lines.push("");
-        lines.push(theme.fg("dim", "Up/Down select  Enter confirm  Esc deny"));
+        appendWrappedText(lines, theme.fg("dim", "Up/Down select  Enter confirm  Esc deny"), width);
 
         return lines;
       }

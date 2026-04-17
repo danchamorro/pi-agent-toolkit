@@ -4,6 +4,15 @@ All notable changes to extensions in `~/.pi/agent/extensions/`.
 
 ## 2026-04-17
 
+### commit-approval.ts
+
+- Fixed the commit approval dialog to normalize escaped newline sequences in
+  `-m/--message` preview text so commit bodies render as real multi-line
+  paragraphs instead of a single literal `\n` line.
+- Hardened the commit approval TUI against over-wide render output by wrapping
+  commit previews, file lists, validation issues, and footer help text with
+  Pi TUI width-safe helpers.
+
 ### context.ts
 
 - Switched `/context` to Pi's exported `loadProjectContextFiles()` helper so
