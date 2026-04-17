@@ -9,8 +9,10 @@ Create well-structured GitHub issues using the `gh` CLI with consistent formatti
 
 ## Ground rules
 
-- Always use `gh issue create` with `--title`, `--body`, and `--label` flags
+- Always use `gh issue create` with `--title`, a body flag (`--body` or `--body-file`), and `--label` when a label is appropriate
+- Prefer `--body-file` for any multi-line or non-trivial issue body to avoid shell escaping and command substitution bugs
 - Auto-detect the repo from the current git context (do not ask the user to specify unless `gh` cannot resolve it)
+- In multi-account setups, verify the active `gh` account can see the repo before creating the issue. If the repo has a `.envrc` that switches GitHub users, make sure it has been loaded before falling back to `gh auth switch`.
 - Never include AI attribution or emojis in issue titles or bodies
 - Use imperative mood in titles (e.g., "Add retry logic" not "Added retry logic")
 
@@ -148,12 +150,13 @@ Background information, motivation, or link to the broader initiative.
 ## Workflow
 
 1. **Determine the issue type** from the user's request or ask if ambiguous
-2. **Map to the correct label** using the table above
-3. **Check existing labels** on the repo with `gh label list` to confirm the label exists
-4. **Gather enough context** -- if the user's request is brief, check the codebase for relevant details (file paths, current behavior, config shapes) before drafting. Do not ask the user for information you can find yourself.
-5. **Draft the title and body** using the appropriate template
-6. **Create the issue** -- for short bodies use `gh issue create --title "..." --body "..." --label "..."`. For longer or complex bodies, write to a temp file and use `--body-file` to avoid shell escaping issues.
-7. **Report the issue URL** back to the user
+2. **Verify repo access** -- confirm the active `gh` account can see the repo with `gh repo view` or similar. If access is wrong, check whether the repo's `.envrc` should switch accounts, then use `gh auth switch` only if needed.
+3. **Map to the correct label** using the table above
+4. **Check existing labels** on the repo with `gh label list` to confirm the label exists
+5. **Gather enough context** -- if the user's request is brief, check the codebase for relevant details (file paths, current behavior, config shapes) before drafting. Do not ask the user for information you can find yourself.
+6. **Draft the title and body** using the appropriate template
+7. **Create the issue** -- for truly short single-line bodies, `--body` is acceptable. For any multi-line, markdown-heavy, or non-trivial body, write to a temp file and use `--body-file`. Default to `--body-file` when in doubt.
+8. **Report the issue URL** back to the user
 
 ## Adapting the template
 
@@ -166,7 +169,7 @@ The body templates above are starting points. Adjust based on the content:
 
 ## What NOT to do
 
-- Do not create issues without `--title` and `--body` flags (no interactive mode)
+- Do not create issues without `--title` and a body flag (`--body` or `--body-file`) (no interactive mode)
 - Do not guess labels that do not exist on the repo
 - Do not include a References section unless the user explicitly provides links or references to include
 - Do not pad the body with boilerplate when the issue is simple

@@ -72,7 +72,7 @@ Breaking changes, follow-ups, deployment considerations, or anything reviewers s
 
 - Be reasonably detailed without being verbose — a reviewer should understand the change without reading every diff line
 - No AI attribution and no emojis
-- Always use `--title` and `--body` flags with `gh pr create`
+- Always use `--title` and `--body-file` with `gh pr create` when the body spans multiple lines. Prefer `--body-file` over inline `--body` for any non-trivial PR description to avoid shell escaping and command substitution bugs.
 
 Example:
 
@@ -102,6 +102,25 @@ responses until TTL expiry.
 
 Existing cache entries will expire naturally via TTL. No migration needed.
 ```
+
+Preferred CLI pattern:
+
+```bash
+cat > /tmp/pr_body.md <<'EOF'
+## What changed
+...
+EOF
+
+gh pr create --title "fix(cache): prevent stale Redis entries" \
+  --body-file /tmp/pr_body.md
+```
+
+### GitHub CLI account safety
+
+- Before repo-level `gh` operations such as `gh issue create`, `gh pr create`, `gh pr view`, or `gh repo view`, verify the active GitHub CLI account can see the target repo.
+- In multi-account setups, run a lightweight check like `gh repo view` or `gh auth status` before assuming the current account is correct.
+- If the repo is missing or returns 404 while git SSH works, check whether the repository's `.envrc` was supposed to switch `gh` to the correct account, then load it if needed before retrying.
+- If the wrong account is active after `.envrc` loads, switch explicitly with `gh auth switch` and then continue.
 
 ### Code style
 
