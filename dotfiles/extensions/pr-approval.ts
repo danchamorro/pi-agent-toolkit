@@ -18,7 +18,7 @@ import type {
 } from "@mariozechner/pi-coding-agent";
 import { isToolCallEventType } from "@mariozechner/pi-coding-agent";
 import type { TUI, KeybindingsManager } from "@mariozechner/pi-tui";
-import { matchesKey } from "@mariozechner/pi-tui";
+import { matchesKey, wrapTextWithAnsi } from "@mariozechner/pi-tui";
 
 const APPROVE_OPTION = "Approve";
 const DENY_OPTION = "Deny";
@@ -449,6 +449,31 @@ function formatValidationIssues(issues: ValidationIssue[]): string {
     .join("\n");
 }
 
+function formatTextForPreview(text: string): string {
+  return text
+    .replace(/\\r\\n/g, "\n")
+    .replace(/\\n/g, "\n")
+    .replace(/\\r/g, "\r")
+    .replace(/\\t/g, "\t");
+}
+
+function appendWrappedLine(lines: string[], line: string, width: number): void {
+  const match = /^(\s*)(.*)$/.exec(line);
+  const indent = match?.[1] ?? "";
+  const content = match?.[2] ?? line;
+  const availableWidth = Math.max(1, width - indent.length);
+
+  if (content.length === 0) {
+    lines.push(indent);
+    return;
+  }
+
+  const wrappedLines = wrapTextWithAnsi(content, availableWidth);
+  for (const wrappedLine of wrappedLines) {
+    lines.push(indent + wrappedLine);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Approval prompts
 // ---------------------------------------------------------------------------
@@ -546,7 +571,7 @@ function getPreviewLines(op: PrOperation): string[] {
       if (m.body) {
         lines.push("");
         lines.push("  Body:");
-        for (const line of m.body.split("\n")) {
+        for (const line of formatTextForPreview(m.body).split("\n")) {
           lines.push(`    ${line}`);
         }
       }
@@ -602,21 +627,21 @@ async function requestApproval(
         const rule = theme.fg("dim", "-".repeat(Math.min(width, 60)));
 
         for (const line of previewLines) {
-          lines.push(line);
+          appendWrappedLine(lines, line, width);
         }
 
         if (issueText) {
           lines.push("");
           lines.push(rule);
-          lines.push(theme.fg("warning", "Issues:"));
+          appendWrappedLine(lines, theme.fg("warning", "Issues:"), width);
           for (const line of issueText.split("\n")) {
-            lines.push(theme.fg("warning", line));
+            appendWrappedLine(lines, theme.fg("warning", line), width);
           }
         }
 
         lines.push("");
         lines.push(rule);
-        lines.push(theme.bold(question));
+        appendWrappedLine(lines, theme.bold(question), width);
         lines.push("");
 
         for (let i = 0; i < options.length; i++) {
@@ -629,7 +654,7 @@ async function requestApproval(
         }
 
         lines.push("");
-        lines.push(theme.fg("dim", "Up/Down select  Enter confirm  Esc deny"));
+        appendWrappedLine(lines, theme.fg("dim", "Up/Down select  Enter confirm  Esc deny"), width);
 
         return lines;
       }

@@ -18,6 +18,14 @@ All notable changes to extensions in `~/.pi/agent/extensions/`.
 - Normalized escaped newlines before validation too, so single `-m` commit
   messages containing `\n\n` are judged on their real subject/body structure.
 
+### pr-approval.ts
+
+- Fixed the PR approval dialog to wrap long preview and validation lines so
+  wide PR titles, bodies, and warning text cannot crash Pi's custom TUI
+  renderer.
+- Normalized escaped newline sequences in PR body previews so `gh pr create
+  --body` content displays as intended in the approval dialog.
+
 ### context.ts
 
 - Switched `/context` to Pi's exported `loadProjectContextFiles()` helper so
