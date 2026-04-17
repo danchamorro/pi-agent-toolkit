@@ -5,7 +5,7 @@ Extensions, skills, and configs for the
 backup so I can restore or sync my setup across machines, and a reference
 for anyone looking to customize their own Pi environment.
 
-Includes 24 extensions, 34 skills, 2 installable npm packages, MCP server
+Includes 24 extensions, 35 skills, 3 installable Pi packages, MCP server
 configurations, and safety guardrails.
 
 ---
@@ -75,17 +75,26 @@ Flags (copy and link modes):
 
 ### Packages (installable via pi)
 
-Standalone packages you can install without cloning the repo:
+This setup installs three Pi packages via `manifest.json`:
 
 ```bash
 pi install npm:@danchamorro/pi-agent-modes
 pi install npm:@danchamorro/pi-prompt-enhancer
+pi install npm:pi-design-deck
 ```
+
+**Published from this repo:**
 
 | Package | Description | npm |
 |---|---|---|
 | [agent-modes](packages/agent-modes) | Switch between code, architect, debug, ask, and review modes with enforced tool restrictions, bash allowlists, and per-mode model assignment | [![npm](https://img.shields.io/npm/v/@danchamorro/pi-agent-modes)](https://www.npmjs.com/package/@danchamorro/pi-agent-modes) |
 | [prompt-enhancer](packages/prompt-enhancer) | Rewrite prompts to be clearer and more actionable before sending | [![npm](https://img.shields.io/npm/v/@danchamorro/pi-prompt-enhancer)](https://www.npmjs.com/package/@danchamorro/pi-prompt-enhancer) |
+
+**Also installed as part of this setup:**
+
+| Package | Description | Source |
+|---|---|---|
+| `pi-design-deck` | Present multi-slide visual decision decks with high-fidelity previews. Bundles the `design-deck` skill used in this setup. | [nicobailon/pi-design-deck](https://github.com/nicobailon/pi-design-deck) |
 
 ### Extensions (24)
 
@@ -148,6 +157,15 @@ full list with descriptions.
 | `technical-docs` | Technical documentation standards |
 | `whats-new` | Git changelog generation between branches |
 
+**Package-provided skills** (1, installed via Pi package):
+
+Installed automatically when `npm:pi-design-deck` is present in
+`manifest.json`.
+
+| Skill | Source |
+|-------|--------|
+| `design-deck` | [`npm:pi-design-deck`](https://github.com/nicobailon/pi-design-deck) |
+
 **External skills** (25, installed from source repos):
 
 Listed in `manifest.json` and installed automatically by `setup.mjs`.
@@ -206,6 +224,12 @@ Or build locally in Pi, then absorb with `node setup.mjs sync`.
 
 1. Install: `npx skills add someone/repo -s skill-name -g -y`
 2. Add an entry to `manifest.json`.
+
+### Pi packages
+
+1. Install: `pi install npm:package-name`
+2. Add it to `manifest.json` under `packages`.
+3. Update the README if it changes the documented setup.
 
 ---
 

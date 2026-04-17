@@ -13,6 +13,7 @@
   ],
   "packages": [
     "npm:@danchamorro/pi-agent-modes",
-    "npm:@danchamorro/pi-prompt-enhancer"
+    "npm:@danchamorro/pi-prompt-enhancer",
+    "npm:pi-design-deck"
   ]
 }
