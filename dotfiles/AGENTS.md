@@ -131,6 +131,15 @@ When something breaks, don't guess -- investigate first. No fixes without unders
 
 Avoid shotgun debugging. If making random changes hoping something works, the problem isn't understood yet.
 
+### Trace data to boundaries
+
+When analyzing data flow, trace it all the way to the system boundary before drawing conclusions. Code-level analysis alone can be misleading when external systems (Zapier, HubSpot, third-party APIs, manual processes) are part of the chain.
+
+- If a value appears in a database row, trace where it was written from.
+- If it was written from a file or payload, trace who created that file.
+- If the creator is an external system outside the codebase, say so explicitly rather than concluding the value "isn't needed" or "comes from the config."
+- When the upstream source is outside the codebase, state the boundary clearly: "This value originates from Zapier/HubSpot/external ETL, which is not visible in the code."
+
 ### Clean up after yourself
 
 Never leave debugging or testing artifacts in the codebase:

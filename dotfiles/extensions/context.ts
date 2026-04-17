@@ -9,12 +9,11 @@
  */
 
 import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext, ToolResultEvent } from "@mariozechner/pi-coding-agent";
+import * as PiAgent from "@mariozechner/pi-coding-agent";
 import { DynamicBorder } from "@mariozechner/pi-coding-agent";
 import { Container, Key, Text, matchesKey, type Component, type TUI } from "@mariozechner/pi-tui";
 import os from "node:os";
 import path from "node:path";
-import fs from "node:fs/promises";
-import { existsSync } from "node:fs";
 
 function formatUsd(cost: number): string {
 	if (!Number.isFinite(cost) || cost <= 0) return "$0.00";
@@ -38,75 +37,21 @@ function normalizeReadPath(inputPath: string, cwd: string): string {
 	return path.resolve(p);
 }
 
-function getAgentDir(): string {
-	// Mirrors pi's behavior reasonably well.
-	const envCandidates = ["PI_CODING_AGENT_DIR", "TAU_CODING_AGENT_DIR"];
-	let envDir: string | undefined;
-	for (const k of envCandidates) {
-		if (process.env[k]) {
-			envDir = process.env[k];
-			break;
-		}
-	}
-	if (!envDir) {
-		for (const [k, v] of Object.entries(process.env)) {
-			if (k.endsWith("_CODING_AGENT_DIR") && v) {
-				envDir = v;
-				break;
-			}
-		}
-	}
-
-	if (envDir) {
-		if (envDir === "~") return os.homedir();
-		if (envDir.startsWith("~/")) return path.join(os.homedir(), envDir.slice(2));
-		return envDir;
-	}
-	return path.join(os.homedir(), ".pi", "agent");
+function contextFilesDisabled(): boolean {
+	return process.argv.includes("--no-context-files") || process.argv.includes("-nc");
 }
 
-async function readFileIfExists(filePath: string): Promise<{ path: string; content: string; bytes: number } | null> {
-	if (!existsSync(filePath)) return null;
-	try {
-		const buf = await fs.readFile(filePath);
-		return { path: filePath, content: buf.toString("utf8"), bytes: buf.byteLength };
-	} catch {
-		return null;
-	}
-}
-
-async function loadProjectContextFiles(cwd: string): Promise<Array<{ path: string; tokens: number; bytes: number }>> {
-	const out: Array<{ path: string; tokens: number; bytes: number }> = [];
-	const seen = new Set<string>();
-
-	const loadFromDir = async (dir: string) => {
-		for (const name of ["AGENTS.md", "CLAUDE.md"]) {
-			const p = path.join(dir, name);
-			const f = await readFileIfExists(p);
-			if (f && !seen.has(f.path)) {
-				seen.add(f.path);
-				out.push({ path: f.path, tokens: estimateTokens(f.content), bytes: f.bytes });
-				// pi loads at most one of those per dir
-				return;
-			}
-		}
-	};
-
-	await loadFromDir(getAgentDir());
-
-	// Ancestors: root → cwd (same order as pi)
-	const stack: string[] = [];
-	let current = path.resolve(cwd);
-	while (true) {
-		stack.push(current);
-		const parent = path.resolve(current, "..");
-		if (parent === current) break;
-		current = parent;
-	}
-	stack.reverse();
-	for (const dir of stack) await loadFromDir(dir);
-
-	return out;
+function getLoadedContextFiles(cwd: string): Array<{ path: string; tokens: number; bytes: number }> {
+	if (contextFilesDisabled()) return [];
+	const loadContextFiles = (PiAgent as any).loadProjectContextFiles as
+		| ((options?: { cwd?: string; agentDir?: string }) => Array<{ path: string; content: string }>)
+		| undefined;
+	if (!loadContextFiles) return [];
+	return loadContextFiles({ cwd }).map((file: { path: string; content: string }) => ({
+		path: file.path,
+		tokens: estimateTokens(file.content),
+		bytes: Buffer.byteLength(file.content, "utf8"),
+	}));
 }
 
 function normalizeSkillName(name: string): string {
@@ -135,6 +80,7 @@ function buildSkillIndex(pi: ExtensionAPI, cwd: string): SkillIndexEntry[] {
 }
 
 const SKILL_LOADED_ENTRY = "context:skill_loaded";
+const PROVIDER_RESPONSE_ENTRY = "context:provider_response";
 
 type SkillLoadedEntryData = {
 	name: string;
@@ -150,6 +96,18 @@ function getLoadedSkillsFromSession(ctx: ExtensionContext): Set<string> {
 		if (data?.name) out.add(data.name);
 	}
 	return out;
+}
+
+function getLatestProviderResponse(ctx: ExtensionContext): ProviderResponseData | null {
+	let latest: ProviderResponseData | null = null;
+	for (const entry of ctx.sessionManager.getEntries()) {
+		if ((entry as any)?.type !== "custom") continue;
+		if ((entry as any)?.customType !== PROVIDER_RESPONSE_ENTRY) continue;
+		const data = (entry as any)?.data as ProviderResponseData | undefined;
+		if (data?.status == null) continue;
+		latest = data;
+	}
+	return latest;
 }
 
 function extractCostTotal(usage: any): number {
@@ -249,6 +207,16 @@ function joinCommaStyled(items: string[], renderItem: (item: string) => string, 
 	return items.map(renderItem).join(sep);
 }
 
+type ProviderResponseData = {
+	provider?: string;
+	model?: string;
+	status: number;
+	retryAfter?: string;
+	requestId?: string;
+	rateLimitRemaining?: string;
+	at: string;
+};
+
 type ContextViewData = {
 	usage:
 		| {
@@ -270,6 +238,7 @@ type ContextViewData = {
 	skills: string[];
 	loadedSkills: string[];
 	session: { totalTokens: number; totalCost: number };
+	providerResponse: ProviderResponseData | null;
 };
 
 class ContextView implements Component {
@@ -393,6 +362,15 @@ class ContextView implements Component {
 				muted(" · ") +
 				text(formatUsd(this.data.session.totalCost)),
 		);
+		if (this.data.providerResponse) {
+			const p = this.data.providerResponse;
+			const providerLabel = [p.provider, p.model].filter(Boolean).join("/") || "provider";
+			let providerLine = muted("Last response: ") + text(`${providerLabel} ${p.status}`);
+			if (p.retryAfter) providerLine += muted(` · retry-after ${p.retryAfter}`);
+			if (p.rateLimitRemaining) providerLine += muted(` · remaining ${p.rateLimitRemaining}`);
+			if (p.requestId) providerLine += muted(` · req ${p.requestId}`);
+			lines.push(providerLine);
+		}
 
 		this.body.setText(lines.join("\n"));
 		this.cachedWidth = width;
@@ -450,6 +428,19 @@ export default function contextExtension(pi: ExtensionAPI) {
 		return best?.name ?? null;
 	};
 
+	(pi.on as any)("after_provider_response", (event: { status: number; headers?: Record<string, string> }, ctx: ExtensionContext) => {
+		const headers = event.headers ?? {};
+		pi.appendEntry<ProviderResponseData>(PROVIDER_RESPONSE_ENTRY, {
+			provider: ctx.model?.provider,
+			model: ctx.model?.id,
+			status: event.status,
+			retryAfter: headers["retry-after"],
+			requestId: headers["x-request-id"] ?? headers["request-id"],
+			rateLimitRemaining: headers["x-ratelimit-remaining"] ?? headers["ratelimit-remaining"],
+			at: new Date().toISOString(),
+		});
+	});
+
 	pi.on("tool_result", (event: ToolResultEvent, ctx: ExtensionContext) => {
 		// Only count successful reads.
 		if ((event as any).toolName !== "read") return;
@@ -492,7 +483,7 @@ export default function contextExtension(pi: ExtensionAPI) {
 				.map((c) => normalizeSkillName(c.name))
 				.sort((a, b) => a.localeCompare(b));
 
-			const agentFiles = await loadProjectContextFiles(ctx.cwd);
+			const agentFiles = getLoadedContextFiles(ctx.cwd);
 			const agentFilePaths = agentFiles.map((f) => shortenPath(f.path, ctx.cwd));
 			const agentTokens = agentFiles.reduce((a, f) => a + f.tokens, 0);
 
@@ -522,6 +513,7 @@ export default function contextExtension(pi: ExtensionAPI) {
 			const remainingTokens = ctxWindow > 0 ? Math.max(0, ctxWindow - effectiveTokens) : 0;
 
 			const sessionUsage = sumSessionUsage(ctx);
+			const providerResponse = getLatestProviderResponse(ctx);
 
 			const makePlainText = () => {
 				const lines: string[] = [];
@@ -539,6 +531,14 @@ export default function contextExtension(pi: ExtensionAPI) {
 				lines.push(`Extensions (${extensionFiles.length}): ${extensionFiles.length ? joinComma(extensionFiles) : "(none)"}`);
 				lines.push(`Skills (${skills.length}): ${skills.length ? joinComma(skills) : "(none)"}`);
 				lines.push(`Session: ${sessionUsage.totalTokens.toLocaleString()} tokens · ${formatUsd(sessionUsage.totalCost)}`);
+				if (providerResponse) {
+					const providerLabel = [providerResponse.provider, providerResponse.model].filter(Boolean).join("/") || "provider";
+					let line = `Last response: ${providerLabel} ${providerResponse.status}`;
+					if (providerResponse.retryAfter) line += ` · retry-after ${providerResponse.retryAfter}`;
+					if (providerResponse.rateLimitRemaining) line += ` · remaining ${providerResponse.rateLimitRemaining}`;
+					if (providerResponse.requestId) line += ` · req ${providerResponse.requestId}`;
+					lines.push(line);
+				}
 				return lines.join("\n");
 			};
 
@@ -568,6 +568,7 @@ export default function contextExtension(pi: ExtensionAPI) {
 				skills,
 				loadedSkills,
 				session: { totalTokens: sessionUsage.totalTokens, totalCost: sessionUsage.totalCost },
+				providerResponse,
 			};
 
 			await ctx.ui.custom<void>((tui, theme, _kb, done) => {

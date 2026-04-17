@@ -2,6 +2,24 @@
 
 All notable changes to extensions in `~/.pi/agent/extensions/`.
 
+## 2026-04-17
+
+### context.ts
+
+- Switched `/context` to Pi's exported `loadProjectContextFiles()` helper so
+  context file discovery stays aligned with current Pi behavior instead of a
+  repo-local reimplementation.
+- Taught `/context` to honor `--no-context-files` and report no AGENTS files
+  when Pi was launched with context loading disabled.
+- Added lightweight provider response telemetry to `/context`, showing the
+  latest HTTP status plus useful headers such as `retry-after`, request id,
+  and remaining rate-limit budget when available.
+
+### control.ts
+
+- Replaced hardcoded `Ctrl+O to expand` copy with Pi's dynamic `keyHint()` so
+  the expand hint matches the user's active keybinding configuration.
+
 ## 2026-04-04
 
 ### find-session.ts
