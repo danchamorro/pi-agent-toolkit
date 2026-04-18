@@ -75,12 +75,13 @@ Flags (copy and link modes):
 
 ### Packages (installable via pi)
 
-This setup installs three Pi packages via `manifest.json`:
+This setup installs four Pi packages via `manifest.json`:
 
 ```bash
 pi install npm:@danchamorro/pi-agent-modes
 pi install npm:@danchamorro/pi-prompt-enhancer
 pi install npm:pi-design-deck
+pi install npm:pi-annotate
 ```
 
 **Published from this repo:**
@@ -95,6 +96,7 @@ pi install npm:pi-design-deck
 | Package | Description | Source |
 |---|---|---|
 | `pi-design-deck` | Present multi-slide visual decision decks with high-fidelity previews. Bundles the `design-deck` skill used in this setup. | [nicobailon/pi-design-deck](https://github.com/nicobailon/pi-design-deck) |
+| `pi-annotate` | Visual browser annotation for AI-assisted UI debugging. Adds `/annotate` plus companion Chrome extension tooling. | [nicobailon/pi-annotate](https://github.com/nicobailon/pi-annotate) |
 
 ### Extensions (24)
 
