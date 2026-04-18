@@ -12,17 +12,23 @@ dotfiles/
   extensions/ ............. 24 extensions (.ts files and subdirectories)
   agent-skills/ ........... Pi-scoped skills     (-> ~/.pi/agent/skills/)
   global-skills/ .......... Cross-agent skills   (-> ~/.agents/skills/)
+  prompts/ ................ Prompt templates      (-> ~/.pi/agent/prompts/)
   intercepted-commands/ ... Python/pip shims (uv.ts dependency)
   Config files ............ AGENTS.md, APPEND_SYSTEM.md, models.json, etc.
 ```
 
-`setup.mjs` also supports `dotfiles/prompts/`, `dotfiles/agents/`, and
-`dotfiles/themes/` if those directories are added later, but they are not
-currently present in this repo.
+`setup.mjs` also supports `dotfiles/agents/` and `dotfiles/themes/` if
+those directories are added later.
 
 Repo-only files such as `README.md`, `SETUP.md`, and `tsconfig.json` live
 in `dotfiles/` for documentation and tooling, but are not installed into
 Pi.
+
+## Prompt templates
+
+| Prompt | Purpose |
+|--------|---------|
+| `orchestrate.md` | Orchestrate a task with `pi-subagents` and `intercom`, keeping planning and final synthesis in the current session while delegating focused work to subagents. |
 
 ## Config files
 

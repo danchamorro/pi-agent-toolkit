@@ -5,8 +5,8 @@ Extensions, skills, and configs for the
 backup so I can restore or sync my setup across machines, and a reference
 for anyone looking to customize their own Pi environment.
 
-Includes 24 extensions, 35 skills, 3 installable Pi packages, MCP server
-configurations, and safety guardrails.
+Includes 24 extensions, 35 skills, 1 prompt template, 6 installable Pi
+packages, MCP server configurations, and safety guardrails.
 
 ---
 
@@ -75,13 +75,15 @@ Flags (copy and link modes):
 
 ### Packages (installable via pi)
 
-This setup installs four Pi packages via `manifest.json`:
+This setup installs six Pi packages via `manifest.json`:
 
 ```bash
 pi install npm:@danchamorro/pi-agent-modes
 pi install npm:@danchamorro/pi-prompt-enhancer
 pi install npm:pi-design-deck
 pi install npm:pi-annotate
+pi install npm:pi-subagents
+pi install npm:pi-intercom
 ```
 
 **Published from this repo:**
@@ -97,6 +99,8 @@ pi install npm:pi-annotate
 |---|---|---|
 | `pi-design-deck` | Present multi-slide visual decision decks with high-fidelity previews. Bundles the `design-deck` skill used in this setup. | [nicobailon/pi-design-deck](https://github.com/nicobailon/pi-design-deck) |
 | `pi-annotate` | Visual browser annotation for AI-assisted UI debugging. Adds `/annotate` plus companion Chrome extension tooling. | [nicobailon/pi-annotate](https://github.com/nicobailon/pi-annotate) |
+| `pi-subagents` | Delegate work to subagents with single, chain, and parallel execution modes. Ships built-in agent definitions like `scout`, `planner`, `worker`, and `reviewer`. | [nicobailon/pi-subagents](https://github.com/nicobailon/pi-subagents) |
+| `pi-intercom` | Direct 1:1 messaging between Pi sessions on the same machine, with an `intercom` tool plus `/intercom` and `Alt+M` UI entry points. | [nicobailon/pi-intercom](https://github.com/nicobailon/pi-intercom) |
 
 ### Extensions (24)
 
@@ -186,6 +190,15 @@ Not committed to this repo. Maintained by their original authors.
 | `firecrawl` | [firecrawl/cli](https://github.com/firecrawl/cli) |
 | `excalidraw-diagram` | [coleam00/excalidraw-diagram-skill](https://github.com/coleam00/excalidraw-diagram-skill) |
 
+### Prompt templates (1)
+
+Prompt templates live in `dotfiles/prompts/` and are installed to
+`~/.pi/agent/prompts/` by `setup.mjs`.
+
+| Prompt | Description |
+|--------|-------------|
+| `orchestrate` | Orchestrate a task using `pi-subagents` and `intercom`, keeping planning and final synthesis in the current session while delegating focused work to subagents. |
+
 ### Config files
 
 | File | Purpose |
@@ -213,10 +226,10 @@ Configured in `mcp.json` (created from template during setup):
 
 ## How to add new components
 
-### Extensions and skills
+### Extensions, skills, and prompts
 
-1. Create the file in `dotfiles/extensions/`, `dotfiles/agent-skills/`, or
-   `dotfiles/global-skills/`.
+1. Create the file in `dotfiles/extensions/`, `dotfiles/agent-skills/`,
+   `dotfiles/global-skills/`, or `dotfiles/prompts/`.
 2. If using `--link` mode, it's already live. Otherwise re-run `setup.mjs`.
 3. Commit and push.
 
