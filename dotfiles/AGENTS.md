@@ -186,6 +186,16 @@ Before every commit, scan changes for artifacts. If `git diff` shows `console.lo
 - Keep changes in this repo polished and shareable. Avoid adding secrets, private tokens, machine-specific credentials, or undocumented local-only assumptions.
 - If a requested change seems specific to one machine or not suitable for a public repo, call that out and ask before adding it here.
 
+### Nushell availability
+
+- Nushell (`nu`) is installed on this machine at `/opt/homebrew/bin/nu`.
+- Prefer Nushell for interactive shell tasks that benefit from structured data instead of text parsing, especially filesystem inspection, process inspection, JSON/YAML/TOML/CSV/SQLite/Excel exploration, HTTP or API responses, and ad hoc table filtering.
+- Common Nushell patterns include `ls | where type == dir`, `ps | where status == Running`, `open package.json | get scripts`, `http get <url> | select ...`, and `help commands | explore`.
+- Prefer bash, zsh, or sh when POSIX compatibility matters, when copied shell snippets assume traditional shell syntax, or when the task is mostly external-command orchestration with little structured-data benefit.
+- Remember that Nushell built-ins and external commands are distinct. Use `^cmd` to force an external command and convert structured data before piping to external tools with commands such as `to text`, `to json`, `lines`, or `get`.
+- For interactive Nushell usage, load the `nushell-shell` skill at `~/.agents/skills/nushell-shell/SKILL.md`.
+- For Nushell script, module, and code review work, load the `nushell-pro` skill at `~/.agents/skills/nushell-pro/SKILL.md`.
+
 ### Default workflow
 
 1. Make requested edits.

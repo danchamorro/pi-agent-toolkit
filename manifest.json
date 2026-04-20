@@ -5,6 +5,7 @@
     { "source": "HazAT/pi-config", "skills": ["learn-codebase", "self-improve"] },
     { "source": "manaflow-ai/cmux", "skills": ["cmux", "cmux-and-worktrees", "cmux-browser", "cmux-debug-windows", "cmux-markdown"] },
     { "source": "hyf0/vue-skills", "skills": ["vue-best-practices"] },
+    { "source": "hustcer/nushell-pro", "skills": ["nushell-pro"] },
     { "source": "obra/superpowers", "skills": ["systematic-debugging", "writing-skills"] },
     { "source": "getsentry/skills", "skills": ["code-simplifier", "iterate-pr"] },
     { "source": "microsoft/playwright-cli", "skills": [] },

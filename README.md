@@ -149,7 +149,7 @@ full list with descriptions.
 
 ### Skills
 
-**Bundled skills** (9, committed to this repo):
+**Bundled skills** (10, committed to this repo):
 
 | Skill | Description |
 |-------|-------------|
@@ -160,6 +160,7 @@ full list with descriptions.
 | `exa-search` | Semantic web search via Exa API |
 | `gh-issue-creator` | Create GitHub issues via `gh` CLI |
 | `google-chat-cards-v2` | Google Chat Cards v2 notifications |
+| `nushell-shell` | Interactive Nushell usage, shell one-liner translation to Nu, and choosing Nu vs traditional shells |
 | `technical-docs` | Technical documentation standards |
 | `whats-new` | Git changelog generation between branches |
 
@@ -172,7 +173,7 @@ Installed automatically when `npm:pi-design-deck` is present in
 |-------|--------|
 | `design-deck` | [`npm:pi-design-deck`](https://github.com/nicobailon/pi-design-deck) |
 
-**External skills** (25, installed from source repos):
+**External skills** (26, installed from source repos):
 
 Listed in `manifest.json` and installed automatically by `setup.mjs`.
 Not committed to this repo. Maintained by their original authors.
@@ -184,6 +185,7 @@ Not committed to this repo. Maintained by their original authors.
 | `learn-codebase`, `self-improve` | [HazAT/pi-config](https://github.com/HazAT/pi-config) |
 | `cmux`, `cmux-and-worktrees`, `cmux-browser`, `cmux-debug-windows`, `cmux-markdown` | [manaflow-ai/cmux](https://github.com/manaflow-ai/cmux) |
 | `vue-best-practices` | [hyf0/vue-skills](https://github.com/hyf0/vue-skills) |
+| `nushell-pro` | [hustcer/nushell-pro](https://github.com/hustcer/nushell-pro) |
 | `systematic-debugging`, `writing-skills` | [obra/superpowers](https://github.com/obra/superpowers) |
 | `code-simplifier`, `iterate-pr` | [getsentry/skills](https://github.com/getsentry/skills) |
 | `playwright-cli` | [microsoft/playwright-cli](https://github.com/microsoft/playwright-cli) |
