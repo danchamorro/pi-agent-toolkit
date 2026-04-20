@@ -34,7 +34,6 @@
     "npm:pi-annotate",
     "npm:pi-subagents",
     "npm:pi-intercom",
-    "git:https://github.com/badlogic/pi-diff-review",
-    "https://github.com/davebcn87/pi-autoresearch"
+    "git:https://github.com/badlogic/pi-diff-review"
   ]
 }
