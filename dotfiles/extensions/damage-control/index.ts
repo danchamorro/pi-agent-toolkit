@@ -63,11 +63,13 @@ function expandHome(p: string): string {
  */
 function pathMatches(filePath: string, pattern: string): boolean {
 	const expanded = expandHome(pattern);
+	const expandedFilePath = expandHome(filePath);
+	const norm = expandedFilePath.startsWith("/") ? expandedFilePath : resolve(expandedFilePath);
+	const name = basename(expandedFilePath);
 
 	// Directory rule: match the directory itself or anything beneath it
 	if (expanded.endsWith("/")) {
 		const dir = expanded.replace(/\/+$/, "");
-		const norm = filePath.startsWith("/") ? filePath : resolve(filePath);
 		return (
 			norm === dir ||
 			norm === `${dir}/` ||
@@ -83,14 +85,11 @@ function pathMatches(filePath: string, pattern: string): boolean {
 			.replace(/[.+^${}()|[\]\\]/g, "\\$&")
 			.replace(/\*/g, ".*");
 		const regex = new RegExp(`(^|/)${regexStr}$`);
-		const norm = filePath.startsWith("/") ? filePath : resolve(filePath);
 		// Match against full path and also just the basename
-		return regex.test(norm) || regex.test(basename(filePath));
+		return regex.test(norm) || regex.test(name);
 	}
 
 	// Exact match against basename or full path
-	const norm = filePath.startsWith("/") ? filePath : resolve(filePath);
-	const name = basename(filePath);
 	return name === expanded || norm === expanded || norm.endsWith("/" + expanded);
 }
 
@@ -193,8 +192,9 @@ export default function (pi: ExtensionAPI) {
 	function extractCommandPathCandidates(command: string): string[] {
 		const candidates = new Set<string>();
 		const tokens = command.match(/"[^"]*"|'[^']*'|`[^`]*`|\S+/g) ?? [];
+		const inlinePathMatches = command.match(/~\/[^\s"'`;$(){}\[\]]+|\/(?:[^\s"'`;$(){}\[\]]+\/)*[^\s"'`;$(){}\[\]]+/g) ?? [];
 
-		for (const token of tokens) {
+		for (const token of [...tokens, ...inlinePathMatches]) {
 			const stripped = token
 				.trim()
 				.replace(/^["'`]+|["'`]+$/g, "")
@@ -216,8 +216,7 @@ export default function (pi: ExtensionAPI) {
 	function getBashPathAccess(command: string): { path: string; access: PathAccess } | null {
 		for (const candidate of extractCommandPathCandidates(command)) {
 			const access = checkPathAccess(candidate);
-			if (access === "zero") return { path: candidate, access };
-			if (shouldAskPathAccess(candidate)) return { path: candidate, access: "ask" };
+			if (access !== "allowed" && access !== "noDelete") return { path: candidate, access };
 		}
 		return null;
 	}
@@ -234,18 +233,20 @@ export default function (pi: ExtensionAPI) {
 		return isNodeModulesPath(filePath);
 	}
 
-	function shouldAskPathAccess(filePath: string): boolean {
-		return rules.askAccessPaths.some((p) => pathMatches(filePath, p));
-	}
-
 	function checkPathAccess(filePath: string): PathAccess {
 		if (rules.zeroAccessPaths.some((p) => pathMatches(filePath, p))) return "zero";
+		if (rules.askAccessPaths.some((p) => pathMatches(filePath, p))) return "ask";
 		if (rules.readOnlyPaths.some((p) => pathMatches(filePath, p))) return "readOnly";
 		if (rules.noDeletePaths.some((p) => pathMatches(filePath, p))) return "noDelete";
 		return "allowed";
 	}
 
-	async function confirmPathAccess(kind: "read" | "bash", target: string, preview: string, ctx: ExtensionContext): Promise<boolean> {
+	async function confirmPathAccess(
+		kind: "read" | "write" | "edit" | "bash",
+		target: string,
+		preview: string,
+		ctx: ExtensionContext,
+	): Promise<boolean> {
 		recordEvent({
 			timestamp: Date.now(),
 			type: "path",
@@ -255,7 +256,14 @@ export default function (pi: ExtensionAPI) {
 
 		if (!ctx.hasUI) return false;
 
-		const noun = kind === "read" ? "read from" : "access via bash";
+		const noun =
+			kind === "read"
+				? "read from"
+				: kind === "write"
+					? "write to"
+					: kind === "edit"
+						? "edit"
+						: "access via bash";
 		const choice = await ctx.ui.select(
 			`[Damage Control] ${target} requires confirmation before the agent can ${noun} it.\n\n  ${preview}\n\nAllow this access?`,
 			["Yes, allow once", "No, block it"],
@@ -314,6 +322,20 @@ export default function (pi: ExtensionAPI) {
 				return {
 					block: true,
 					reason: `Damage Control: bash command targets zero-access path "${pathAccess.path}". Access is not permitted.`,
+				};
+			}
+
+			if (pathAccess?.access === "readOnly") {
+				recordEvent({
+					timestamp: Date.now(),
+					type: "path",
+					detail: `read-only bash target: ${pathAccess.path}`,
+					action: "blocked",
+				});
+				ctx.ui.notify(`[DC] Blocked bash access: ${pathAccess.path} (read-only)`, "error");
+				return {
+					block: true,
+					reason: `Damage Control: bash command targets read-only path "${pathAccess.path}". Bash access is blocked because it can mutate files. Use the read tool for inspection instead.`,
 				};
 			}
 
@@ -396,7 +418,7 @@ export default function (pi: ExtensionAPI) {
 				};
 			}
 
-			if (!shouldSkipReadConfirmation(filePath) && shouldAskPathAccess(filePath)) {
+			if (!shouldSkipReadConfirmation(filePath) && access === "ask") {
 				const allowed = await confirmPathAccess("read", filePath, filePath, ctx);
 				if (!allowed) {
 					recordEvent({
@@ -414,7 +436,7 @@ export default function (pi: ExtensionAPI) {
 			}
 		}
 
-		// --- Write tool: check zero-access and read-only paths ---
+		// --- Write tool: check zero-access, ask-access, and read-only paths ---
 		if (event.toolName === "write") {
 			const filePath = (event.input as Record<string, unknown>).path as string;
 			const access = checkPathAccess(filePath);
@@ -433,6 +455,23 @@ export default function (pi: ExtensionAPI) {
 				};
 			}
 
+			if (access === "ask") {
+				const allowed = await confirmPathAccess("write", filePath, filePath, ctx);
+				if (!allowed) {
+					recordEvent({
+						timestamp: Date.now(),
+						type: "path",
+						detail: `ask write: ${filePath}`,
+						action: "blocked",
+					});
+					ctx.ui.notify(`[DC] Blocked write: ${filePath} (confirmation required)`, "error");
+					return {
+						block: true,
+						reason: `Damage Control: "${filePath}" requires explicit approval before it can be written.`,
+					};
+				}
+			}
+
 			if (access === "readOnly") {
 				recordEvent({
 					timestamp: Date.now(),
@@ -448,7 +487,7 @@ export default function (pi: ExtensionAPI) {
 			}
 		}
 
-		// --- Edit tool: check zero-access and read-only paths ---
+		// --- Edit tool: check zero-access, ask-access, and read-only paths ---
 		if (isToolCallEventType("edit", event)) {
 			const filePath = event.input.path;
 			const access = checkPathAccess(filePath);
@@ -465,6 +504,23 @@ export default function (pi: ExtensionAPI) {
 					block: true,
 					reason: `Damage Control: "${filePath}" is a zero-access path. Editing is not permitted.`,
 				};
+			}
+
+			if (access === "ask") {
+				const allowed = await confirmPathAccess("edit", filePath, filePath, ctx);
+				if (!allowed) {
+					recordEvent({
+						timestamp: Date.now(),
+						type: "path",
+						detail: `ask edit: ${filePath}`,
+						action: "blocked",
+					});
+					ctx.ui.notify(`[DC] Blocked edit: ${filePath} (confirmation required)`, "error");
+					return {
+						block: true,
+						reason: `Damage Control: "${filePath}" requires explicit approval before it can be edited.`,
+					};
+				}
 			}
 
 			if (access === "readOnly") {

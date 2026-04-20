@@ -5,7 +5,7 @@ Extensions, skills, and configs for the
 backup so I can restore or sync my setup across machines, and a reference
 for anyone looking to customize their own Pi environment.
 
-Includes 24 extensions, 35 skills, 1 prompt template, 6 installable Pi
+Includes 24 extensions, 35 skills, 1 prompt template, 8 installable Pi
 packages, MCP server configurations, and safety guardrails.
 
 ---
@@ -75,7 +75,7 @@ Flags (copy and link modes):
 
 ### Packages (installable via pi)
 
-This setup installs six Pi packages via `manifest.json`:
+This setup installs eight Pi packages via `manifest.json`:
 
 ```bash
 pi install npm:@danchamorro/pi-agent-modes
@@ -84,6 +84,8 @@ pi install npm:pi-design-deck
 pi install npm:pi-annotate
 pi install npm:pi-subagents
 pi install npm:pi-intercom
+pi install git:https://github.com/badlogic/pi-diff-review
+pi install https://github.com/davebcn87/pi-autoresearch
 ```
 
 **Published from this repo:**
@@ -101,6 +103,8 @@ pi install npm:pi-intercom
 | `pi-annotate` | Visual browser annotation for AI-assisted UI debugging. Adds `/annotate` plus companion Chrome extension tooling. | [nicobailon/pi-annotate](https://github.com/nicobailon/pi-annotate) |
 | `pi-subagents` | Delegate work to subagents with single, chain, and parallel execution modes. Ships built-in agent definitions like `scout`, `planner`, `worker`, and `reviewer`. | [nicobailon/pi-subagents](https://github.com/nicobailon/pi-subagents) |
 | `pi-intercom` | Direct 1:1 messaging between Pi sessions on the same machine, with an `intercom` tool plus `/intercom` and `Alt+M` UI entry points. | [nicobailon/pi-intercom](https://github.com/nicobailon/pi-intercom) |
+| `pi-diff-review` | Native diff review window for Pi. Adds a `/diff-review` command that opens changed files in a Monaco diff editor and turns review notes into a prompt back in Pi. | [badlogic/pi-diff-review](https://github.com/badlogic/pi-diff-review) |
+| `pi-autoresearch` | Autonomous experiment loop for Pi. Adds benchmark tools, a live dashboard, `/autoresearch` controls, and an `autoresearch-create` skill to set up and run optimization sessions. | [davebcn87/pi-autoresearch](https://github.com/davebcn87/pi-autoresearch) |
 
 ### Extensions (24)
 
@@ -164,14 +168,15 @@ full list with descriptions.
 | `technical-docs` | Technical documentation standards |
 | `whats-new` | Git changelog generation between branches |
 
-**Package-provided skills** (1, installed via Pi package):
+**Package-provided skills** (2, installed via Pi packages):
 
-Installed automatically when `npm:pi-design-deck` is present in
+Installed automatically when these packages are present in
 `manifest.json`.
 
 | Skill | Source |
 |-------|--------|
 | `design-deck` | [`npm:pi-design-deck`](https://github.com/nicobailon/pi-design-deck) |
+| `autoresearch-create` | [`https://github.com/davebcn87/pi-autoresearch`](https://github.com/davebcn87/pi-autoresearch) |
 
 **External skills** (26, installed from source repos):
 

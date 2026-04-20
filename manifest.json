@@ -1,9 +1,24 @@
 {
   "externalSkills": [
-    { "source": "anthropics/skills", "skills": ["docx", "pdf", "pptx", "xlsx", "frontend-design", "skill-creator", "agent-browser"] },
-    { "source": "vercel-labs/skills", "skills": ["find-skills", "vercel-react-best-practices", "web-design-guidelines"] },
+    {
+      "source": "anthropics/skills",
+      "skills": ["docx", "pdf", "pptx", "xlsx", "frontend-design", "skill-creator", "agent-browser"]
+    },
+    {
+      "source": "vercel-labs/skills",
+      "skills": ["find-skills", "vercel-react-best-practices", "web-design-guidelines"]
+    },
     { "source": "HazAT/pi-config", "skills": ["learn-codebase", "self-improve"] },
-    { "source": "manaflow-ai/cmux", "skills": ["cmux", "cmux-and-worktrees", "cmux-browser", "cmux-debug-windows", "cmux-markdown"] },
+    {
+      "source": "manaflow-ai/cmux",
+      "skills": [
+        "cmux",
+        "cmux-and-worktrees",
+        "cmux-browser",
+        "cmux-debug-windows",
+        "cmux-markdown"
+      ]
+    },
     { "source": "hyf0/vue-skills", "skills": ["vue-best-practices"] },
     { "source": "hustcer/nushell-pro", "skills": ["nushell-pro"] },
     { "source": "obra/superpowers", "skills": ["systematic-debugging", "writing-skills"] },
@@ -18,6 +33,8 @@
     "npm:pi-design-deck",
     "npm:pi-annotate",
     "npm:pi-subagents",
-    "npm:pi-intercom"
+    "npm:pi-intercom",
+    "git:https://github.com/badlogic/pi-diff-review",
+    "https://github.com/davebcn87/pi-autoresearch"
   ]
 }

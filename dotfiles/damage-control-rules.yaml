@@ -245,7 +245,11 @@ bashToolPatterns:
     reason: SQL DELETE with specific ID
     ask: true
 
-askAccessPaths: []
+askAccessPaths:
+  - ~/.bashrc
+  - ~/.zshrc
+  - ~/.profile
+  - ~/.bash_profile
 
 readOnlyPaths:
   - /etc/
@@ -257,10 +261,6 @@ readOnlyPaths:
   - ~/.bash_history
   - ~/.zsh_history
   - ~/.node_repl_history
-  - ~/.bashrc
-  - ~/.zshrc
-  - ~/.profile
-  - ~/.bash_profile
   - "package-lock.json"
   - "yarn.lock"
   - "pnpm-lock.yaml"
