@@ -127,6 +127,140 @@ gh pr create --title "fix(cache): prevent stale Redis entries" \
 - Do **not** use emojis in code (strings, comments, log messages, docstrings).
 - To make text stand out, use colors (ANSI codes), bolding, or ASCII symbols instead of emojis.
 
+## Agent-Legible Code, Enforcement, and Reviewability
+
+AI agents work best when the codebase is explicit, searchable, modular, and mechanically enforced. Prioritize changes that make the system easier for both humans and agents to understand.
+
+### 1. Avoid Hidden Magic
+
+Prefer boring, explicit code over clever or implicit behavior.
+
+Agents must avoid introducing patterns that hide intent, control flow, data access, or side effects. If the behavior is not easy to search for, trace, and review, it is probably not agent-legible.
+
+Do not introduce:
+
+- Dynamic imports unless there is already a clear project convention for them.
+- Implicit global state.
+- Silent fallbacks that hide configuration, permission, database, API, or runtime failures.
+- Bare `except`, `catch`, or broad catch-all error handling.
+- Multiple competing ways to perform the same operation.
+- Business logic hidden inside framework hooks, decorators, model magic, or lifecycle callbacks.
+- Raw SQL scattered across the codebase when a query interface or repository layer exists.
+- Raw UI primitives when a shared component library exists.
+- New abstractions that obscure simple behavior.
+
+Prefer:
+
+- Explicit imports.
+- Explicit function arguments.
+- Explicit return values.
+- Clear module boundaries.
+- Searchable names.
+- Centralized data access patterns.
+- Simple, predictable control flow.
+- Errors that fail loudly when the system is misconfigured or in an unsafe state.
+
+If something must be implicit, document why and point to the existing project convention that supports it.
+
+### 2. Respect Mechanical Enforcement
+
+Do not rely on prompts or judgment alone. Follow the project's mechanical guardrails.
+
+Before considering a task complete, run the relevant checks for the files changed. This may include linting, formatting, type checking, tests, migrations, or build validation.
+
+Agents must not bypass, weaken, delete, or silence enforcement rules just to make a change pass.
+
+Do not:
+
+- Disable lint rules without a clear justification.
+- Add broad `ignore`, `noqa`, `type: ignore`, or equivalent comments unless there is no reasonable alternative.
+- Remove failing tests instead of fixing the underlying issue.
+- Relax type safety to make code compile.
+- Add catch-all error handling to hide failures.
+- Introduce duplicate helpers, duplicate query paths, or duplicate UI primitives.
+- Rename existing concepts casually.
+- Create generic function names that collide with existing names.
+
+Prefer:
+
+- Unique, searchable function names.
+- One canonical place for each type of operation.
+- Existing shared utilities over new one-off helpers.
+- Existing component primitives over raw UI elements.
+- Existing query/data-access layers over ad hoc access.
+- Narrow exception handling with meaningful error behavior.
+- Type-safe changes that preserve the existing contract.
+
+If a mechanical rule blocks the change, assume the rule is correct first. Fix the code to satisfy the rule. Only propose changing the rule when the rule is clearly wrong for the project as a whole.
+
+### 3. Keep Changes Small and Reviewable
+
+AI can generate large diffs quickly, but large diffs are harder to review and more likely to hide defects.
+
+Agents should optimize for small, coherent changes that a human can understand.
+
+Prefer:
+
+- One logical change per pull request.
+- Minimal diffs.
+- Small, focused commits.
+- Clear separation between refactoring and behavior changes.
+- Incremental implementation over large rewrites.
+- Localized changes inside the appropriate module.
+- Tests that directly cover the changed behavior.
+
+Avoid:
+
+- Large rewrites unless explicitly requested.
+- Drive-by refactors.
+- Formatting unrelated files.
+- Renaming unrelated symbols.
+- Moving code unnecessarily.
+- Mixing style cleanup with feature work.
+- Touching files outside the task scope.
+- Generating thousands of lines of code without a clear review plan.
+
+If a requested change requires a large diff, break it into smaller steps where possible:
+
+1. Add or adjust tests.
+2. Make the smallest functional change.
+3. Refactor only the affected area.
+4. Run checks.
+5. Summarize what changed and what should be reviewed carefully.
+
+### 4. Human Review Triggers
+
+Certain changes require extra human attention. When making any of the following changes, clearly call them out in the final response:
+
+- Database migrations.
+- Permission or authorization logic.
+- Authentication logic.
+- Billing logic.
+- Security-sensitive behavior.
+- Dependency additions or upgrades.
+- Production configuration changes.
+- Error handling changes.
+- Retry, timeout, or background job behavior.
+- Data deletion, mutation, or backfill logic.
+- Changes that affect reliability, observability, or incident response.
+
+For these areas, do not assume that passing tests is enough. Explain the risk, the intended behavior, and what a human reviewer should verify.
+
+### 5. Completion Checklist
+
+Before finishing a task, verify:
+
+- The code follows existing project patterns.
+- The change is explicit and searchable.
+- No hidden magic was introduced.
+- No enforcement rule was bypassed.
+- The diff is as small as reasonably possible.
+- Related tests, linters, formatters, or type checks were run where available.
+- Any high-risk areas were called out clearly.
+- The final summary explains what changed and what needs human review.
+
+The goal is not just code that runs. The goal is code that is understandable, maintainable, reviewable, and safe to own.
+
 ### Try before asking
 
 When about to ask the user whether they have a tool, command, or dependency installed -- don't ask, just try it. If it works, proceed. If it fails, inform the user and suggest installation. Saves back-and-forth and gives a definitive answer immediately.
