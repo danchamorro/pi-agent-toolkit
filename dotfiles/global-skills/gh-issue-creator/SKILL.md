@@ -13,6 +13,9 @@ Create well-structured GitHub issues using the `gh` CLI with consistent formatti
 - Prefer `--body-file` for any multi-line or non-trivial issue body to avoid shell escaping and command substitution bugs
 - Auto-detect the repo from the current git context (do not ask the user to specify unless `gh` cannot resolve it)
 - In multi-account setups, verify the active `gh` account can see the repo before creating the issue. If the repo has a `.envrc` that switches GitHub users, make sure it has been loaded before falling back to `gh auth switch`.
+- Before creating the issue, show the user the exact proposed title, labels, and body, then wait for explicit approval. Do not create the issue immediately after drafting it.
+- Exception: if the user provides the exact final title/body text and explicitly says to post it as-is, you may skip the full preview, but still restate the intended action before running `gh issue create`.
+- If the workflow includes follow-up GitHub mutations such as adding a comment, editing the issue, or closing it, use the same preview-and-approval rule for the exact action being taken.
 - Never include AI attribution or emojis in issue titles or bodies
 - Use imperative mood in titles (e.g., "Add retry logic" not "Added retry logic")
 
@@ -155,8 +158,9 @@ Background information, motivation, or link to the broader initiative.
 4. **Check existing labels** on the repo with `gh label list` to confirm the label exists
 5. **Gather enough context** -- if the user's request is brief, check the codebase for relevant details (file paths, current behavior, config shapes) before drafting. Do not ask the user for information you can find yourself.
 6. **Draft the title and body** using the appropriate template
-7. **Create the issue** -- for truly short single-line bodies, `--body` is acceptable. For any multi-line, markdown-heavy, or non-trivial body, write to a temp file and use `--body-file`. Default to `--body-file` when in doubt.
-8. **Report the issue URL** back to the user
+7. **Preview and confirm** -- present the exact draft title, labels, and body to the user. Ask for explicit approval or requested edits before any `gh` mutation.
+8. **Create the issue after approval** -- for truly short single-line bodies, `--body` is acceptable. For any multi-line, markdown-heavy, or non-trivial body, write to a temp file and use `--body-file`. Default to `--body-file` when in doubt.
+9. **Report the issue URL** back to the user
 
 ## Adapting the template
 
@@ -173,4 +177,5 @@ The body templates above are starting points. Adjust based on the content:
 - Do not guess labels that do not exist on the repo
 - Do not include a References section unless the user explicitly provides links or references to include
 - Do not pad the body with boilerplate when the issue is simple
+- Do not skip user approval when the title, labels, body, comment text, or close action were inferred by the agent
 - Do not ask the user to specify the repo -- detect it from git context
