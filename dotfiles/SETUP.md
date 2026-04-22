@@ -18,7 +18,7 @@ Run all `node setup.mjs ...` commands from the repo root.
   extensions. Install: `brew install fd`
 - **[uv](https://github.com/astral-sh/uv)**: Python package manager.
   Required for jCodeMunch MCP server (`uvx`). Install: `brew install uv`
-- **[Docker](https://www.docker.com/)**: Required for Postgres MCP servers.
+- **[Docker](https://www.docker.com/)**: Required for Docker-based MCP servers such as Postgres MCP.
 - **[cmux](https://github.com/manaflow-ai/cmux)**: Ghostty-based terminal
   multiplexer. Several extensions and skills integrate with cmux for
   notifications, split panes, and browser automation.
@@ -42,9 +42,9 @@ Edit `~/.pi/agent/auth.json` with your provider API keys:
 ### MCP servers (`mcp.json`)
 
 Edit `~/.pi/agent/mcp.json` to configure your MCP servers. The template
-includes skeletons for jCodeMunch, Postgres MCP, and chrome-devtools.
-`mcp.json` is always local-only: it is created from the template on first
-run and is never symlinked or committed.
+includes skeletons for jCodeMunch, Postgres MCP, MariaDB MCP, and
+chrome-devtools. `mcp.json` is always local-only: it is created from the
+template on first run and is never symlinked or committed.
 
 ### Exa API key
 
@@ -104,6 +104,45 @@ Add your database connection string under `mcpServers` in `mcp.json`:
 - `--access-mode=restricted`: Read-only queries only
 - `"lifecycle": "lazy"`: Server starts only when first used
 - Add multiple entries for different databases
+
+### MariaDB MCP (database access)
+
+[MariaDB/mcp](https://github.com/MariaDB/mcp) provides read-only MariaDB or
+MySQL access through `uvx`. In practice, this setup uses the published
+package entrypoint `mariadb-server` from
+`iflow-mcp_mariadb-mariadb-server`.
+
+Add your database connection under `mcpServers` in `mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "mariadb-your-db": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "iflow-mcp_mariadb-mariadb-server",
+        "mariadb-server"
+      ],
+      "env": {
+        "DB_HOST": "127.0.0.1",
+        "DB_PORT": "3306",
+        "DB_USER": "readonly_user",
+        "DB_PASSWORD": "your_password",
+        "DB_NAME": "your_database",
+        "MCP_READ_ONLY": "true",
+        "MCP_MAX_POOL_SIZE": "5"
+      },
+      "lifecycle": "lazy"
+    }
+  }
+}
+```
+
+- `MCP_READ_ONLY=true`: Enforces read-only SQL mode in the MCP server
+- Prefer a dedicated read-only DB user instead of `root`
+- Use `127.0.0.1` for host-local databases when the MCP runs via `uvx`
+- `"lifecycle": "lazy"`: Server starts only when first used
 
 ### chrome-devtools (browser integration)
 
@@ -168,4 +207,6 @@ cd dotfiles/extensions/damage-control && npm install
 1. Verify the server is configured in `~/.pi/agent/mcp.json`
 2. For jCodeMunch: ensure `uvx` is installed (`brew install uv`)
 3. For Postgres MCP: ensure Docker is running (`docker ps`)
-4. For chrome-devtools: ensure `npx` is available
+4. For MariaDB MCP: ensure `uvx` is installed, the DB host and port are
+   reachable, and host-local DBs use `127.0.0.1`
+5. For chrome-devtools: ensure `npx` is available
