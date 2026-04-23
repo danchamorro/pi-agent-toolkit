@@ -8,9 +8,15 @@
  * - current context window usage + session totals (tokens/cost)
  */
 
-import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext, ToolResultEvent } from "@mariozechner/pi-coding-agent";
-import * as PiAgent from "@mariozechner/pi-coding-agent";
-import { DynamicBorder } from "@mariozechner/pi-coding-agent";
+import {
+	DynamicBorder,
+	getAgentDir,
+	loadProjectContextFiles,
+	type ExtensionAPI,
+	type ExtensionCommandContext,
+	type ExtensionContext,
+	type ToolResultEvent,
+} from "@mariozechner/pi-coding-agent";
 import { Container, Key, Text, matchesKey, type Component, type TUI } from "@mariozechner/pi-tui";
 import os from "node:os";
 import path from "node:path";
@@ -43,11 +49,7 @@ function contextFilesDisabled(): boolean {
 
 function getLoadedContextFiles(cwd: string): Array<{ path: string; tokens: number; bytes: number }> {
 	if (contextFilesDisabled()) return [];
-	const loadContextFiles = (PiAgent as any).loadProjectContextFiles as
-		| ((options?: { cwd?: string; agentDir?: string }) => Array<{ path: string; content: string }>)
-		| undefined;
-	if (!loadContextFiles) return [];
-	return loadContextFiles({ cwd }).map((file: { path: string; content: string }) => ({
+	return loadProjectContextFiles({ cwd, agentDir: getAgentDir() }).map((file) => ({
 		path: file.path,
 		tokens: estimateTokens(file.content),
 		bytes: Buffer.byteLength(file.content, "utf8"),
@@ -428,7 +430,7 @@ export default function contextExtension(pi: ExtensionAPI) {
 		return best?.name ?? null;
 	};
 
-	(pi.on as any)("after_provider_response", (event: { status: number; headers?: Record<string, string> }, ctx: ExtensionContext) => {
+	pi.on("after_provider_response", (event, ctx: ExtensionContext) => {
 		const headers = event.headers ?? {};
 		pi.appendEntry<ProviderResponseData>(PROVIDER_RESPONSE_ENTRY, {
 			provider: ctx.model?.provider,

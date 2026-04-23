@@ -44,9 +44,13 @@ import {
 	Markdown,
 	SelectList,
 	Spacer,
-	type SelectItem,
 	Text,
 	TUI,
+	type AutocompleteItem,
+	type AutocompleteProvider,
+	type AutocompleteSuggestions,
+	type SelectItem,
+	fuzzyFilter,
 	fuzzyMatch,
 	matchesKey,
 	truncateToWidth,
@@ -128,6 +132,8 @@ type TodoAction =
 
 type TodoOverlayAction = "back" | "work";
 
+type TodoAutocompleteRecord = Pick<TodoRecord, "id" | "title" | "status" | "tags">;
+
 type TodoMenuAction =
 	| "work"
 	| "refine"
@@ -172,6 +178,73 @@ function validateTodoId(id: string): { id: string } | { error: string } {
 
 function displayTodoId(id: string): string {
 	return formatTodoId(normalizeTodoId(id));
+}
+
+function extractTodoToken(textBeforeCursor: string): string | undefined {
+	const match = textBeforeCursor.match(/(?:^|[\s("'`])(?:todo:)?(TODO-[^\s]*)$/i);
+	return match?.[1];
+}
+
+function formatTodoAutocompleteItem(todo: TodoAutocompleteRecord): AutocompleteItem {
+	const tagSummary = todo.tags.length > 0 ? ` [${todo.tags.join(", ")}]` : "";
+	return {
+		value: displayTodoId(todo.id),
+		label: displayTodoId(todo.id),
+		description: `${todo.status}: ${todo.title}${tagSummary}`,
+	};
+}
+
+function filterTodoAutocompleteItems(todos: TodoAutocompleteRecord[], query: string): AutocompleteItem[] {
+	if (!query.trim()) {
+		return todos.slice(0, 20).map(formatTodoAutocompleteItem);
+	}
+
+	return fuzzyFilter(
+		todos,
+		query,
+		(todo) => `${displayTodoId(todo.id)} ${todo.title} ${todo.status} ${todo.tags.join(" ")}`,
+	)
+		.slice(0, 20)
+		.map(formatTodoAutocompleteItem);
+}
+
+function createTodoAutocompleteProvider(
+	current: AutocompleteProvider,
+	getTodos: () => Promise<TodoAutocompleteRecord[]>,
+): AutocompleteProvider {
+	return {
+		async getSuggestions(lines, cursorLine, cursorCol, options): Promise<AutocompleteSuggestions | null> {
+			const currentLine = lines[cursorLine] ?? "";
+			const textBeforeCursor = currentLine.slice(0, cursorCol);
+			const token = extractTodoToken(textBeforeCursor);
+			if (token === undefined) {
+				return current.getSuggestions(lines, cursorLine, cursorCol, options);
+			}
+
+			const todos = await getTodos();
+			if (options.signal.aborted || todos.length === 0) {
+				return current.getSuggestions(lines, cursorLine, cursorCol, options);
+			}
+
+			const suggestions = filterTodoAutocompleteItems(todos, token);
+			if (suggestions.length === 0) {
+				return current.getSuggestions(lines, cursorLine, cursorCol, options);
+			}
+
+			return {
+				items: suggestions,
+				prefix: token,
+			};
+		},
+
+		applyCompletion(lines, cursorLine, cursorCol, item, prefix) {
+			return current.applyCompletion(lines, cursorLine, cursorCol, item, prefix);
+		},
+
+		shouldTriggerFileCompletion(lines, cursorLine, cursorCol) {
+			return current.shouldTriggerFileCompletion?.(lines, cursorLine, cursorCol) ?? true;
+		},
+	};
 }
 
 function isTodoClosed(status: string): boolean {
@@ -1433,6 +1506,20 @@ export default function todosExtension(pi: ExtensionAPI) {
 		await ensureTodosDir(todosDir);
 		const settings = await readTodoSettings(todosDir);
 		await garbageCollectTodos(todosDir, settings);
+
+		if (ctx.hasUI) {
+			ctx.ui.addAutocompleteProvider((current) =>
+				createTodoAutocompleteProvider(current, async () => {
+					const todos = await listTodos(todosDir);
+					return todos.map((todo) => ({
+						id: todo.id,
+						title: todo.title,
+						status: todo.status,
+						tags: todo.tags,
+					}));
+				}),
+			);
+		}
 	});
 
 	const todosDirLabel = getTodosDirLabel(process.cwd());
@@ -1536,6 +1623,7 @@ export default function todosExtension(pi: ExtensionAPI) {
 					return {
 						content: [{ type: "text", text: serializeTodoForAgent(todo) }],
 						details: { action: "create", todo },
+						terminate: true,
 					};
 				}
 
@@ -1589,6 +1677,7 @@ export default function todosExtension(pi: ExtensionAPI) {
 					return {
 						content: [{ type: "text", text: serializeTodoForAgent(updatedTodo) }],
 						details: { action: "update", todo: updatedTodo },
+						terminate: true,
 					};
 				}
 
@@ -1636,6 +1725,7 @@ export default function todosExtension(pi: ExtensionAPI) {
 					return {
 						content: [{ type: "text", text: serializeTodoForAgent(updatedTodo) }],
 						details: { action: "append", todo: updatedTodo },
+						terminate: true,
 					};
 				}
 
@@ -1662,6 +1752,7 @@ export default function todosExtension(pi: ExtensionAPI) {
 					return {
 						content: [{ type: "text", text: serializeTodoForAgent(updatedTodo) }],
 						details: { action: "claim", todo: updatedTodo },
+						terminate: true,
 					};
 				}
 
@@ -1688,6 +1779,7 @@ export default function todosExtension(pi: ExtensionAPI) {
 					return {
 						content: [{ type: "text", text: serializeTodoForAgent(updatedTodo) }],
 						details: { action: "release", todo: updatedTodo },
+						terminate: true,
 					};
 				}
 
@@ -1717,6 +1809,7 @@ export default function todosExtension(pi: ExtensionAPI) {
 					return {
 						content: [{ type: "text", text: serializeTodoForAgent(result as TodoRecord) }],
 						details: { action: "delete", todo: result as TodoRecord },
+						terminate: true,
 					};
 				}
 			}

@@ -6,6 +6,14 @@ in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/).
 
+## [1.0.6] - 2026-04-22
+
+### Added
+
+- Added a custom working indicator and working message while prompt
+  enhancement is running, so interactive users get clearer feedback that
+  the package is actively rewriting the current prompt.
+
 ## [1.0.5] - 2026-04-03
 
 ### Fixed

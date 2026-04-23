@@ -46,7 +46,17 @@ import type { ExtensionAPI, ExtensionContext, TurnEndEvent, MessageRenderer } fr
 import { getMarkdownTheme, keyHint } from "@mariozechner/pi-coding-agent";
 import { complete, type Model, type Api, type UserMessage, type TextContent } from "@mariozechner/pi-ai";
 import { StringEnum } from "@mariozechner/pi-ai";
-import { Box, Container, Markdown, Spacer, Text } from "@mariozechner/pi-tui";
+import {
+	Box,
+	Container,
+	Markdown,
+	Spacer,
+	Text,
+	type AutocompleteItem,
+	type AutocompleteProvider,
+	type AutocompleteSuggestions,
+	fuzzyFilter,
+} from "@mariozechner/pi-tui";
 import { Type } from "typebox";
 import { promises as fs } from "node:fs";
 import * as net from "node:net";
@@ -370,6 +380,75 @@ async function getLiveSessions(): Promise<LiveSessionInfo[]> {
 
 	sessions.sort((a, b) => (a.name ?? a.sessionId).localeCompare(b.name ?? b.sessionId));
 	return sessions;
+}
+
+function extractSessionToken(textBeforeCursor: string): string | undefined {
+	const match = textBeforeCursor.match(/(?:^|[\s("'`])session:([^\s]*)$/i);
+	return match?.[1];
+}
+
+function formatSessionAutocompleteItem(session: LiveSessionInfo): AutocompleteItem {
+	const aliases = session.aliases.filter((alias) => alias !== session.name);
+	const aliasSummary = aliases.length > 0 ? ` (aliases: ${aliases.join(", ")})` : "";
+	const label = session.name ? `session:${session.name}` : `session:${session.sessionId}`;
+	return {
+		value: label,
+		label,
+		description: `${session.sessionId}${aliasSummary}`,
+	};
+}
+
+function filterSessionAutocompleteItems(sessions: LiveSessionInfo[], query: string): AutocompleteItem[] {
+	if (!query.trim()) {
+		return sessions.slice(0, 20).map(formatSessionAutocompleteItem);
+	}
+
+	return fuzzyFilter(
+		sessions,
+		query,
+		(session) => `${session.name ?? ""} ${session.sessionId} ${session.aliases.join(" ")}`,
+	)
+		.slice(0, 20)
+		.map(formatSessionAutocompleteItem);
+}
+
+function createSessionAutocompleteProvider(
+	current: AutocompleteProvider,
+	getSessions: () => Promise<LiveSessionInfo[]>,
+): AutocompleteProvider {
+	return {
+		async getSuggestions(lines, cursorLine, cursorCol, options): Promise<AutocompleteSuggestions | null> {
+			const currentLine = lines[cursorLine] ?? "";
+			const textBeforeCursor = currentLine.slice(0, cursorCol);
+			const token = extractSessionToken(textBeforeCursor);
+			if (token === undefined) {
+				return current.getSuggestions(lines, cursorLine, cursorCol, options);
+			}
+
+			const sessions = await getSessions();
+			if (options.signal.aborted || sessions.length === 0) {
+				return current.getSuggestions(lines, cursorLine, cursorCol, options);
+			}
+
+			const suggestions = filterSessionAutocompleteItems(sessions, token);
+			if (suggestions.length === 0) {
+				return current.getSuggestions(lines, cursorLine, cursorCol, options);
+			}
+
+			return {
+				items: suggestions,
+				prefix: `session:${token}`,
+			};
+		},
+
+		applyCompletion(lines, cursorLine, cursorCol, item, prefix) {
+			return current.applyCompletion(lines, cursorLine, cursorCol, item, prefix);
+		},
+
+		shouldTriggerFileCompletion(lines, cursorLine, cursorCol) {
+			return current.shouldTriggerFileCompletion?.(lines, cursorLine, cursorCol) ?? true;
+		},
+	};
 }
 
 async function syncAlias(state: SocketState, ctx: ExtensionContext): Promise<void> {
@@ -1052,6 +1131,11 @@ export default function (pi: ExtensionAPI) {
 
 	pi.on("session_start", async (_event, ctx) => {
 		await refreshServer(ctx);
+		if (ctx.hasUI) {
+			ctx.ui.addAutocompleteProvider((current) =>
+				createSessionAutocompleteProvider(current, async () => getLiveSessions()),
+			);
+		}
 		if (!cliSendHandled) {
 			cliSendHandled = true;
 			await maybeHandleStartupControlSend(pi, ctx);

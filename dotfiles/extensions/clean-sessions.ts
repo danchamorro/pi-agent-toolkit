@@ -376,10 +376,14 @@ export default function cleanSessionsExtension(pi: ExtensionAPI): void {
         `Scanning sessions older than ${lookbackDays} days with fewer than ${MAX_LINES_THRESHOLD} lines...`,
         "info"
       );
+      ctx.ui.setWorkingMessage(`Scanning old sessions (${lookbackDays}d lookback)...`);
+      ctx.ui.setWorkingIndicator({ frames: ["[scan]"], intervalMs: 120 });
 
       const candidates = await findCandidates(lookbackDays);
 
       if (candidates.length === 0) {
+        ctx.ui.setWorkingMessage();
+        ctx.ui.setWorkingIndicator();
         ctx.ui.notify(
           `No cleanup candidates found (older than ${lookbackDays}d, fewer than ${MAX_LINES_THRESHOLD} lines, auto-named or unnamed).`,
           "info"
@@ -397,11 +401,15 @@ export default function cleanSessionsExtension(pi: ExtensionAPI): void {
       );
 
       if (!confirmed) {
+        ctx.ui.setWorkingMessage();
+        ctx.ui.setWorkingIndicator();
         return;
       }
 
       let trashed = 0;
       let failed = 0;
+      ctx.ui.setWorkingMessage(`Moving ${candidates.length} session(s) to trash...`);
+      ctx.ui.setWorkingIndicator({ frames: ["[trash]"], intervalMs: 120 });
 
       for (const candidate of candidates) {
         if (!isInsideSessionsRoot(candidate.filePath)) {
@@ -426,6 +434,8 @@ export default function cleanSessionsExtension(pi: ExtensionAPI): void {
 
       const level = failed > 0 ? "warning" : "info";
 
+      ctx.ui.setWorkingMessage();
+      ctx.ui.setWorkingIndicator();
       ctx.ui.notify(formatCleanupResult(trashed, failed), level);
     },
   });

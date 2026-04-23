@@ -4,6 +4,23 @@ All notable changes to extensions in `~/.pi/agent/extensions/`.
 
 ## 2026-04-22
 
+### control.ts, context.ts, loop.ts, tilldone.ts, todos.ts
+
+- Added session and todo autocomplete providers so interactive typing can
+  suggest live `session:...` targets and `TODO-...` identifiers without
+  replacing Pi's built-in slash and file completion.
+- Added terminating tool results to loop, tilldone, and todo state
+  mutations, which stops unnecessary follow-up LLM turns after successful
+  state changes.
+- Tightened `/context` to use Pi's current exported context-loading APIs
+  directly, removing older compatibility shims.
+
+### clean-sessions.ts
+
+- Added explicit working messages and custom working indicators while the
+  session scan and trash-move phases are running, so long cleanups feel less
+  opaque.
+
 ### btw.ts
 
 - Updated the BTW side-chat extension to create side sessions with Pi's
