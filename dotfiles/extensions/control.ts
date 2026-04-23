@@ -47,7 +47,7 @@ import { getMarkdownTheme, keyHint } from "@mariozechner/pi-coding-agent";
 import { complete, type Model, type Api, type UserMessage, type TextContent } from "@mariozechner/pi-ai";
 import { StringEnum } from "@mariozechner/pi-ai";
 import { Box, Container, Markdown, Spacer, Text } from "@mariozechner/pi-tui";
-import { Type } from "@sinclair/typebox";
+import { Type } from "typebox";
 import { promises as fs } from "node:fs";
 import * as net from "node:net";
 import * as os from "node:os";

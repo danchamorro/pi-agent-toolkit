@@ -11,7 +11,6 @@
 
 import {
 	buildSessionContext,
-	codingTools,
 	createAgentSession,
 	createExtensionRuntime,
 	getMarkdownTheme,
@@ -639,13 +638,13 @@ export default function (pi: ExtensionAPI) {
 			model: ctx.model,
 			modelRegistry: ctx.modelRegistry as AgentSession["modelRegistry"],
 			thinkingLevel: pi.getThinkingLevel() as SessionThinkingLevel,
-			tools: codingTools,
+			tools: ["read", "bash", "edit", "write"],
 			resourceLoader: createBtwResourceLoader(ctx),
 		});
 
 		const seedMessages = buildSeedMessages(ctx, thread);
 		if (seedMessages.length > 0) {
-			session.agent.replaceMessages(seedMessages as typeof session.state.messages);
+			session.agent.state.messages = seedMessages as typeof session.state.messages;
 		}
 
 		const unsubscribe = session.subscribe((event: AgentSessionEvent) => {

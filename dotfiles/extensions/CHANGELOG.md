@@ -2,6 +2,23 @@
 
 All notable changes to extensions in `~/.pi/agent/extensions/`.
 
+## 2026-04-22
+
+### btw.ts
+
+- Updated the BTW side-chat extension to create side sessions with Pi's
+  current string-based tool allowlist API instead of the legacy
+  `codingTools` export, restoring compatibility with newer Pi releases.
+- Replaced BTW's seed-message initialization to write through
+  `session.agent.state.messages`, matching the current agent API after the
+  older `replaceMessages()` helper disappeared.
+
+### control.ts, exa-search-tool.ts, loop.ts, tilldone.ts, todos.ts
+
+- Migrated these extensions from `@sinclair/typebox` to `typebox` so local
+  typechecking and future Pi compatibility stay aligned with Pi 0.69.0's
+  TypeBox 1.x migration.
+
 ## 2026-04-17
 
 ### commit-approval.ts
