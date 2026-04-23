@@ -334,7 +334,6 @@ export default function loopExtension(pi: ExtensionAPI): void {
 			return {
 				content: [{ type: "text", text: "Loop ended." }],
 				details: { active: false },
-				terminate: true,
 			};
 		},
 	});

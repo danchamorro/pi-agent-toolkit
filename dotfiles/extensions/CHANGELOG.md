@@ -9,11 +9,19 @@ All notable changes to extensions in `~/.pi/agent/extensions/`.
 - Added session and todo autocomplete providers so interactive typing can
   suggest live `session:...` targets and `TODO-...` identifiers without
   replacing Pi's built-in slash and file completion.
-- Added terminating tool results to loop, tilldone, and todo state
-  mutations, which stops unnecessary follow-up LLM turns after successful
-  state changes.
 - Tightened `/context` to use Pi's current exported context-loading APIs
   directly, removing older compatibility shims.
+
+## 2026-04-23
+
+### loop.ts, tilldone.ts, todos.ts
+
+- Removed the recently added `terminate: true` tool-result hints from loop,
+  tilldone, and todo mutations after they proved too aggressive for these
+  interactive extensions and could stop the agent immediately after a tool
+  call.
+- Restored the expected follow-up turn behavior so agents can continue after
+  task and todo state changes instead of appearing to stall.
 
 ### clean-sessions.ts
 

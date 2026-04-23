@@ -373,7 +373,6 @@ export default function (pi: ExtensionAPI) {
 					return {
 						content: [{ type: "text" as const, text: msg }],
 						details: makeDetails("add"),
-						terminate: true,
 					};
 				}
 
@@ -414,7 +413,6 @@ export default function (pi: ExtensionAPI) {
 					return {
 						content: [{ type: "text" as const, text: msg }],
 						details: makeDetails("toggle"),
-						terminate: true,
 					};
 				}
 
@@ -438,7 +436,6 @@ export default function (pi: ExtensionAPI) {
 					return {
 						content: [{ type: "text" as const, text: `Removed task #${removed.id}: ${removed.text}` }],
 						details: makeDetails("remove"),
-						terminate: true,
 					};
 				}
 
@@ -463,7 +460,6 @@ export default function (pi: ExtensionAPI) {
 					return {
 						content: [{ type: "text" as const, text: `Updated #${toUpdate.id}: "${oldText}" -> "${toUpdate.text}"` }],
 						details: makeDetails("update"),
-						terminate: true,
 					};
 				}
 
@@ -503,7 +499,6 @@ export default function (pi: ExtensionAPI) {
 					return {
 						content: [{ type: "text" as const, text: `Cleared ${count} task(s)` }],
 						details: makeDetails("clear"),
-						terminate: true,
 					};
 				}
 

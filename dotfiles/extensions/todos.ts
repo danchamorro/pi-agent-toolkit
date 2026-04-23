@@ -1623,7 +1623,6 @@ export default function todosExtension(pi: ExtensionAPI) {
 					return {
 						content: [{ type: "text", text: serializeTodoForAgent(todo) }],
 						details: { action: "create", todo },
-						terminate: true,
 					};
 				}
 
@@ -1677,7 +1676,6 @@ export default function todosExtension(pi: ExtensionAPI) {
 					return {
 						content: [{ type: "text", text: serializeTodoForAgent(updatedTodo) }],
 						details: { action: "update", todo: updatedTodo },
-						terminate: true,
 					};
 				}
 
@@ -1725,7 +1723,6 @@ export default function todosExtension(pi: ExtensionAPI) {
 					return {
 						content: [{ type: "text", text: serializeTodoForAgent(updatedTodo) }],
 						details: { action: "append", todo: updatedTodo },
-						terminate: true,
 					};
 				}
 
@@ -1752,7 +1749,6 @@ export default function todosExtension(pi: ExtensionAPI) {
 					return {
 						content: [{ type: "text", text: serializeTodoForAgent(updatedTodo) }],
 						details: { action: "claim", todo: updatedTodo },
-						terminate: true,
 					};
 				}
 
@@ -1779,7 +1775,6 @@ export default function todosExtension(pi: ExtensionAPI) {
 					return {
 						content: [{ type: "text", text: serializeTodoForAgent(updatedTodo) }],
 						details: { action: "release", todo: updatedTodo },
-						terminate: true,
 					};
 				}
 
@@ -1809,7 +1804,6 @@ export default function todosExtension(pi: ExtensionAPI) {
 					return {
 						content: [{ type: "text", text: serializeTodoForAgent(result as TodoRecord) }],
 						details: { action: "delete", todo: result as TodoRecord },
-						terminate: true,
 					};
 				}
 			}
