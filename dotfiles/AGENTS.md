@@ -166,7 +166,7 @@ If something must be implicit, document why and point to the existing project co
 
 Do not rely on prompts or judgment alone. Follow the project's mechanical guardrails.
 
-Before considering a task complete, run the relevant checks for the files changed. This may include linting, formatting, type checking, tests, migrations, or build validation.
+Before considering a task complete, run the relevant project-native checks for the affected scope. This may include linting, formatting, type checking, tests, migrations, or build validation. Prefer the narrowest command that covers the files or package you changed, and discover the repo's standard commands before inventing your own.
 
 Agents must not bypass, weaken, delete, or silence enforcement rules just to make a change pass.
 
@@ -192,6 +192,8 @@ Prefer:
 - Type-safe changes that preserve the existing contract.
 
 If a mechanical rule blocks the change, assume the rule is correct first. Fix the code to satisfy the rule. Only propose changing the rule when the rule is clearly wrong for the project as a whole.
+
+When validation fails, limit automatic fixes to files you touched unless the user explicitly asks for broader cleanup. If a check fails because of pre-existing issues in untouched files, report that clearly instead of modifying unrelated code.
 
 ### 3. Keep Changes Small and Reviewable
 
@@ -333,9 +335,11 @@ Before every commit, scan changes for artifacts. If `git diff` shows `console.lo
 ### Default workflow
 
 1. Make requested edits.
-2. Run relevant checks (lint/typecheck/tests as appropriate).
-3. Report changed files and results.
-4. Wait for explicit commit/push instruction.
+2. After completing a coherent change, run the relevant project-native checks for the affected scope, such as linting, formatting, type checking, and targeted tests.
+3. Prefer the narrowest validation command that covers the files or package you changed.
+4. Do not fix unrelated pre-existing failures outside the touched scope unless the user explicitly asks.
+5. Report changed files and validation results.
+6. Wait for explicit commit/push instruction.
 
 ### cmux environment
 
