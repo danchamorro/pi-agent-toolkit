@@ -74,7 +74,6 @@ All 9 extensions are self-contained in this repo (no upstream package reference)
 | `exa-search-tool.ts` | Registers Exa as a search tool |
 | `qna-interactive.ts` | Interactive Q&A mode |
 | `question-mode.ts` | Question-only mode (no file changes) |
-| `require-session-name-on-exit.ts` | Prompts for a session name before exiting |
 | `clean-sessions.ts` | Prunes old, low-value session files |
 | `find-session.ts` | Search past Pi sessions with LLM ranking and one-step resume |
 | `coach.ts` | Recommends underused Pi workflows based on session habits |

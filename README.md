@@ -145,7 +145,6 @@ full list with descriptions.
 | `term-notify.ts` | Desktop notifications on agent completion (cmux + OSC 777) |
 | `qna-interactive.ts` | Structured Q&A mode |
 | `question-mode.ts` | Read-only question mode (no file changes) |
-| `require-session-name-on-exit.ts` | Prompts for session name before exit |
 | `clean-sessions.ts` | Prunes old, low-value session files |
 | `uv.ts` | Intercepts pip/python calls and redirects to uv |
 

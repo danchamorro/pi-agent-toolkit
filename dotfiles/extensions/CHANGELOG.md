@@ -14,6 +14,12 @@ All notable changes to extensions in `~/.pi/agent/extensions/`.
 
 ## 2026-04-23
 
+### require-session-name-on-exit.ts
+
+- Removed the extension because Pi now provides built-in safe quit behavior
+  that prompts for a session name before exiting, making the local extension
+  redundant and avoiding command conflicts with core quit handling.
+
 ### loop.ts, tilldone.ts, todos.ts
 
 - Removed the recently added `terminate: true` tool-result hints from loop,
