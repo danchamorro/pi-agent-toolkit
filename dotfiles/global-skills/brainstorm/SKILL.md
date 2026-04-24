@@ -29,19 +29,40 @@ If there is no `plans/` directory, create it when appropriate. If the right loca
 
 At the start of the session, tell the user which file you will update. If the file already exists, read it first and resume from its open questions, unresolved decisions, or latest status.
 
-## Update the notes after each answer
+## Update the notes only when decision state changes
 
-After the user answers a question, update the notes file before asking another question. Capture the result as useful design notes, not as a raw transcript.
+Do not update the notes file after every user response. Discussion, clarification, and explanation should usually stay in chat until they change the durable design state.
+
+Update the notes file only when one of these happens:
+
+- The user makes, confirms, or rejects a decision.
+- The user explicitly parks a question as unresolved.
+- The user asks to record something in the notes.
+- Codebase, documentation, command output, or prior-note evidence materially changes the recommendation.
+- A new open question is discovered that must be tracked before moving on.
+
+Do not update the notes file for:
+
+- Clarifying questions.
+- The user saying they do not understand.
+- Explanations of the current question.
+- Back-and-forth discussion that does not change a decision.
+- Restating the agent's recommendation.
+- Minor wording or framing adjustments.
+
+Before writing, identify the decision-state change in chat. If there is no decision-state change, continue the conversation without editing the notes.
+
+When the user is unsure, do not automatically write the current recommendation to the notes. Keep discussing until the user accepts the recommendation, rejects it, or explicitly asks to park the question as unresolved.
+
+After consensus is reached, or the user explicitly parks the question, update the notes file before moving to the next unresolved decision. Capture the result as useful design notes, not as a raw transcript.
 
 Each update should record:
 
-- The decision, recommendation, or open question that came out of the answer.
-- Why that direction was chosen.
+- The decision, rejected option, parked question, or material evidence that changed the design state.
+- Why that direction was chosen or why the question remains unresolved.
 - Whether the decision is final, draft, recommended, or unresolved.
 - Any evidence gathered from code, docs, commands, or prior notes.
-- Follow-up questions created by the answer.
-
-If the user is unsure, record the current recommendation and mark the status as draft or unresolved. If a branch is parked, add it to open questions instead of dropping it.
+- Follow-up questions created by the decision or parked question.
 
 ## Suggested notes structure
 
@@ -85,6 +106,6 @@ When continuing a prior brainstorm:
 1. Read the existing notes file.
 2. Summarize the current decisions and open questions briefly.
 3. Ask the next highest-leverage unresolved question.
-4. Continue updating the same file after every answer.
+4. Continue updating the same file only when decision state changes, following the rules above.
 
 The notes file should make it possible to come back days later and understand what was decided, why it was decided, what remains unresolved, and what question should be asked next.
