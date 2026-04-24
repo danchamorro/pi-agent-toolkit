@@ -118,6 +118,7 @@ full list with descriptions.
 | `commit-approval.ts` | Intercepts git commits for interactive review before execution |
 | `pr-approval.ts` | Intercepts PR creation for interactive review |
 | `dirty-repo-guard.ts` | Warns when working in a repo with uncommitted changes |
+| `require-session-name-on-exit.ts` | Prompts for a session name before `/quit`, `/q`, `/safe-quit`, or Ctrl+Shift+Q exits |
 
 **Search and tools:**
 

@@ -2,6 +2,16 @@
 
 All notable changes to extensions in `~/.pi/agent/extensions/`.
 
+## 2026-04-24
+
+### require-session-name-on-exit.ts
+
+- Restored and updated the guarded `/safe-quit`, `/q`, `/quit`, and
+  Ctrl+Shift+Q exit flow after Pi's built-in safe-quit prompt was no longer
+  available in the current release. The extension now intercepts `/quit` before
+  Pi's built-in handler stops the TUI, so unnamed sessions prompt correctly
+  without leaving the terminal in a bad state.
+
 ## 2026-04-22
 
 ### control.ts, context.ts, loop.ts, tilldone.ts, todos.ts

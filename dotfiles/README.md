@@ -70,6 +70,7 @@ All 9 extensions are self-contained in this repo (no upstream package reference)
 | `commit-approval.ts` | Interactive commit approval workflow |
 | `pr-approval.ts` | Interactive PR approval workflow |
 | `dirty-repo-guard.ts` | Warns when working in a repo with uncommitted changes |
+| `require-session-name-on-exit.ts` | Prompts for a session name before guarded quit commands and safe-exit shortcuts |
 | `exa-enforce.ts` | Enforces Exa usage for web search |
 | `exa-search-tool.ts` | Registers Exa as a search tool |
 | `qna-interactive.ts` | Interactive Q&A mode |
