@@ -210,7 +210,7 @@ Prompt templates live in `dotfiles/prompts/` and are installed to
 | File | Purpose |
 |------|---------|
 | `AGENTS.md` | Global agent rules: git safety, commit style, code style, path discipline |
-| `APPEND_SYSTEM.md` | System prompt: reasoning quality, jCodeMunch policy, documentation lookup, writing style |
+| `APPEND_SYSTEM.md` | System prompt: reasoning quality, jCodeMunch and Context Mode policies, documentation lookup, writing style |
 | `settings.json` | Pi settings: default provider/model, enabled models, compaction. Mutated by Pi at runtime; gitignored. |
 | `models.json` | Custom provider definitions (e.g., local models via Ollama) |
 | `agent-modes.json` | Per-mode model/thinking overrides for debug, review, etc. |
@@ -225,6 +225,7 @@ Configured in `mcp.json` (created from template during setup):
 | Server | Purpose | Source |
 |--------|---------|--------|
 | [jCodeMunch](https://github.com/jcodemunch/jcodemunch-mcp) | Code indexing, symbol search, context-aware exploration | `uvx jcodemunch-mcp@latest` |
+| [Context Mode](https://github.com/mksglu/context-mode) | Context-efficient sandboxed execution, indexing, and session continuity | Local clone or `npx context-mode` |
 | [Postgres MCP](https://github.com/crystaldba/postgres-mcp) | Read-only PostgreSQL access via Docker | `crystaldba/postgres-mcp` |
 | [MariaDB MCP](https://github.com/MariaDB/mcp) | Read-only MariaDB or MySQL access via `uvx` | `uvx --from iflow-mcp_mariadb-mariadb-server mariadb-server` |
 | [chrome-devtools](https://github.com/nicobailon/chrome-devtools-mcp) | Browser automation via Chrome DevTools Protocol | `npx chrome-devtools-mcp@latest` |

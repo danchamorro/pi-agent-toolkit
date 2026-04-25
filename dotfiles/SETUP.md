@@ -43,7 +43,8 @@ Edit `~/.pi/agent/auth.json` with your provider API keys:
 
 Edit `~/.pi/agent/mcp.json` to configure your MCP servers. The template
 includes skeletons for jCodeMunch, Postgres MCP, MariaDB MCP, and
-chrome-devtools. `mcp.json` is always local-only: it is created from the
+chrome-devtools. Context Mode can be added after its local clone or npm install
+is available. `mcp.json` is always local-only: it is created from the
 template on first run and is never symlinked or committed.
 
 ### Exa API key
@@ -73,6 +74,31 @@ immediately with the template config. Requires `uvx` (`brew install uv`).
 The agent automatically indexes the current repo on session start
 (configured in `APPEND_SYSTEM.md`). Incremental indexing keeps subsequent
 runs fast.
+
+### Context Mode (context-efficient execution)
+
+[Context Mode](https://github.com/mksglu/context-mode) provides sandboxed
+execution, indexing, search, and session continuity tools that keep bulky raw
+output out of the model context. The guidance in `APPEND_SYSTEM.md` tells Pi to
+prefer Context Mode for large-output analysis, log processing, broad scans,
+long test output, and external documentation ingestion.
+
+For full Pi hook support, clone and build the extension, then add its MCP server
+to `~/.pi/agent/mcp.json` and its built Pi extension to `settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "context-mode": {
+      "command": "node",
+      "args": ["/Users/youruser/.pi/extensions/context-mode/start.mjs"]
+    }
+  }
+}
+```
+
+Use an absolute path because JSON does not expand `~`. Verify with `ctx doctor`
+and `ctx stats` in a Pi session.
 
 ### Postgres MCP (database access)
 
