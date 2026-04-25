@@ -5,7 +5,7 @@ Extensions, skills, and configs for the
 backup so I can restore or sync my setup across machines, and a reference
 for anyone looking to customize their own Pi environment.
 
-Includes 24 extensions, 35 skills, 2 prompt templates, 7 installable Pi
+Includes 24 extensions, 36 skills, 2 prompt templates, 7 installable Pi
 packages, MCP server configurations, and safety guardrails.
 
 ---
@@ -151,7 +151,7 @@ full list with descriptions.
 
 ### Skills
 
-**Bundled skills** (10, committed to this repo):
+**Bundled skills** (11, committed to this repo):
 
 | Skill | Description |
 |-------|-------------|
@@ -163,6 +163,7 @@ full list with descriptions.
 | `gh-issue-creator` | Create GitHub issues via `gh` CLI |
 | `google-chat-cards-v2` | Google Chat Cards v2 notifications |
 | `nushell-shell` | Interactive Nushell usage, shell one-liner translation to Nu, and choosing Nu vs traditional shells |
+| `plan-reviewer` | Review implementation plans for evidence, trackability, dependencies, risks, and validation before execution |
 | `technical-docs` | Technical documentation standards |
 | `whats-new` | Git changelog generation between branches |
 
