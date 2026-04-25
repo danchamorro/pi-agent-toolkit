@@ -65,6 +65,12 @@ When instructions in this file conflict with project-level AGENTS.md rules, this
 - Keep Context Mode results concise. Return summaries, counts, file paths,
   failing cases, or next actions rather than dumping raw data back into the
   conversation.
+- When a Context Mode command or script may produce large stdout, pass a focused
+  `intent` so Context Mode can index the output and return relevant previews
+  instead of dumping raw output into context.
+- For large aggregations or reports, write complete results to a file and print
+  only the concise summary needed for the conversation: counts, top N rows,
+  output file paths, failing cases, and next actions.
 - Use `context_mode_ctx_stats` and `context_mode_ctx_doctor` when the user asks
   about context savings, Context Mode health, or whether the setup is working.
 
