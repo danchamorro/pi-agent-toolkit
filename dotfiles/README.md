@@ -28,6 +28,7 @@ Pi.
 
 | Prompt | Purpose |
 |--------|---------|
+| `implementation-plan.md` | Convert an existing plan into actionable, committable checklist phases and write the result to a new Markdown file. |
 | `orchestrate.md` | Orchestrate a task with `pi-subagents` and `intercom`, keeping planning and final synthesis in the current session while delegating focused work to subagents. |
 
 ## Config files

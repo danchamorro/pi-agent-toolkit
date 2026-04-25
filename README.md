@@ -5,7 +5,7 @@ Extensions, skills, and configs for the
 backup so I can restore or sync my setup across machines, and a reference
 for anyone looking to customize their own Pi environment.
 
-Includes 24 extensions, 35 skills, 1 prompt template, 7 installable Pi
+Includes 24 extensions, 35 skills, 2 prompt templates, 7 installable Pi
 packages, MCP server configurations, and safety guardrails.
 
 ---
@@ -194,13 +194,14 @@ Not committed to this repo. Maintained by their original authors.
 | `firecrawl` | [firecrawl/cli](https://github.com/firecrawl/cli) |
 | `excalidraw-diagram` | [coleam00/excalidraw-diagram-skill](https://github.com/coleam00/excalidraw-diagram-skill) |
 
-### Prompt templates (1)
+### Prompt templates (2)
 
 Prompt templates live in `dotfiles/prompts/` and are installed to
 `~/.pi/agent/prompts/` by `setup.mjs`.
 
 | Prompt | Description |
 |--------|-------------|
+| `implementation-plan` | Convert an existing plan into actionable, committable checklist phases and write the result to a new Markdown file. |
 | `orchestrate` | Orchestrate a task using `pi-subagents` and `intercom`, keeping planning and final synthesis in the current session while delegating focused work to subagents. |
 
 ### Config files
