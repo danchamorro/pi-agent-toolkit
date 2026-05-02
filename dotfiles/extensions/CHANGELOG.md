@@ -6,6 +6,13 @@ All notable changes to extensions in `~/.pi/agent/extensions/`.
 
 ### claude-code-acp/
 
+- Documented how the maintained ACP adapter chooses the underlying Claude
+  model, including `ANTHROPIC_MODEL`, Claude Code settings, and sanitized debug
+  output from `session/new`. Added debug summaries for ACP `initialize` and
+  `session/new` responses without logging prompts, environment variables, file
+  contents, or raw payloads. Disabled Claude Code built-in tools when creating
+  ACP sessions so milestone-one text-only behavior does not depend on the
+  user's Claude Code permission mode.
 - Added an experimental text-only Claude Code provider backed by an ACP agent
   process. The first milestone uses `npx -y @agentclientprotocol/claude-agent-acp@0.31.4`
   by default, renders Pi context into a single text prompt, denies permission

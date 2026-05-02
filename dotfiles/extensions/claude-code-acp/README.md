@@ -24,6 +24,37 @@ Pre-authenticate outside Pi before using this provider. The extension does not i
 
 If `ANTHROPIC_API_KEY` is present in your environment, Claude Code or its adapter may choose API billing instead of subscription billing. Check the adapter documentation and your environment before using this provider for real work.
 
+## Underlying Claude model selection
+
+The Pi model `claude-code-acp/claude-code-acp` means “send this request through the Claude Code ACP adapter.” It does not currently mean Sonnet, Opus, or any specific Claude model.
+
+Pi does not choose the underlying Claude model yet. With `@agentclientprotocol/claude-agent-acp@0.31.4`, model selection is handled inside the adapter and Claude Code. Based on the maintained adapter source, the initial model priority is:
+
+1. `ANTHROPIC_MODEL` in the environment that launches Pi.
+2. Claude Code settings `model` value.
+3. The first model returned by the Claude Agent SDK.
+
+Claude Code settings are loaded from:
+
+- `~/.claude/settings.json`
+- `<cwd>/.claude/settings.json`
+- `<cwd>/.claude/settings.local.json`
+- platform managed settings, such as `/Library/Application Support/ClaudeCode/managed-settings.json` on macOS
+
+The adapter can expose the current and available models after ACP `session/new`. To inspect that without logging prompts, file contents, auth tokens, or environment variables, run Pi with debug enabled:
+
+```bash
+PI_CLAUDE_ACP_DEBUG=1 pi --model claude-code-acp/claude-code-acp --no-tools --no-session -p "Reply with exactly: debug ok"
+```
+
+Look for a sanitized line like:
+
+```text
+[claude-code-acp] session/new: sessionId=... currentModel=... availableModels=...
+```
+
+The adapter also supports model changes through ACP session configuration, but this extension intentionally does not expose Sonnet, Opus, or exact Claude model aliases yet. That is planned for the next phase after we verify the safest way to request and label models.
+
 ## Configuration
 
 Set these environment variables before launching Pi if you need to override the default adapter command:
@@ -47,6 +78,7 @@ pi
 
 This is intentionally text-only.
 
+- Claude Code built-in tools are disabled when creating the ACP session.
 - No filesystem passthrough is advertised.
 - No terminal passthrough is advertised.
 - No MCP server passthrough is advertised.

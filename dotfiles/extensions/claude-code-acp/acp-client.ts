@@ -40,8 +40,33 @@ interface JsonRpcErrorResponse {
 
 type JsonRpcMessage = JsonRpcRequest | JsonRpcNotification | JsonRpcSuccessResponse | JsonRpcErrorResponse;
 
+interface InitializeResponse {
+	protocolVersion?: number;
+	agentInfo?: {
+		name?: string;
+		title?: string;
+		version?: string;
+	};
+	agentCapabilities?: Record<string, unknown>;
+	authMethods?: Array<{ id?: string; name?: string; type?: string }>;
+}
+
 interface NewSessionResponse {
 	sessionId: string;
+	models?: {
+		currentModelId?: string;
+		availableModels?: Array<{ modelId?: string; name?: string; description?: string }>;
+	};
+	modes?: {
+		currentModeId?: string;
+		availableModes?: Array<{ id?: string; name?: string }>;
+	};
+	configOptions?: Array<{
+		id?: string;
+		name?: string;
+		currentValue?: unknown;
+		options?: Array<{ value?: string; name?: string }>;
+	}>;
 }
 
 interface PromptResponse {
@@ -131,7 +156,7 @@ class MinimalAcpClient {
 		signal?.addEventListener("abort", abort, { once: true });
 
 		try {
-			await this.sendRequest("initialize", {
+			const initialize = await this.sendRequest<InitializeResponse>("initialize", {
 				protocolVersion: ACP_PROTOCOL_VERSION,
 				clientInfo: {
 					name: "pi-claude-code-acp",
@@ -139,12 +164,21 @@ class MinimalAcpClient {
 				},
 				clientCapabilities: {},
 			});
+			this.debugInitializeSummary(initialize);
 
 			const session = await this.sendRequest<NewSessionResponse>("session/new", {
 				cwd: resolve(this.cwd),
 				mcpServers: [],
+				_meta: {
+					claudeCode: {
+						options: {
+							tools: [],
+						},
+					},
+				},
 			});
 			this.sessionId = session.sessionId;
+			this.debugSessionSummary(session);
 
 			const response = await this.sendRequest<PromptResponse>("session/prompt", {
 				sessionId: this.sessionId,
@@ -346,9 +380,63 @@ class MinimalAcpClient {
 		clearTimeout(killTimer);
 	}
 
+	private debugInitializeSummary(response: InitializeResponse): void {
+		const capabilities = Object.keys(response.agentCapabilities ?? {}).sort();
+		const authMethods = (response.authMethods ?? [])
+			.map((method) => formatSummaryParts(method.id, method.name, method.type))
+			.filter(isNonEmptyString);
+		this.debug(
+			`initialize: protocolVersion=${response.protocolVersion ?? "unknown"} ` +
+				`agent=${response.agentInfo?.name ?? "unknown"}@${response.agentInfo?.version ?? "unknown"} ` +
+				`capabilities=${formatList(capabilities)} authMethods=${formatList(authMethods)}`,
+		);
+	}
+
+	private debugSessionSummary(response: NewSessionResponse): void {
+		const models = response.models?.availableModels ?? [];
+		const modelSummary = models
+			.slice(0, 12)
+			.map((model) => formatSummaryParts(model.modelId, model.name))
+			.filter(isNonEmptyString);
+		const configOptions = (response.configOptions ?? [])
+			.map((option) => `${option.id ?? "unknown"}=${formatConfigValue(option.currentValue)}`)
+			.filter(Boolean);
+		const modes = (response.modes?.availableModes ?? [])
+			.map((mode) => formatSummaryParts(mode.id, mode.name))
+			.filter(isNonEmptyString);
+		const remainingModels = Math.max(0, models.length - modelSummary.length);
+		const modelSuffix = remainingModels > 0 ? ` +${remainingModels} more` : "";
+
+		this.debug(
+			`session/new: sessionId=${response.sessionId} currentModel=${response.models?.currentModelId ?? "unknown"} ` +
+				`availableModels=${formatList(modelSummary)}${modelSuffix} ` +
+				`currentMode=${response.modes?.currentModeId ?? "unknown"} availableModes=${formatList(modes)} ` +
+				`configOptions=${formatList(configOptions)}`,
+		);
+	}
+
 	private debug(message: string): void {
 		if (this.config.debug) this.callbacks.onDebug?.(`[claude-code-acp] ${message}`);
 	}
+}
+
+function formatList(values: string[]): string {
+	return values.length > 0 ? values.join(",") : "none";
+}
+
+function formatSummaryParts(...parts: Array<string | undefined>): string {
+	return parts.filter(isNonEmptyString).join("/");
+}
+
+function isNonEmptyString(value: string | undefined): value is string {
+	return Boolean(value);
+}
+
+function formatConfigValue(value: unknown): string {
+	if (typeof value === "string") return value;
+	if (typeof value === "number" || typeof value === "boolean") return String(value);
+	if (value === null || value === undefined) return "unset";
+	return "set";
 }
 
 export function mapAcpStopReason(
