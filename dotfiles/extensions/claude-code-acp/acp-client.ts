@@ -70,7 +70,7 @@ interface NewSessionResponse {
 }
 
 interface PromptResponse {
-	stopReason: "end_turn" | "max_tokens" | "max_turn_requests" | "refusal" | "cancelled";
+	stopReason: string;
 }
 
 interface SessionNotification {
@@ -130,6 +130,7 @@ class MinimalAcpClient {
 	private readonly pending = new Map<
 		number | string,
 		{
+			method: string;
 			resolve(value: unknown): void;
 			reject(error: Error): void;
 		}
@@ -163,34 +164,40 @@ class MinimalAcpClient {
 		signal?.addEventListener("abort", abort, { once: true });
 
 		try {
-			const initialize = await this.sendRequest<InitializeResponse>("initialize", {
-				protocolVersion: ACP_PROTOCOL_VERSION,
-				clientInfo: {
-					name: "pi-claude-code-acp",
-					version: "0.1.0",
-				},
-				clientCapabilities: {},
-			});
+			const initialize = validateInitializeResponse(
+				await this.sendRequest("initialize", {
+					protocolVersion: ACP_PROTOCOL_VERSION,
+					clientInfo: {
+						name: "pi-claude-code-acp",
+						version: "0.1.0",
+					},
+					clientCapabilities: {},
+				}),
+			);
 			this.debugInitializeSummary(initialize);
 
-			const session = await this.sendRequest<NewSessionResponse>("session/new", {
-				cwd: resolve(this.cwd),
-				mcpServers: [],
-				_meta: {
-					claudeCode: {
-						options: {
-							tools: [],
+			const session = validateNewSessionResponse(
+				await this.sendRequest("session/new", {
+					cwd: resolve(this.cwd),
+					mcpServers: [],
+					_meta: {
+						claudeCode: {
+							options: {
+								tools: [],
+							},
 						},
 					},
-				},
-			});
+				}),
+			);
 			this.sessionId = session.sessionId;
 			this.debugSessionSummary(session);
 
-			const response = await this.sendRequest<PromptResponse>("session/prompt", {
-				sessionId: this.sessionId,
-				prompt: [{ type: "text", text: prompt }],
-			});
+			const response = validatePromptResponse(
+				await this.sendRequest("session/prompt", {
+					sessionId: this.sessionId,
+					prompt: [{ type: "text", text: prompt }],
+				}),
+			);
 
 			if (this.fatalError) throw this.fatalError;
 			return { stopReason: response.stopReason };
@@ -246,28 +253,32 @@ class MinimalAcpClient {
 	}
 
 	private handleLine(line: string): void {
-		let message: JsonRpcMessage;
+		let parsed: unknown;
 		try {
-			message = JSON.parse(line) as JsonRpcMessage;
+			parsed = JSON.parse(line);
 		} catch (error) {
 			const detail = error instanceof Error ? error.message : String(error);
-			this.fail(new Error(`Claude Code ACP emitted invalid JSON-RPC: ${detail}`));
+			this.fail(new Error(`Claude Code ACP emitted malformed JSON: ${detail}`));
 			return;
 		}
 
-		if ("id" in message && ("result" in message || "error" in message)) {
-			this.handleResponse(message as JsonRpcSuccessResponse | JsonRpcErrorResponse);
+		const message = validateJsonRpcMessage(parsed);
+		if (message instanceof Error) {
+			this.fail(message);
 			return;
 		}
 
-		if ("id" in message && "method" in message) {
-			void this.handleRequest(message as JsonRpcRequest);
+		if (isJsonRpcResponse(message)) {
+			this.handleResponse(message);
 			return;
 		}
 
-		if ("method" in message) {
-			this.handleNotification(message as JsonRpcNotification);
+		if ("id" in message) {
+			void this.handleRequest(message);
+			return;
 		}
+
+		this.handleNotification(message);
 	}
 
 	private handleResponse(message: JsonRpcSuccessResponse | JsonRpcErrorResponse): void {
@@ -278,7 +289,11 @@ class MinimalAcpClient {
 
 		this.pending.delete(message.id);
 		if ("error" in message) {
-			pending.reject(new Error(`${message.error.message} (${message.error.code})`));
+			pending.reject(
+				this.protocolError(
+					`ACP ${pending.method} failed: ${message.error.message} (${message.error.code})${formatErrorData(message.error.data)}`,
+				),
+			);
 		} else {
 			pending.resolve(message.result);
 		}
@@ -301,8 +316,14 @@ class MinimalAcpClient {
 			return;
 		}
 
-		const notification = message.params as SessionNotification | undefined;
-		const update = notification?.update;
+		const notification = validateSessionNotification(message.params);
+		if (notification instanceof Error) {
+			this.fail(notification);
+			void this.cancelAndClose();
+			return;
+		}
+
+		const update = notification.update;
 		if (!update) return;
 
 		if (update.sessionUpdate === "agent_message_chunk") {
@@ -316,7 +337,7 @@ class MinimalAcpClient {
 
 		if (update.sessionUpdate === "tool_call" || update.sessionUpdate === "tool_call_update") {
 			const title = typeof update.title === "string" && update.title ? `: ${update.title}` : "";
-			this.fail(new Error(`Claude Code ACP attempted a tool call${title}. Tool passthrough is disabled.`));
+			this.fail(this.protocolError(`Claude Code ACP attempted a tool call${title}. Tool passthrough is disabled.`));
 			void this.cancelAndClose();
 			return;
 		}
@@ -324,15 +345,16 @@ class MinimalAcpClient {
 		this.debug(`Ignoring ACP session update: ${update.sessionUpdate}`);
 	}
 
-	private sendRequest<T>(method: string, params: unknown): Promise<T> {
+	private sendRequest(method: string, params: unknown): Promise<unknown> {
 		if (this.fatalError) return Promise.reject(this.fatalError);
 		if (!this.child || this.closed) return Promise.reject(new Error("Claude Code ACP process is not running."));
 
 		const id = this.nextId++;
 		const request: JsonRpcRequest = { jsonrpc: JSON_RPC_VERSION, id, method, params };
-		return new Promise<T>((resolvePromise, rejectPromise) => {
+		return new Promise<unknown>((resolvePromise, rejectPromise) => {
 			this.pending.set(id, {
-				resolve: (value) => resolvePromise(value as T),
+				method,
+				resolve: resolvePromise,
 				reject: rejectPromise,
 			});
 			this.writeMessage(request);
@@ -364,6 +386,13 @@ class MinimalAcpClient {
 			pending.reject(error);
 			this.pending.delete(id);
 		}
+	}
+
+	private protocolError(message: string): Error {
+		return new Error(
+			`${message} route=${this.modelSelection.routeId} ` +
+				`requestedModel=${this.modelSelection.modelPreference ?? "adapter-default"}`,
+		);
 	}
 
 	private async cancelAndClose(): Promise<void> {
@@ -431,6 +460,167 @@ class MinimalAcpClient {
 
 	private debug(message: string): void {
 		if (this.config.debug) this.callbacks.onDebug?.(`[claude-code-acp] ${message}`);
+	}
+}
+
+function validateJsonRpcMessage(value: unknown): JsonRpcMessage | Error {
+	if (!isRecord(value)) return new Error("Claude Code ACP emitted invalid JSON-RPC envelope: message must be an object.");
+	if (value.jsonrpc !== JSON_RPC_VERSION) {
+		return new Error('Claude Code ACP emitted invalid JSON-RPC envelope: jsonrpc must be "2.0".');
+	}
+
+	const hasId = "id" in value;
+	const hasMethod = "method" in value;
+	const hasResult = "result" in value;
+	const hasError = "error" in value;
+	if (hasId && !isJsonRpcId(value.id)) return new Error("Claude Code ACP emitted invalid JSON-RPC envelope: invalid id.");
+
+	if (hasMethod) {
+		if (typeof value.method !== "string" || !value.method) {
+			return new Error("Claude Code ACP emitted invalid JSON-RPC envelope: method must be a non-empty string.");
+		}
+		if (hasResult || hasError) return new Error("Claude Code ACP emitted invalid JSON-RPC envelope: method cannot include result or error.");
+		return value as unknown as JsonRpcRequest | JsonRpcNotification;
+	}
+
+	if (hasId && (hasResult || hasError)) {
+		if (hasResult && hasError) return new Error("Claude Code ACP emitted invalid JSON-RPC envelope: response has result and error.");
+		if (hasError && !isJsonRpcErrorObject(value.error)) {
+			return new Error("Claude Code ACP emitted invalid JSON-RPC envelope: invalid error object.");
+		}
+		return value as unknown as JsonRpcSuccessResponse | JsonRpcErrorResponse;
+	}
+
+	return new Error("Claude Code ACP emitted invalid JSON-RPC envelope: expected request, notification, or response.");
+}
+
+function isJsonRpcResponse(message: JsonRpcMessage): message is JsonRpcSuccessResponse | JsonRpcErrorResponse {
+	return "id" in message && ("result" in message || "error" in message);
+}
+
+function validateInitializeResponse(value: unknown): InitializeResponse {
+	if (!isRecord(value)) throw new Error("ACP initialize returned invalid response: expected object.");
+	if ("protocolVersion" in value && typeof value.protocolVersion !== "number") {
+		throw new Error("ACP initialize returned invalid response: protocolVersion must be a number.");
+	}
+	if ("agentInfo" in value && value.agentInfo !== undefined && !isRecord(value.agentInfo)) {
+		throw new Error("ACP initialize returned invalid response: agentInfo must be an object.");
+	}
+	if ("agentCapabilities" in value && value.agentCapabilities !== undefined && !isRecord(value.agentCapabilities)) {
+		throw new Error("ACP initialize returned invalid response: agentCapabilities must be an object.");
+	}
+	if ("authMethods" in value && value.authMethods !== undefined && !Array.isArray(value.authMethods)) {
+		throw new Error("ACP initialize returned invalid response: authMethods must be an array.");
+	}
+	return value as InitializeResponse;
+}
+
+function validateNewSessionResponse(value: unknown): NewSessionResponse {
+	if (!isRecord(value)) throw new Error("ACP session/new returned invalid response: expected object.");
+	if (typeof value.sessionId !== "string" || !value.sessionId) {
+		throw new Error("ACP session/new returned invalid response: sessionId must be a non-empty string.");
+	}
+	if ("models" in value && value.models !== undefined && !isRecord(value.models)) {
+		throw new Error("ACP session/new returned invalid response: models must be an object.");
+	}
+	if (isRecord(value.models) && "availableModels" in value.models && !isOptionalArray(value.models.availableModels)) {
+		throw new Error("ACP session/new returned invalid response: models.availableModels must be an array.");
+	}
+	if ("modes" in value && value.modes !== undefined && !isRecord(value.modes)) {
+		throw new Error("ACP session/new returned invalid response: modes must be an object.");
+	}
+	if (isRecord(value.modes) && "availableModes" in value.modes && !isOptionalArray(value.modes.availableModes)) {
+		throw new Error("ACP session/new returned invalid response: modes.availableModes must be an array.");
+	}
+	if ("configOptions" in value && !isOptionalArray(value.configOptions)) {
+		throw new Error("ACP session/new returned invalid response: configOptions must be an array.");
+	}
+	return value as unknown as NewSessionResponse;
+}
+
+function validatePromptResponse(value: unknown): PromptResponse {
+	if (!isRecord(value)) throw new Error("ACP session/prompt returned invalid response: expected object.");
+	if (typeof value.stopReason !== "string" || !value.stopReason) {
+		throw new Error("ACP session/prompt returned invalid response: stopReason must be a non-empty string.");
+	}
+	return value as unknown as PromptResponse;
+}
+
+function validateSessionNotification(value: unknown): SessionNotification | Error {
+	if (!isRecord(value)) return new Error("ACP session/update notification was invalid: params must be an object.");
+	if ("sessionId" in value && value.sessionId !== undefined && typeof value.sessionId !== "string") {
+		return new Error("ACP session/update notification was invalid: sessionId must be a string.");
+	}
+	if (!("update" in value) || value.update === undefined) return value as SessionNotification;
+	if (!isRecord(value.update)) return new Error("ACP session/update notification was invalid: update must be an object.");
+	const update = value.update;
+	if (typeof update.sessionUpdate !== "string" || !update.sessionUpdate) {
+		return new Error("ACP session/update notification was invalid: sessionUpdate must be a non-empty string.");
+	}
+
+	if (isChunkSessionUpdate(update.sessionUpdate)) {
+		const contentError = validateChunkContent(update);
+		if (contentError) return contentError;
+		return value as SessionNotification;
+	}
+
+	if (isToolCallSessionUpdate(update.sessionUpdate)) {
+		const titleError = validateToolCallTitle(update);
+		if (titleError) return titleError;
+		return value as SessionNotification;
+	}
+
+	return value as SessionNotification;
+}
+
+function isChunkSessionUpdate(sessionUpdate: string): boolean {
+	return ["agent_message_chunk", "agent_thought_chunk", "user_message_chunk"].includes(sessionUpdate);
+}
+
+function validateChunkContent(update: Record<string, unknown>): Error | undefined {
+	if (!("content" in update) || update.content === undefined) return undefined;
+	if (!isRecord(update.content)) return new Error("ACP session/update chunk was invalid: content must be an object.");
+	if ("type" in update.content && update.content.type !== undefined && typeof update.content.type !== "string") {
+		return new Error("ACP session/update chunk was invalid: content.type must be a string.");
+	}
+	if ("text" in update.content && update.content.text !== undefined && typeof update.content.text !== "string") {
+		return new Error("ACP session/update chunk was invalid: content.text must be a string.");
+	}
+	return undefined;
+}
+
+function isToolCallSessionUpdate(sessionUpdate: string): boolean {
+	return sessionUpdate === "tool_call" || sessionUpdate === "tool_call_update";
+}
+
+function validateToolCallTitle(update: Record<string, unknown>): Error | undefined {
+	if (!("title" in update) || update.title === undefined || update.title === null) return undefined;
+	if (typeof update.title === "string") return undefined;
+	return new Error("ACP session/update tool call was invalid: title must be a string or null.");
+}
+
+function isJsonRpcId(value: unknown): value is number | string | null {
+	return typeof value === "number" || typeof value === "string" || value === null;
+}
+
+function isJsonRpcErrorObject(value: unknown): value is JsonRpcErrorResponse["error"] {
+	return isRecord(value) && typeof value.code === "number" && typeof value.message === "string";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isOptionalArray(value: unknown): boolean {
+	return value === undefined || Array.isArray(value);
+}
+
+function formatErrorData(value: unknown): string {
+	if (value === undefined) return "";
+	try {
+		return ` data=${JSON.stringify(value)}`;
+	} catch {
+		return " data=[unserializable]";
 	}
 }
 

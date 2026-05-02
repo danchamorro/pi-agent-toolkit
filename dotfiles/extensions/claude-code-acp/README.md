@@ -56,7 +56,7 @@ Claude Code settings are loaded from:
 The adapter can expose the current and available models after ACP `session/new`. To inspect that without logging prompts, file contents, auth tokens, or environment variables, run Pi with debug enabled:
 
 ```bash
-PI_CLAUDE_ACP_DEBUG=1 pi --model claude-code-acp/claude-code-acp --no-tools --no-session -p "Reply with exactly: debug ok"
+PI_CLAUDE_ACP_DEBUG=1 pi --model claude-code-acp/default --no-tools --no-session -p "Reply with exactly: debug ok"
 ```
 
 Look for a sanitized line like:
@@ -78,6 +78,12 @@ pi --model claude-code-acp/haiku-4-5 --no-tools
 ```
 
 The adapter also supports model changes through ACP session configuration. This extension uses per-request environment overrides for now because each Pi request creates a fresh ACP session.
+
+## Protocol diagnostics
+
+The extension validates the minimal ACP JSON-RPC protocol surface it uses before trusting adapter messages. Malformed JSON, invalid JSON-RPC envelopes, invalid `initialize`, `session/new`, or `session/prompt` responses, and malformed session updates fail the request with an explicit error. Unknown but well-formed session update types are debug-logged and ignored for forward compatibility.
+
+Permission requests are still denied automatically. Tool-call updates still cancel the prompt because tool, file, terminal, and MCP passthrough remain disabled. Adapter error diagnostics include the ACP method when available, the selected Pi route, the requested adapter model, and the configured adapter command.
 
 ## Configuration
 

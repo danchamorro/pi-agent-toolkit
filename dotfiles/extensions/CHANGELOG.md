@@ -6,6 +6,12 @@ All notable changes to extensions in `~/.pi/agent/extensions/`.
 
 ### claude-code-acp/
 
+- Added ACP protocol validation and clearer diagnostics for malformed JSON-RPC
+  envelopes, invalid `initialize`, `session/new`, and `session/prompt`
+  responses, malformed session updates, and adapter method errors. Unknown
+  well-formed session update types are ignored for forward compatibility.
+  Permission requests remain denied and ACP tool-call updates still cancel the
+  prompt because file, terminal, tool, and MCP passthrough are disabled.
 - Added explicit verified model routes for `sonnet-4-6`, `sonnet-4-5`,
   `opus-4-7-1m`, `opus-4-7`, `opus-4-6`, and `haiku-4-5`. The named routes set
   `ANTHROPIC_MODEL` only for the spawned adapter subprocess, omit broad model
