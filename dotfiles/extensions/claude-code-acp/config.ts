@@ -3,6 +3,7 @@ export interface ClaudeCodeAcpConfig {
 	args: string[];
 	timeoutMs: number;
 	debug: boolean;
+	debugTranscript: boolean;
 }
 
 const DEFAULT_COMMAND = "npx";
@@ -36,7 +37,7 @@ function parseTimeoutMs(raw: string | undefined): number {
 	return timeoutMs;
 }
 
-function parseDebug(raw: string | undefined): boolean {
+function parseBooleanEnv(raw: string | undefined): boolean {
 	if (!raw) return false;
 	return ["1", "true", "yes", "on"].includes(raw.toLowerCase());
 }
@@ -49,7 +50,8 @@ export function loadClaudeCodeAcpConfig(env: NodeJS.ProcessEnv = process.env): C
 		command,
 		args,
 		timeoutMs: parseTimeoutMs(env.PI_CLAUDE_ACP_TIMEOUT_MS),
-		debug: parseDebug(env.PI_CLAUDE_ACP_DEBUG),
+		debug: parseBooleanEnv(env.PI_CLAUDE_ACP_DEBUG),
+		debugTranscript: parseBooleanEnv(env.PI_CLAUDE_ACP_DEBUG_TRANSCRIPT),
 	};
 }
 

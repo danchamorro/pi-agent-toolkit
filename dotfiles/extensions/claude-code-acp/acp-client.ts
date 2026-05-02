@@ -8,6 +8,10 @@ const ACP_PROTOCOL_VERSION = 1;
 const METHOD_NOT_FOUND = -32601;
 const PROCESS_EXIT_GRACE_MS = 1_000;
 const STDERR_LIMIT = 8_000;
+const CHUNK_SESSION_UPDATES = new Set(["agent_message_chunk", "agent_thought_chunk", "user_message_chunk"]);
+const TOOL_CALL_SESSION_UPDATES = new Set(["tool_call", "tool_call_update"]);
+
+type TranscriptFieldValue = string | number | boolean | undefined;
 
 interface JsonRpcRequest {
 	jsonrpc: typeof JSON_RPC_VERSION;
@@ -198,6 +202,7 @@ class MinimalAcpClient {
 					prompt: [{ type: "text", text: prompt }],
 				}),
 			);
+			this.transcript("prompt_complete", { stopReason: response.stopReason });
 
 			if (this.fatalError) throw this.fatalError;
 			return { stopReason: response.stopReason };
@@ -217,6 +222,11 @@ class MinimalAcpClient {
 			...process.env,
 			...(this.modelSelection.modelPreference ? { ANTHROPIC_MODEL: this.modelSelection.modelPreference } : {}),
 		};
+		this.transcript("process_start", {
+			command: this.config.command,
+			args: this.config.args.length,
+			anthropicModelOverride: Boolean(this.modelSelection.modelPreference),
+		});
 		this.child = spawn(this.config.command, this.config.args, {
 			cwd: this.cwd,
 			env,
@@ -240,11 +250,16 @@ class MinimalAcpClient {
 		this.child.stderr.on("data", (chunk: string) => {
 			this.stderr = `${this.stderr}${chunk}`.slice(-STDERR_LIMIT);
 			this.debug(`stderr: ${chunk.trim()}`);
+			this.transcript("stderr", { bytes: Buffer.byteLength(chunk, "utf8"), lines: countLines(chunk) });
 		});
 
-		this.child.on("error", (error) => this.fail(error));
+		this.child.on("error", (error) => {
+			this.transcript("process_error", { errorName: error.name, messageLength: error.message.length });
+			this.fail(error);
+		});
 		this.child.on("exit", (code, signal) => {
 			this.closed = true;
+			this.transcript("process_exit", { code: code ?? "null", signal: signal ?? "null", pending: this.pending.size });
 			if (this.pending.size > 0 && !this.fatalError) {
 				const detail = this.stderr.trim() ? ` stderr: ${this.stderr.trim()}` : "";
 				this.fail(new Error(`Claude Code ACP process exited before completing. code=${code} signal=${signal}.${detail}`));
@@ -258,12 +273,14 @@ class MinimalAcpClient {
 			parsed = JSON.parse(line);
 		} catch (error) {
 			const detail = error instanceof Error ? error.message : String(error);
+			this.transcript("recv_malformed_json", { errorName: error instanceof Error ? error.name : "Error", bytes: Buffer.byteLength(line, "utf8") });
 			this.fail(new Error(`Claude Code ACP emitted malformed JSON: ${detail}`));
 			return;
 		}
 
 		const message = validateJsonRpcMessage(parsed);
 		if (message instanceof Error) {
+			this.transcript("recv_invalid_jsonrpc", { messageLength: message.message.length });
 			this.fail(message);
 			return;
 		}
@@ -288,6 +305,14 @@ class MinimalAcpClient {
 		if (!pending) return;
 
 		this.pending.delete(message.id);
+		this.transcript("recv_response", {
+			id: message.id,
+			method: pending.method,
+			status: "error" in message ? "error" : "ok",
+			result: "error" in message ? undefined : summarizeResult(pending.method, message.result),
+			errorCode: "error" in message ? message.error.code : undefined,
+			errorMessage: "error" in message ? message.error.message : undefined,
+		});
 		if ("error" in message) {
 			pending.reject(
 				this.protocolError(
@@ -300,6 +325,7 @@ class MinimalAcpClient {
 	}
 
 	private async handleRequest(message: JsonRpcRequest): Promise<void> {
+		this.transcript("recv_request", { id: message.id, method: message.method, params: summarizeParams(message.method, message.params) });
 		if (message.method === "session/request_permission") {
 			this.debug("Denying ACP permission request because tool passthrough is disabled.");
 			this.sendResponse(message.id, { outcome: { outcome: "cancelled" } });
@@ -311,6 +337,7 @@ class MinimalAcpClient {
 	}
 
 	private handleNotification(message: JsonRpcNotification): void {
+		this.transcript("recv_notification", { method: message.method, update: summarizeSessionUpdate(message.params) });
 		if (message.method !== "session/update") {
 			this.debug(`Ignoring ACP notification: ${message.method}`);
 			return;
@@ -351,6 +378,7 @@ class MinimalAcpClient {
 
 		const id = this.nextId++;
 		const request: JsonRpcRequest = { jsonrpc: JSON_RPC_VERSION, id, method, params };
+		this.transcript("send_request", { id, method, params: summarizeParams(method, params) });
 		return new Promise<unknown>((resolvePromise, rejectPromise) => {
 			this.pending.set(id, {
 				method,
@@ -362,10 +390,12 @@ class MinimalAcpClient {
 	}
 
 	private sendResponse(id: number | string, result: unknown): void {
+		this.transcript("send_response", { id, status: "ok", result: summarizeResult("client/response", result) });
 		this.writeMessage({ jsonrpc: JSON_RPC_VERSION, id, result });
 	}
 
 	private sendError(id: number | string, code: number, message: string): void {
+		this.transcript("send_response", { id, status: "error", errorCode: code, errorMessage: message });
 		this.writeMessage({ jsonrpc: JSON_RPC_VERSION, id, error: { code, message } });
 	}
 
@@ -381,6 +411,7 @@ class MinimalAcpClient {
 	}
 
 	private fail(error: Error): void {
+		this.transcript("fail", { errorName: error.name, messageLength: error.message.length, pending: this.pending.size });
 		if (!this.fatalError) this.fatalError = error;
 		for (const [id, pending] of this.pending) {
 			pending.reject(error);
@@ -396,8 +427,10 @@ class MinimalAcpClient {
 	}
 
 	private async cancelAndClose(): Promise<void> {
+		this.transcript("cancel_and_close", { hasSession: Boolean(this.sessionId), closed: this.closed });
 		if (this.sessionId && this.child && !this.closed) {
 			const id = this.nextId++;
+			this.transcript("send_request", { id, method: "session/cancel", params: "sessionId=present" });
 			this.writeMessage({
 				jsonrpc: JSON_RPC_VERSION,
 				id,
@@ -412,6 +445,7 @@ class MinimalAcpClient {
 	private async closeProcess(): Promise<void> {
 		if (!this.child || this.closed) return;
 
+		this.transcript("close_process", { action: "sigterm" });
 		this.child.stdin.end();
 		this.child.kill("SIGTERM");
 
@@ -456,6 +490,16 @@ class MinimalAcpClient {
 				`currentMode=${response.modes?.currentModeId ?? "unknown"} availableModes=${formatList(modes)} ` +
 				`configOptions=${formatList(configOptions)}`,
 		);
+	}
+
+	private transcript(event: string, fields: Record<string, TranscriptFieldValue> = {}): void {
+		if (!this.config.debugTranscript) return;
+		const shared = {
+			route: this.modelSelection.routeId,
+			requestedModel: this.modelSelection.modelPreference ?? "adapter-default",
+			...fields,
+		};
+		this.callbacks.onDebug?.(`[claude-code-acp:transcript] ${event}${formatTranscriptFields(shared)}`);
 	}
 
 	private debug(message: string): void {
@@ -574,7 +618,7 @@ function validateSessionNotification(value: unknown): SessionNotification | Erro
 }
 
 function isChunkSessionUpdate(sessionUpdate: string): boolean {
-	return ["agent_message_chunk", "agent_thought_chunk", "user_message_chunk"].includes(sessionUpdate);
+	return CHUNK_SESSION_UPDATES.has(sessionUpdate);
 }
 
 function validateChunkContent(update: Record<string, unknown>): Error | undefined {
@@ -590,7 +634,7 @@ function validateChunkContent(update: Record<string, unknown>): Error | undefine
 }
 
 function isToolCallSessionUpdate(sessionUpdate: string): boolean {
-	return sessionUpdate === "tool_call" || sessionUpdate === "tool_call_update";
+	return TOOL_CALL_SESSION_UPDATES.has(sessionUpdate);
 }
 
 function validateToolCallTitle(update: Record<string, unknown>): Error | undefined {
@@ -622,6 +666,87 @@ function formatErrorData(value: unknown): string {
 	} catch {
 		return " data=[unserializable]";
 	}
+}
+
+function summarizeParams(method: string, params: unknown): string {
+	if (!isRecord(params)) return params === undefined ? "none" : typeof params;
+	if (method === "session/prompt") return summarizePromptParams(params);
+	if (method === "session/new") return `cwd=present mcpServers=${arrayLength(params.mcpServers)} tools=disabled`;
+	if (method === "initialize") return `protocolVersion=${String(params.protocolVersion ?? "unknown")}`;
+	if (method === "session/cancel") return "sessionId=present";
+	return summarizeObjectShape(params);
+}
+
+function summarizePromptParams(params: Record<string, unknown>): string {
+	const prompt = Array.isArray(params.prompt) ? params.prompt : [];
+	let textChars = 0;
+	for (const block of prompt) {
+		if (isRecord(block) && typeof block.text === "string") textChars += block.text.length;
+	}
+	return `sessionId=present blocks=${prompt.length} textChars=${textChars}`;
+}
+
+function summarizeResult(method: string, result: unknown): string {
+	if (method === "session/prompt" && isRecord(result)) return `stopReason=${String(result.stopReason ?? "unknown")}`;
+	if (method === "session/new" && isRecord(result)) return `sessionId=present currentModel=${summarizeNestedString(result, "models", "currentModelId")}`;
+	if (method === "initialize" && isRecord(result)) return `protocolVersion=${String(result.protocolVersion ?? "unknown")}`;
+	if (isRecord(result)) return summarizeObjectShape(result);
+	return result === undefined ? "none" : typeof result;
+}
+
+function summarizeSessionUpdate(params: unknown): string {
+	if (!isRecord(params) || !isRecord(params.update)) return "none";
+	const update = params.update;
+	const sessionUpdate = typeof update.sessionUpdate === "string" ? update.sessionUpdate : "unknown";
+	const content = isRecord(update.content) ? update.content : undefined;
+	const contentType = typeof content?.type === "string" ? content.type : undefined;
+	const textLength = typeof content?.text === "string" ? content.text.length : undefined;
+	return formatInlineFields({ type: sessionUpdate, contentType, textLength });
+}
+
+function summarizeObjectShape(value: Record<string, unknown>): string {
+	return `keys=${Object.keys(value)
+		.map((key) => (isSensitiveKey(key) ? `${key}:redacted` : key))
+		.slice(0, 8)
+		.join(",")}`;
+}
+
+function summarizeNestedString(value: Record<string, unknown>, parentKey: string, childKey: string): string {
+	const parent = isRecord(value[parentKey]) ? value[parentKey] : undefined;
+	const child = parent?.[childKey];
+	return typeof child === "string" ? child : "unknown";
+}
+
+function arrayLength(value: unknown): number {
+	return Array.isArray(value) ? value.length : 0;
+}
+
+function formatTranscriptFields(fields: Record<string, TranscriptFieldValue>): string {
+	const formatted = formatInlineFields(fields);
+	return formatted ? ` ${formatted}` : "";
+}
+
+function formatInlineFields(fields: Record<string, TranscriptFieldValue>): string {
+	const parts: string[] = [];
+	for (const [key, value] of Object.entries(fields)) {
+		if (value === undefined) continue;
+		parts.push(`${key}=${formatTranscriptValue(key, value)}`);
+	}
+	return parts.join(" ");
+}
+
+function formatTranscriptValue(key: string, value: Exclude<TranscriptFieldValue, undefined>): string {
+	if (isSensitiveKey(key)) return "[redacted]";
+	return String(value).replaceAll(/\s+/g, " ").slice(0, 200);
+}
+
+function isSensitiveKey(key: string): boolean {
+	return /(^|_|-)(token|apiKey|secret|auth|password|credential|cookie|sessionId|bearer)($|_|-)/i.test(key);
+}
+
+function countLines(value: string): number {
+	if (!value) return 0;
+	return value.split("\n").length - (value.endsWith("\n") ? 1 : 0);
 }
 
 function formatList(values: string[]): string {

@@ -6,6 +6,13 @@ All notable changes to extensions in `~/.pi/agent/extensions/`.
 
 ### claude-code-acp/
 
+- Added opt-in sanitized ACP transcript diagnostics with
+  `PI_CLAUDE_ACP_DEBUG_TRANSCRIPT`. Transcript logs include protocol method
+  names, request ids, response status, update types, text lengths, stop
+  reasons, selected routes, requested models, stderr byte counts, and process
+  lifecycle events without logging raw prompts, rendered context, raw agent text
+  chunks, raw JSON-RPC messages, environment variables, auth tokens, raw stderr,
+  or raw tool payloads.
 - Added ACP protocol validation and clearer diagnostics for malformed JSON-RPC
   envelopes, invalid `initialize`, `session/new`, and `session/prompt`
   responses, malformed session updates, and adapter method errors. Unknown

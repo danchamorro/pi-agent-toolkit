@@ -85,6 +85,20 @@ The extension validates the minimal ACP JSON-RPC protocol surface it uses before
 
 Permission requests are still denied automatically. Tool-call updates still cancel the prompt because tool, file, terminal, and MCP passthrough remain disabled. Adapter error diagnostics include the ACP method when available, the selected Pi route, the requested adapter model, and the configured adapter command.
 
+## Safe transcript diagnostics
+
+Set `PI_CLAUDE_ACP_DEBUG_TRANSCRIPT=1` to emit compact ACP protocol transcript lines on stderr. This is independent from `PI_CLAUDE_ACP_DEBUG` and is intended for safer bug reports.
+
+```bash
+PI_CLAUDE_ACP_DEBUG_TRANSCRIPT=1 \
+PI_CLAUDE_ACP_TIMEOUT_MS=60000 \
+pi --model claude-code-acp/default --no-tools --no-session -p "Reply with exactly: transcript ok"
+```
+
+Transcript lines include method names, request ids, response status, route, requested model, stop reason, session update type, content type, text length, stderr byte counts, and process lifecycle events. Transcript mode does not log raw prompts, rendered Pi context, file contents, environment variables, auth tokens, raw JSON-RPC messages, raw adapter stderr, raw tool payloads, or raw agent text chunks.
+
+`PI_CLAUDE_ACP_DEBUG` still emits the existing human-readable debug summaries and raw adapter stderr chunks. Prefer `PI_CLAUDE_ACP_DEBUG_TRANSCRIPT=1` when sharing diagnostics.
+
 ## Configuration
 
 Set these environment variables before launching Pi if you need to override the default adapter command:
@@ -95,6 +109,7 @@ Set these environment variables before launching Pi if you need to override the 
 | `PI_CLAUDE_ACP_ARGS_JSON` | JSON array of command arguments | `["-y", "@agentclientprotocol/claude-agent-acp@0.31.4"]` |
 | `PI_CLAUDE_ACP_TIMEOUT_MS` | Prompt timeout in milliseconds | `300000` |
 | `PI_CLAUDE_ACP_DEBUG` | Set to `true`, `1`, `yes`, or `on` for debug logs on stderr | unset |
+| `PI_CLAUDE_ACP_DEBUG_TRANSCRIPT` | Set to `true`, `1`, `yes`, or `on` for sanitized ACP protocol transcript logs on stderr | unset |
 
 Example using a globally installed adapter:
 
