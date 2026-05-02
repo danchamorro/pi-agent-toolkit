@@ -5,7 +5,7 @@ Extensions, skills, and configs for the
 backup so I can restore or sync my setup across machines, and a reference
 for anyone looking to customize their own Pi environment.
 
-Includes 24 extensions, 36 skills, 2 prompt templates, 7 installable Pi
+Includes 25 extensions, 36 skills, 2 prompt templates, 7 installable Pi
 packages, MCP server configurations, and safety guardrails.
 
 ---
@@ -104,7 +104,7 @@ pi install git:https://github.com/badlogic/pi-diff-review
 | `pi-intercom` | Direct 1:1 messaging between Pi sessions on the same machine, with an `intercom` tool plus `/intercom` and `Alt+M` UI entry points. | [nicobailon/pi-intercom](https://github.com/nicobailon/pi-intercom) |
 | `pi-diff-review` | Native diff review window for Pi. Adds a `/diff-review` command that opens changed files in a Monaco diff editor and turns review notes into a prompt back in Pi. | [badlogic/pi-diff-review](https://github.com/badlogic/pi-diff-review) |
 
-### Extensions (24)
+### Extensions (25)
 
 All extensions live in `dotfiles/extensions/`. See
 [dotfiles/extensions/README.md](dotfiles/extensions/README.md) for the
@@ -120,7 +120,7 @@ full list with descriptions.
 | `dirty-repo-guard.ts` | Warns when working in a repo with uncommitted changes |
 | `require-session-name-on-exit.ts` | Prompts for a session name before `/quit`, `/q`, `/safe-quit`, or Ctrl+Shift+Q exits |
 
-**Search and tools:**
+**Search, tools, and experimental providers:**
 
 | Extension | What it does |
 |-----------|-------------|
@@ -128,6 +128,7 @@ full list with descriptions.
 | `exa-enforce.ts` | Enforces Exa over ad-hoc web search methods |
 | `tilldone.ts` | Task list management with progress tracking |
 | `tools.ts` | Custom tool registrations |
+| `claude-code-acp/` | Experimental text-only Claude Code provider backed by an ACP agent process |
 
 **UI and session management:**
 

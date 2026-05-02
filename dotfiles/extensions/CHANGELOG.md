@@ -2,6 +2,17 @@
 
 All notable changes to extensions in `~/.pi/agent/extensions/`.
 
+## 2026-05-02
+
+### claude-code-acp/
+
+- Added an experimental text-only Claude Code provider backed by an ACP agent
+  process. The first milestone uses `npx -y @agentclientprotocol/claude-agent-acp@0.31.4`
+  by default, renders Pi context into a single text prompt, denies permission
+  requests, and cancels unsupported tool-call updates so Pi does not provide
+  ACP filesystem or terminal passthrough. The adapter process still runs with
+  normal OS permissions, so this is not a sandbox.
+
 ## 2026-04-24
 
 ### require-session-name-on-exit.ts
