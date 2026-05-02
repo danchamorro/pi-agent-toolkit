@@ -133,10 +133,10 @@ export default function (pi: ExtensionAPI) {
     ctx.ui.addAutocompleteProvider((current: any) => ({
       async getSuggestions(lines: string[], line: number, col: number, options: any) {
         const beforeCursor = (lines[line] ?? "").slice(0, col);
-        const match = beforeCursor.match(/^\/(q|safe-quit)?$/);
+        const match = beforeCursor.match(/^\/(q|safe-quit)$/);
         if (!match) return current.getSuggestions(lines, line, col, options);
 
-        const query = match[1] ?? "";
+        const query = match[1];
         const commands = [
           {
             value: "/q",

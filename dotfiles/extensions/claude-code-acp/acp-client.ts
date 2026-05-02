@@ -107,14 +107,20 @@ export interface AcpPromptResult {
 	stopReason: PromptResponse["stopReason"];
 }
 
+export interface AcpModelSelection {
+	routeId: string;
+	modelPreference?: string;
+}
+
 export async function runAcpTextPrompt(params: {
 	config: ClaudeCodeAcpConfig;
 	cwd: string;
 	prompt: string;
+	modelSelection: AcpModelSelection;
 	signal?: AbortSignal;
 	callbacks: AcpPromptCallbacks;
 }): Promise<AcpPromptResult> {
-	const client = new MinimalAcpClient(params.config, params.cwd, params.callbacks);
+	const client = new MinimalAcpClient(params.config, params.cwd, params.callbacks, params.modelSelection);
 	return await client.runPrompt(params.prompt, params.signal);
 }
 
@@ -137,6 +143,7 @@ class MinimalAcpClient {
 		private readonly config: ClaudeCodeAcpConfig,
 		private readonly cwd: string,
 		private readonly callbacks: AcpPromptCallbacks,
+		private readonly modelSelection: AcpModelSelection,
 	) {}
 
 	async runPrompt(prompt: string, signal?: AbortSignal): Promise<AcpPromptResult> {
@@ -195,10 +202,17 @@ class MinimalAcpClient {
 	}
 
 	private spawnChild(): void {
-		this.debug(`Starting ACP command: ${this.config.command} ${this.config.args.join(" ")}`);
+		this.debug(
+			`Starting ACP command: ${this.config.command} ${this.config.args.join(" ")} ` +
+				`route=${this.modelSelection.routeId} requestedModel=${this.modelSelection.modelPreference ?? "adapter-default"}`,
+		);
+		const env = {
+			...process.env,
+			...(this.modelSelection.modelPreference ? { ANTHROPIC_MODEL: this.modelSelection.modelPreference } : {}),
+		};
 		this.child = spawn(this.config.command, this.config.args, {
 			cwd: this.cwd,
-			env: process.env,
+			env,
 			stdio: "pipe",
 		});
 

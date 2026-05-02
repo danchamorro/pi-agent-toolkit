@@ -6,6 +6,11 @@ All notable changes to extensions in `~/.pi/agent/extensions/`.
 
 ### claude-code-acp/
 
+- Added explicit verified model routes for `sonnet-4-6`, `sonnet-4-5`,
+  `opus-4-7-1m`, `opus-4-7`, `opus-4-6`, and `haiku-4-5`. The named routes set
+  `ANTHROPIC_MODEL` only for the spawned adapter subprocess, omit broad model
+  aliases from the picker, and use debug output as the source of truth for the
+  adapter-resolved model.
 - Documented how the maintained ACP adapter chooses the underlying Claude
   model, including `ANTHROPIC_MODEL`, Claude Code settings, and sanitized debug
   output from `session/new`. Added debug summaries for ACP `initialize` and

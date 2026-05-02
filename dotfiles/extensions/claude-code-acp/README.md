@@ -4,9 +4,21 @@ Experimental Pi provider that sends text prompts to Claude Code through an ACP a
 
 ## What it registers
 
-- Provider id: `claude-code-acp`
-- Model id: `claude-code-acp`
-- Display name: `Claude Code via ACP (experimental)`
+Provider id: `claude-code-acp`
+
+Model routes:
+
+| Model id | What it requests |
+|---|---|
+| `default` | Adapter default. Leaves `ANTHROPIC_MODEL` unchanged, so the adapter uses your environment, Claude Code settings, or SDK default. |
+| `sonnet-4-6` | Requests `ANTHROPIC_MODEL=claude-sonnet-4-6` for the adapter subprocess. |
+| `sonnet-4-5` | Requests `ANTHROPIC_MODEL=claude-sonnet-4-5` for the adapter subprocess. |
+| `opus-4-7-1m` | Requests `ANTHROPIC_MODEL=opus[1m]` for the adapter subprocess. This is the verified Opus 4.7 1M route. |
+| `opus-4-7` | Requests `ANTHROPIC_MODEL=claude-opus-4-7` for the adapter subprocess. This is not the 1M route. |
+| `opus-4-6` | Requests `ANTHROPIC_MODEL=claude-opus-4-6` for the adapter subprocess. |
+| `haiku-4-5` | Requests `ANTHROPIC_MODEL=claude-haiku-4-5` for the adapter subprocess. |
+
+These routes request adapter model preferences. The ACP `session/new` debug line is the source of truth for what the adapter actually selected. The broad `sonnet`, `opus`, and `haiku` aliases, plus the old `claude-code-acp` model id, are intentionally omitted from the picker to keep model selection explicit. `claude-haiku-3-5` and exact `*-1m` IDs such as `claude-opus-4-7-1m` were tested but rejected by the adapter/account used during implementation, so `opus-4-7-1m` uses the adapter's working `opus[1m]` alias.
 
 The default command is:
 
@@ -26,9 +38,9 @@ If `ANTHROPIC_API_KEY` is present in your environment, Claude Code or its adapte
 
 ## Underlying Claude model selection
 
-The Pi model `claude-code-acp/claude-code-acp` means “send this request through the Claude Code ACP adapter.” It does not currently mean Sonnet, Opus, or any specific Claude model.
+The Pi provider is still an ACP adapter route, not a direct Anthropic Messages API provider. The explicit model routes set `ANTHROPIC_MODEL` only for the spawned adapter subprocess. They request a model from Claude Code, but the adapter may resolve aliases differently depending on account, subscription tier, adapter version, and available models.
 
-Pi does not choose the underlying Claude model yet. With `@agentclientprotocol/claude-agent-acp@0.31.4`, model selection is handled inside the adapter and Claude Code. Based on the maintained adapter source, the initial model priority is:
+For `claude-code-acp/default`, Pi does not set `ANTHROPIC_MODEL`. With `@agentclientprotocol/claude-agent-acp@0.31.4`, the adapter's initial model priority is:
 
 1. `ANTHROPIC_MODEL` in the environment that launches Pi.
 2. Claude Code settings `model` value.
@@ -53,7 +65,19 @@ Look for a sanitized line like:
 [claude-code-acp] session/new: sessionId=... currentModel=... availableModels=...
 ```
 
-The adapter also supports model changes through ACP session configuration, but this extension intentionally does not expose Sonnet, Opus, or exact Claude model aliases yet. That is planned for the next phase after we verify the safest way to request and label models.
+Example commands:
+
+```bash
+pi --model claude-code-acp/default --no-tools
+pi --model claude-code-acp/sonnet-4-6 --no-tools
+pi --model claude-code-acp/sonnet-4-5 --no-tools
+pi --model claude-code-acp/opus-4-7-1m --no-tools
+pi --model claude-code-acp/opus-4-7 --no-tools
+pi --model claude-code-acp/opus-4-6 --no-tools
+pi --model claude-code-acp/haiku-4-5 --no-tools
+```
+
+The adapter also supports model changes through ACP session configuration. This extension uses per-request environment overrides for now because each Pi request creates a fresh ACP session.
 
 ## Configuration
 

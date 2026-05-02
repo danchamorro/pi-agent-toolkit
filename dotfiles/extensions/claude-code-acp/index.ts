@@ -26,8 +26,83 @@ import { describeClaudeCodeAcpCommand, loadClaudeCodeAcpConfig } from "./config.
 import { renderContextAsAcpPrompt } from "./context-renderer.ts";
 
 const PROVIDER_ID = "claude-code-acp";
-const MODEL_ID = "claude-code-acp";
 const API_ID = "claude-code-acp";
+
+interface ClaudeCodeAcpModelRoute {
+	id: string;
+	name: string;
+	modelPreference?: string;
+}
+
+interface ClaudeCodeAcpProviderModel {
+	id: string;
+	name: string;
+	reasoning: boolean;
+	input: ["text"];
+	cost: { input: number; output: number; cacheRead: number; cacheWrite: number };
+	contextWindow: number;
+	maxTokens: number;
+}
+
+const DEFAULT_MODEL_ROUTE: ClaudeCodeAcpModelRoute = {
+	id: "default",
+	name: "Claude Code via ACP (adapter default, experimental)",
+};
+
+const MODEL_ROUTES: ClaudeCodeAcpModelRoute[] = [
+	DEFAULT_MODEL_ROUTE,
+	{
+		id: "sonnet-4-6",
+		name: "Claude Code via ACP (Sonnet 4.6 requested, experimental)",
+		modelPreference: "claude-sonnet-4-6",
+	},
+	{
+		id: "sonnet-4-5",
+		name: "Claude Code via ACP (Sonnet 4.5 requested, experimental)",
+		modelPreference: "claude-sonnet-4-5",
+	},
+	{
+		id: "opus-4-7-1m",
+		name: "Claude Code via ACP (Opus 4.7 1M requested, experimental)",
+		modelPreference: "opus[1m]",
+	},
+	{
+		id: "opus-4-7",
+		name: "Claude Code via ACP (Opus 4.7 requested, experimental)",
+		modelPreference: "claude-opus-4-7",
+	},
+	{
+		id: "opus-4-6",
+		name: "Claude Code via ACP (Opus 4.6 requested, experimental)",
+		modelPreference: "claude-opus-4-6",
+	},
+	{
+		id: "haiku-4-5",
+		name: "Claude Code via ACP (Haiku 4.5 requested, experimental)",
+		modelPreference: "claude-haiku-4-5",
+	},
+];
+
+function getModelRoute(modelId: string): ClaudeCodeAcpModelRoute {
+	return MODEL_ROUTES.find((route) => route.id === modelId) ?? DEFAULT_MODEL_ROUTE;
+}
+
+function describeModelRoute(route: ClaudeCodeAcpModelRoute): string {
+	if (!route.modelPreference) return `${PROVIDER_ID}/${route.id}`;
+	return `${PROVIDER_ID}/${route.id} -> ANTHROPIC_MODEL=${route.modelPreference}`;
+}
+
+function toProviderModel(route: ClaudeCodeAcpModelRoute): ClaudeCodeAcpProviderModel {
+	return {
+		id: route.id,
+		name: route.name,
+		reasoning: false,
+		input: ["text"],
+		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+		contextWindow: 200_000,
+		maxTokens: 64_000,
+	};
+}
 
 function streamClaudeCodeAcp(
 	model: Model<Api>,
@@ -58,6 +133,7 @@ function streamClaudeCodeAcp(
 		let textIndex: number | undefined;
 		let textClosed = false;
 		let commandDescription = "npx -y @agentclientprotocol/claude-agent-acp";
+		let routeDescription = model.id;
 
 		const closeTextBlock = () => {
 			if (textIndex === undefined || textClosed) return;
@@ -72,12 +148,18 @@ function streamClaudeCodeAcp(
 			stream.push({ type: "start", partial: output });
 
 			const config = loadClaudeCodeAcpConfig();
+			const route = getModelRoute(model.id);
 			commandDescription = describeClaudeCodeAcpCommand(config);
+			routeDescription = describeModelRoute(route);
 			const prompt = renderContextAsAcpPrompt(context);
 			const result = await runAcpTextPrompt({
 				config,
 				cwd: process.cwd(),
 				prompt,
+				modelSelection: {
+					routeId: route.id,
+					modelPreference: route.modelPreference,
+				},
 				signal: options?.signal,
 				callbacks: {
 					onText: (delta) => {
@@ -119,7 +201,7 @@ function streamClaudeCodeAcp(
 			closeTextBlock();
 			output.stopReason = options?.signal?.aborted ? "aborted" : "error";
 			const message = error instanceof Error ? error.message : String(error);
-			output.errorMessage = `${message}\n\nACP command: ${commandDescription}`;
+			output.errorMessage = `${message}\n\nACP route: ${routeDescription}\nACP command: ${commandDescription}`;
 			stream.push({ type: "error", reason: output.stopReason, error: output });
 			stream.end();
 		}
@@ -133,17 +215,7 @@ export default function (pi: ExtensionAPI): void {
 		baseUrl: "acp://claude-code",
 		apiKey: "not-used",
 		api: API_ID,
-		models: [
-			{
-				id: MODEL_ID,
-				name: "Claude Code via ACP (experimental)",
-				reasoning: false,
-				input: ["text"],
-				cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-				contextWindow: 200_000,
-				maxTokens: 64_000,
-			},
-		],
+		models: MODEL_ROUTES.map(toProviderModel),
 		streamSimple: streamClaudeCodeAcp,
 	});
 }
