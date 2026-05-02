@@ -41,39 +41,6 @@ When instructions in this file conflict with project-level AGENTS.md rules, this
   values, log text), non-code files (config, JSON, YAML, markdown), and files
   outside the indexed repository.
 
-## Context Mode MCP usage policy
-
-- Context Mode is available as an MCP server for context-efficient analysis.
-  Its tools are prefixed with `context_mode_ctx_` in this harness, while user
-  facing commands may be phrased as `ctx stats`, `ctx doctor`, `ctx execute`,
-  and similar.
-- Prefer Context Mode tools for large-output or data-heavy work where raw tool
-  output would pollute the model context: repo-wide scans, log analysis, test
-  output summarization, large JSON or CSV processing, generated reports, and
-  web or documentation ingestion.
-- Use `context_mode_ctx_execute` or `context_mode_ctx_batch_execute` when a
-  command may produce more than about 20 lines of output. Write a small script
-  that performs the analysis and prints only the concise answer needed for the
-  task.
-- Use `context_mode_ctx_execute_file` to process large files without loading
-  the full file into context. Use `context_mode_ctx_fetch_and_index`,
-  `context_mode_ctx_index`, and `context_mode_ctx_search` for external docs or
-  larger knowledge sources that should be searched in chunks later.
-- Do not force Context Mode for small, targeted file reads, simple config
-  inspection, or direct source edits. Normal Pi tools (`read`, `edit`, `write`,
-  `bash`) are still appropriate for precise, low-output work and mutations.
-- Keep Context Mode results concise. Return summaries, counts, file paths,
-  failing cases, or next actions rather than dumping raw data back into the
-  conversation.
-- When a Context Mode command or script may produce large stdout, pass a focused
-  `intent` so Context Mode can index the output and return relevant previews
-  instead of dumping raw output into context.
-- For large aggregations or reports, write complete results to a file and print
-  only the concise summary needed for the conversation: counts, top N rows,
-  output file paths, failing cases, and next actions.
-- Use `context_mode_ctx_stats` and `context_mode_ctx_doctor` when the user asks
-  about context savings, Context Mode health, or whether the setup is working.
-
 ## Preferred CLI tools
 
 - **ripgrep** (`rg`) is installed. Prefer over `grep` for searching file contents. Faster, respects `.gitignore`, and has sane defaults. Example: `rg "pattern"` instead of `grep -r "pattern"`.

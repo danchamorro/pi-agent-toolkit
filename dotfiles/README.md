@@ -36,7 +36,7 @@ Pi.
 | File | Purpose |
 |------|---------|
 | `AGENTS.md` | Global agent rules: git safety, commit style, PR style, code style, path discipline, cmux integration |
-| `APPEND_SYSTEM.md` | System prompt additions: reasoning quality, jCodeMunch and Context Mode policies, documentation lookup, writing style |
+| `APPEND_SYSTEM.md` | System prompt additions: reasoning quality, jCodeMunch policies, documentation lookup, writing style |
 | `settings.json` | Pi settings: default provider/model, enabled models, compaction, installed packages. Mutated by Pi at runtime, so it is gitignored and not installed by `setup.mjs`. |
 | `models.json` | Custom model/provider definitions (e.g., local models via Ollama) |
 | `agent-modes.json` | Per-mode overrides: which provider/model/thinking level to use in debug, review, etc. |
@@ -113,7 +113,6 @@ is never committed:
 | Server | Purpose | How it runs |
 |--------|---------|-------------|
 | [jCodeMunch](https://github.com/jcodemunch/jcodemunch-mcp) | Code indexing, symbol search, context-aware code exploration. Auto-indexes on session start. | `uvx jcodemunch-mcp@latest` |
-| [Context Mode](https://github.com/mksglu/context-mode) | Context-efficient sandboxed execution, indexing, and session continuity. Prefer it for large-output analysis. | Local clone or `npx context-mode` |
 | [Postgres MCP](https://github.com/crystaldba/postgres-mcp) | Read-only PostgreSQL access. Runs in Docker with `--access-mode=restricted`. Uses `"lifecycle": "lazy"`. | `docker run crystaldba/postgres-mcp` |
 | [MariaDB MCP](https://github.com/MariaDB/mcp) | Read-only MariaDB or MySQL access. Runs via `uvx` with a local connection and optional `MCP_READ_ONLY=true`. | `uvx --from iflow-mcp_mariadb-mariadb-server mariadb-server` |
 | [chrome-devtools](https://github.com/nicobailon/chrome-devtools-mcp) | Browser automation via Chrome DevTools Protocol. | `npx chrome-devtools-mcp@latest` |
