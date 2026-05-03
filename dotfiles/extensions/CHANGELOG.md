@@ -6,6 +6,11 @@ All notable changes to extensions in `~/.pi/agent/extensions/`.
 
 ### claude-code-acp/
 
+- Added an opt-in Pi-owned read-only MCP bridge with `pi.files.read_text`,
+  `pi.files.list`, and `pi.files.search_text`. The bridge is disabled by
+  default, keeps Claude Code native tools and user Claude MCP config disabled,
+  and enforces cwd, symlink, binary, size, result, and secret-path policy checks
+  before returning file content.
 - Added Pi-authoritative ACP session metadata that replaces the Claude Code
   preset system prompt with a Pi policy prompt, keeps Claude Code built-in tools
   disabled, suppresses SDK settings sources with `settingSources: []`, requests

@@ -1,3 +1,13 @@
+export interface ClaudeCodeAcpMcpBridgeConfig {
+	enabled: boolean;
+	maxFileBytes: number;
+	maxReturnedChars: number;
+	maxSearchMatches: number;
+	maxListEntries: number;
+	toolTimeoutMs: number;
+	maxConcurrentCalls: number;
+}
+
 export interface ClaudeCodeAcpConfig {
 	command: string;
 	args: string[];
@@ -5,11 +15,18 @@ export interface ClaudeCodeAcpConfig {
 	debug: boolean;
 	debugTranscript: boolean;
 	persist: boolean;
+	mcpBridge: ClaudeCodeAcpMcpBridgeConfig;
 }
 
 const DEFAULT_COMMAND = "npx";
 const DEFAULT_ARGS = ["-y", "@agentclientprotocol/claude-agent-acp@0.31.4"];
 const DEFAULT_TIMEOUT_MS = 300_000;
+const DEFAULT_MCP_MAX_FILE_BYTES = 256 * 1024;
+const DEFAULT_MCP_MAX_RETURNED_CHARS = 64 * 1024;
+const DEFAULT_MCP_MAX_SEARCH_MATCHES = 50;
+const DEFAULT_MCP_MAX_LIST_ENTRIES = 200;
+const DEFAULT_MCP_TOOL_TIMEOUT_MS = 10_000;
+const DEFAULT_MCP_MAX_CONCURRENT_CALLS = 2;
 
 function parseArgsJson(raw: string): string[] {
 	let parsed: unknown;
@@ -27,15 +44,21 @@ function parseArgsJson(raw: string): string[] {
 	return parsed;
 }
 
-function parseTimeoutMs(raw: string | undefined): number {
-	if (!raw) return DEFAULT_TIMEOUT_MS;
+function parsePositiveNumber(raw: string | undefined, fallback: number, name: string): number {
+	if (!raw) return fallback;
 
-	const timeoutMs = Number(raw);
-	if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
-		throw new Error("PI_CLAUDE_ACP_TIMEOUT_MS must be a positive number of milliseconds.");
+	const value = Number(raw);
+	if (!Number.isFinite(value) || value <= 0) {
+		throw new Error(`${name} must be a positive number.`);
 	}
 
-	return timeoutMs;
+	return value;
+}
+
+function parsePositiveInteger(raw: string | undefined, fallback: number, name: string): number {
+	const value = parsePositiveNumber(raw, fallback, name);
+	if (!Number.isInteger(value)) throw new Error(`${name} must be a positive integer.`);
+	return value;
 }
 
 function parseBooleanEnv(raw: string | undefined): boolean {
@@ -50,10 +73,47 @@ export function loadClaudeCodeAcpConfig(env: NodeJS.ProcessEnv = process.env): C
 	return {
 		command,
 		args,
-		timeoutMs: parseTimeoutMs(env.PI_CLAUDE_ACP_TIMEOUT_MS),
+		timeoutMs: parsePositiveNumber(env.PI_CLAUDE_ACP_TIMEOUT_MS, DEFAULT_TIMEOUT_MS, "PI_CLAUDE_ACP_TIMEOUT_MS"),
 		debug: parseBooleanEnv(env.PI_CLAUDE_ACP_DEBUG),
 		debugTranscript: parseBooleanEnv(env.PI_CLAUDE_ACP_DEBUG_TRANSCRIPT),
 		persist: parseBooleanEnv(env.PI_CLAUDE_ACP_PERSIST),
+		mcpBridge: loadMcpBridgeConfig(env),
+	};
+}
+
+function loadMcpBridgeConfig(env: NodeJS.ProcessEnv): ClaudeCodeAcpMcpBridgeConfig {
+	return {
+		enabled: parseBooleanEnv(env.PI_CLAUDE_ACP_PI_MCP_BRIDGE),
+		maxFileBytes: parsePositiveInteger(
+			env.PI_CLAUDE_ACP_MCP_MAX_FILE_BYTES,
+			DEFAULT_MCP_MAX_FILE_BYTES,
+			"PI_CLAUDE_ACP_MCP_MAX_FILE_BYTES",
+		),
+		maxReturnedChars: parsePositiveInteger(
+			env.PI_CLAUDE_ACP_MCP_MAX_RETURNED_CHARS,
+			DEFAULT_MCP_MAX_RETURNED_CHARS,
+			"PI_CLAUDE_ACP_MCP_MAX_RETURNED_CHARS",
+		),
+		maxSearchMatches: parsePositiveInteger(
+			env.PI_CLAUDE_ACP_MCP_MAX_SEARCH_MATCHES,
+			DEFAULT_MCP_MAX_SEARCH_MATCHES,
+			"PI_CLAUDE_ACP_MCP_MAX_SEARCH_MATCHES",
+		),
+		maxListEntries: parsePositiveInteger(
+			env.PI_CLAUDE_ACP_MCP_MAX_LIST_ENTRIES,
+			DEFAULT_MCP_MAX_LIST_ENTRIES,
+			"PI_CLAUDE_ACP_MCP_MAX_LIST_ENTRIES",
+		),
+		toolTimeoutMs: parsePositiveNumber(
+			env.PI_CLAUDE_ACP_MCP_TOOL_TIMEOUT_MS,
+			DEFAULT_MCP_TOOL_TIMEOUT_MS,
+			"PI_CLAUDE_ACP_MCP_TOOL_TIMEOUT_MS",
+		),
+		maxConcurrentCalls: parsePositiveInteger(
+			env.PI_CLAUDE_ACP_MCP_MAX_CONCURRENT_CALLS,
+			DEFAULT_MCP_MAX_CONCURRENT_CALLS,
+			"PI_CLAUDE_ACP_MCP_MAX_CONCURRENT_CALLS",
+		),
 	};
 }
 

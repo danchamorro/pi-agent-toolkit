@@ -132,6 +132,7 @@ function streamClaudeCodeAcp(
 
 		let textIndex: number | undefined;
 		let textClosed = false;
+		let outputTextChars = 0;
 		let commandDescription = "npx -y @agentclientprotocol/claude-agent-acp";
 		let routeDescription = model.id;
 
@@ -152,6 +153,7 @@ function streamClaudeCodeAcp(
 			commandDescription = describeClaudeCodeAcpCommand(config);
 			routeDescription = describeModelRoute(route);
 			const prompt = renderContextAsAcpPrompt(context);
+			setEstimatedUsage(output, estimateTokens(prompt), 0);
 			const result = await runAcpTextPrompt({
 				config,
 				cwd: process.cwd(),
@@ -164,6 +166,8 @@ function streamClaudeCodeAcp(
 				callbacks: {
 					onText: (delta) => {
 						if (!delta) return;
+						outputTextChars += delta.length;
+						setEstimatedUsage(output, output.usage.input, estimateTokensFromChars(outputTextChars));
 						if (textIndex === undefined) {
 							output.content.push({ type: "text", text: "" });
 							textIndex = output.content.length - 1;
@@ -208,6 +212,23 @@ function streamClaudeCodeAcp(
 	})();
 
 	return stream;
+}
+
+function setEstimatedUsage(output: AssistantMessage, input: number, outputTokens: number): void {
+	output.usage.input = input;
+	output.usage.output = outputTokens;
+	output.usage.totalTokens = input + outputTokens;
+	output.usage.cacheRead = 0;
+	output.usage.cacheWrite = 0;
+	output.usage.cost = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 };
+}
+
+function estimateTokens(text: string): number {
+	return estimateTokensFromChars(text.length);
+}
+
+function estimateTokensFromChars(chars: number): number {
+	return Math.max(1, Math.ceil(chars / 4));
 }
 
 export default function (pi: ExtensionAPI): void {

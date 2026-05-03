@@ -100,11 +100,36 @@ This is not a sandbox or a guarantee that no Claude Code configuration is read. 
 
 Future tool work should use a Pi-owned MCP bridge: selected Pi capabilities exposed as MCP tools, with Pi enforcing tool selection, permissions, logging, and policy. Claude Code native tools and user Claude Code MCP config remain disabled by default and should not be enabled as a shortcut to Pi tools.
 
+## Opt-in Pi MCP bridge
+
+Set `PI_CLAUDE_ACP_PI_MCP_BRIDGE=1` to expose a Pi-owned read-only MCP server to Claude Code for the current ACP session. The bridge is off by default. When enabled, Pi passes exactly one MCP stdio server in ACP `session/new`; Claude Code built-in tools remain disabled with `tools: []`, SDK settings sources remain disabled with `settingSources: []`, and user Claude Code MCP configuration is not passed through.
+
+The MVP bridge exposes only these tools:
+
+- `pi.files.read_text`: read one UTF-8 text file under the active cwd.
+- `pi.files.list`: list direct children of a directory under the active cwd.
+- `pi.files.search_text`: search literal text under the active cwd.
+
+The bridge denies mutation and execution capabilities. There are no write, edit, delete, move, terminal, bash, subagent, or arbitrary Pi tool execution tools. It also denies secret-looking paths such as `.env`, key files, token files, credential files, and known secret directories. The MVP does not use `.gitignore`; it relies on cwd boundaries, realpath symlink checks, secret-path denial, binary detection, and size/result limits.
+
+Bridge limits are configurable with:
+
+| Variable | Default |
+|---|---|
+| `PI_CLAUDE_ACP_MCP_MAX_FILE_BYTES` | `262144` |
+| `PI_CLAUDE_ACP_MCP_MAX_RETURNED_CHARS` | `65536` |
+| `PI_CLAUDE_ACP_MCP_MAX_SEARCH_MATCHES` | `50` |
+| `PI_CLAUDE_ACP_MCP_MAX_LIST_ENTRIES` | `200` |
+| `PI_CLAUDE_ACP_MCP_TOOL_TIMEOUT_MS` | `10000` |
+| `PI_CLAUDE_ACP_MCP_MAX_CONCURRENT_CALLS` | `2` |
+
+This is read-only file access, not a sandbox. It can still reveal non-secret project files that match the policy. Keep it disabled unless you explicitly want Claude Code ACP to inspect files through the Pi-owned bridge.
+
 ## Protocol diagnostics
 
 The extension validates the minimal ACP JSON-RPC protocol surface it uses before trusting adapter messages. Malformed JSON, invalid JSON-RPC envelopes, invalid `initialize`, `session/new`, or `session/prompt` responses, and malformed session updates fail the request with an explicit error. Unknown but well-formed session update types are debug-logged and ignored for forward compatibility.
 
-Permission requests are still denied automatically. Tool-call updates still cancel the prompt because tool, file, terminal, and MCP passthrough remain disabled. Adapter error diagnostics include the ACP method when available, the selected Pi route, the requested adapter model, and the configured adapter command.
+Permission requests are still denied automatically. With the bridge disabled, tool-call updates still cancel the prompt because tool, file, terminal, and MCP passthrough remain disabled. With the opt-in Pi MCP bridge enabled, only tool-call updates for the three approved Pi bridge tools are allowed; unexpected tool-call updates still fail closed. Adapter error diagnostics include the ACP method when available, the selected Pi route, the requested adapter model, and the configured adapter command.
 
 ## Safe transcript diagnostics
 
@@ -132,6 +157,7 @@ Set these environment variables before launching Pi if you need to override the 
 | `PI_CLAUDE_ACP_DEBUG` | Set to `true`, `1`, `yes`, or `on` for debug logs on stderr | unset |
 | `PI_CLAUDE_ACP_DEBUG_TRANSCRIPT` | Set to `true`, `1`, `yes`, or `on` for sanitized ACP protocol transcript logs on stderr | unset |
 | `PI_CLAUDE_ACP_PERSIST` | Set to `true`, `1`, `yes`, or `on` to reuse a compatible adapter process while still creating a fresh ACP session per prompt | unset |
+| `PI_CLAUDE_ACP_PI_MCP_BRIDGE` | Set to `true`, `1`, `yes`, or `on` to expose the opt-in Pi-owned read-only MCP bridge | unset |
 
 Example using a globally installed adapter:
 
@@ -141,20 +167,20 @@ PI_CLAUDE_ACP_ARGS_JSON='[]' \
 pi
 ```
 
-## Milestone 1 limitations
+## Milestone limitations
 
-This is intentionally text-only.
+By default this is intentionally text-only.
 
 - Claude Code built-in tools are disabled when creating the ACP session.
-- No filesystem passthrough is advertised.
+- No filesystem passthrough is advertised unless `PI_CLAUDE_ACP_PI_MCP_BRIDGE=1` is set.
 - No terminal passthrough is advertised.
-- No MCP server passthrough is advertised.
+- No MCP server passthrough is advertised unless the opt-in Pi-owned read-only MCP bridge is enabled.
 - Permission requests are cancelled automatically.
-- Tool call updates from the ACP agent are treated as unsupported and cancel the prompt.
+- Tool call updates from the ACP agent are treated as unsupported and cancel the prompt. The current Pi MCP bridge executes through MCP and should not surface ACP tool-call updates to Pi; unexpected ACP tool-call updates still fail closed.
 - Images and previous tool calls are rendered as explicit omitted markers in the prompt.
-- Token usage and cost are reported as zero because subscription usage is not token-priced through Pi.
+- Token usage is estimated from rendered prompt and streamed output text because Claude Code subscription-backed ACP does not expose Pi-priced usage. Cost is still reported as zero because subscription usage is not token-priced through Pi.
 
-Ask for explanations, plans, or patches in text. Do not rely on this provider to edit files directly. These limitations are not a sandbox: the adapter process still runs in the repository working directory with the current process environment and operating-system permissions.
+Ask for explanations, plans, patches in text, or opt into the read-only Pi MCP bridge for limited file inspection. Do not rely on this provider to edit files directly. These limitations are not a sandbox: the adapter process still runs in the repository working directory with the current process environment and operating-system permissions.
 
 ## Runtime behavior
 

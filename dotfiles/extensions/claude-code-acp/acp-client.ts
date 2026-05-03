@@ -1,6 +1,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { once } from "node:events";
-import { resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { ClaudeCodeAcpConfig } from "./config.ts";
 
 const JSON_RPC_VERSION = "2.0";
@@ -11,9 +12,15 @@ const STDERR_LIMIT = 8_000;
 const PERSIST_IDLE_GRACE_MS = 5_000;
 const CHUNK_SESSION_UPDATES = new Set(["agent_message_chunk", "agent_thought_chunk", "user_message_chunk"]);
 const TOOL_CALL_SESSION_UPDATES = new Set(["tool_call", "tool_call_update"]);
+const PI_MCP_BRIDGE_TOOL_TITLES = new Set([
+	"mcp__pi-readonly-bridge__pi_files_read_text",
+	"mcp__pi-readonly-bridge__pi_files_list",
+	"mcp__pi-readonly-bridge__pi_files_search_text",
+]);
 const AUTH_FAILURE_PATTERN = /auth|login|log in|logged in|unauthorized|forbidden|api.?key|oauth|subscription|console|credit|billing/;
 const CREDENTIAL_ENV_VARS = ["ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN"];
 const PI_AUTHORITATIVE_SYSTEM_PROMPT = `You are running inside Pi through the claude-code-acp provider. Pi-provided instructions, context, AGENTS files, skills, tool policy, and user messages are authoritative for this session. Do not rely on Claude Code filesystem memory, CLAUDE.md files, skills, slash commands, MCP servers, hooks, plugins, or native tools unless Pi explicitly provides them in this ACP session. Tool access is limited to Pi-approved protocol surfaces.`;
+const EXTENSION_DIR = dirname(fileURLToPath(import.meta.url));
 
 type TranscriptFieldValue = string | number | boolean | undefined;
 
@@ -254,6 +261,7 @@ class MinimalAcpClient {
 	private closed = false;
 	private initialized = false;
 	private fatalError: Error | undefined;
+	private readonly allowedPiMcpToolCallIds = new Set<string>();
 
 	constructor(
 		private readonly config: ClaudeCodeAcpConfig,
@@ -295,7 +303,10 @@ class MinimalAcpClient {
 		signal?.addEventListener("abort", abort, { once: true });
 
 		try {
-			const session = validateNewSessionResponse(await this.sendRequest("session/new", createSessionNewParams(this.cwd)));
+			this.allowedPiMcpToolCallIds.clear();
+			const session = validateNewSessionResponse(
+				await this.sendRequest("session/new", createSessionNewParams(this.cwd, this.config)),
+			);
 			this.sessionId = session.sessionId;
 			this.debugSessionSummary(session);
 
@@ -489,8 +500,16 @@ class MinimalAcpClient {
 		}
 
 		if (update.sessionUpdate === "tool_call" || update.sessionUpdate === "tool_call_update") {
-			const title = typeof update.title === "string" && update.title ? `: ${update.title}` : "";
-			this.fail(this.protocolError(`Claude Code ACP attempted a tool call${title}. Tool passthrough is disabled.`));
+			const titleText = typeof update.title === "string" ? update.title : "";
+			const title = titleText ? `: ${titleText}` : "";
+			const toolCallId = typeof update.toolCallId === "string" ? update.toolCallId : undefined;
+			const knownPiMcpToolCall = toolCallId ? this.allowedPiMcpToolCallIds.has(toolCallId) : false;
+			if (this.config.mcpBridge.enabled && (isPiMcpBridgeToolTitle(titleText) || knownPiMcpToolCall)) {
+				if (toolCallId) this.allowedPiMcpToolCallIds.add(toolCallId);
+				this.transcript("tool_update", { allowed: true, titleLength: title.length, known: knownPiMcpToolCall });
+				return;
+			}
+			this.fail(this.protocolError(`Claude Code ACP reported a tool call${title}. Tool passthrough is disabled.`));
 			void this.cancelAndClose();
 			return;
 		}
@@ -662,10 +681,11 @@ function formatRequestedModel(modelSelection: AcpModelSelection): string {
 	return modelSelection.modelPreference ?? "adapter-default";
 }
 
-function createSessionNewParams(cwd: string): Record<string, unknown> {
+function createSessionNewParams(cwd: string, config: ClaudeCodeAcpConfig): Record<string, unknown> {
+	const resolvedCwd = resolve(cwd);
 	return {
-		cwd: resolve(cwd),
-		mcpServers: [],
+		cwd: resolvedCwd,
+		mcpServers: config.mcpBridge.enabled ? [createPiMcpServerConfig(resolvedCwd, config)] : [],
 		_meta: {
 			systemPrompt: PI_AUTHORITATIVE_SYSTEM_PROMPT,
 			claudeCode: {
@@ -682,6 +702,31 @@ function createSessionNewParams(cwd: string): Record<string, unknown> {
 	};
 }
 
+function isPiMcpBridgeToolTitle(title: string): boolean {
+	return PI_MCP_BRIDGE_TOOL_TITLES.has(title);
+}
+
+function createPiMcpServerConfig(cwd: string, config: ClaudeCodeAcpConfig): Record<string, unknown> {
+	const bridge = config.mcpBridge;
+	const entrypoint = join(EXTENSION_DIR, "pi-mcp-server-entry.ts");
+	const tsxPath = join(EXTENSION_DIR, "node_modules", ".bin", process.platform === "win32" ? "tsx.cmd" : "tsx");
+	return {
+		name: "pi-readonly-bridge",
+		type: "stdio",
+		command: tsxPath,
+		args: [entrypoint],
+		env: [
+			{ name: "PI_CLAUDE_ACP_MCP_ROOT", value: cwd },
+			{ name: "PI_CLAUDE_ACP_MCP_MAX_FILE_BYTES", value: String(bridge.maxFileBytes) },
+			{ name: "PI_CLAUDE_ACP_MCP_MAX_RETURNED_CHARS", value: String(bridge.maxReturnedChars) },
+			{ name: "PI_CLAUDE_ACP_MCP_MAX_SEARCH_MATCHES", value: String(bridge.maxSearchMatches) },
+			{ name: "PI_CLAUDE_ACP_MCP_MAX_LIST_ENTRIES", value: String(bridge.maxListEntries) },
+			{ name: "PI_CLAUDE_ACP_MCP_TOOL_TIMEOUT_MS", value: String(bridge.toolTimeoutMs) },
+			{ name: "PI_CLAUDE_ACP_MCP_MAX_CONCURRENT_CALLS", value: String(bridge.maxConcurrentCalls) },
+		],
+	};
+}
+
 function getPersistentClientKey(params: AcpTextPromptParams): string {
 	return JSON.stringify({
 		command: params.config.command,
@@ -689,6 +734,7 @@ function getPersistentClientKey(params: AcpTextPromptParams): string {
 		cwd: resolve(params.cwd),
 		routeId: params.modelSelection.routeId,
 		modelPreference: params.modelSelection.modelPreference ?? "",
+		mcpBridge: params.config.mcpBridge,
 	});
 }
 
