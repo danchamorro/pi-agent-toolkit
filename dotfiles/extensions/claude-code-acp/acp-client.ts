@@ -13,6 +13,7 @@ const CHUNK_SESSION_UPDATES = new Set(["agent_message_chunk", "agent_thought_chu
 const TOOL_CALL_SESSION_UPDATES = new Set(["tool_call", "tool_call_update"]);
 const AUTH_FAILURE_PATTERN = /auth|login|log in|logged in|unauthorized|forbidden|api.?key|oauth|subscription|console|credit|billing/;
 const CREDENTIAL_ENV_VARS = ["ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN"];
+const PI_AUTHORITATIVE_SYSTEM_PROMPT = `You are running inside Pi through the claude-code-acp provider. Pi-provided instructions, context, AGENTS files, skills, tool policy, and user messages are authoritative for this session. Do not rely on Claude Code filesystem memory, CLAUDE.md files, skills, slash commands, MCP servers, hooks, plugins, or native tools unless Pi explicitly provides them in this ACP session. Tool access is limited to Pi-approved protocol surfaces.`;
 
 type TranscriptFieldValue = string | number | boolean | undefined;
 
@@ -666,9 +667,15 @@ function createSessionNewParams(cwd: string): Record<string, unknown> {
 		cwd: resolve(cwd),
 		mcpServers: [],
 		_meta: {
+			systemPrompt: PI_AUTHORITATIVE_SYSTEM_PROMPT,
 			claudeCode: {
 				options: {
 					tools: [],
+					settingSources: [],
+					mcpServers: {},
+					env: {
+						CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1",
+					},
 				},
 			},
 		},

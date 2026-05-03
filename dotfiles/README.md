@@ -13,6 +13,7 @@ dotfiles/
   agent-skills/ ........... Pi-scoped skills     (-> ~/.pi/agent/skills/)
   global-skills/ .......... Cross-agent skills   (-> ~/.agents/skills/)
   prompts/ ................ Prompt templates      (-> ~/.pi/agent/prompts/)
+  agents/ ................. Custom subagents      (-> ~/.pi/agent/agents/)
   intercepted-commands/ ... Python/pip shims (uv.ts dependency)
   Config files ............ AGENTS.md, APPEND_SYSTEM.md, models.json, etc.
 ```
@@ -23,6 +24,12 @@ those directories are added later.
 Repo-only files such as `README.md`, `SETUP.md`, and `tsconfig.json` live
 in `dotfiles/` for documentation and tooling, but are not installed into
 Pi.
+
+## Custom subagents
+
+| Agent | Purpose |
+|-------|---------|
+| `db-researcher` | Read-only MCP database investigation agent. It can inspect MCP-connected databases, but has no edit/write tools and is instructed to avoid mutations, schema changes, migrations, backfills, and large exports. |
 
 ## Prompt templates
 

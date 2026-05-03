@@ -196,6 +196,15 @@ Not committed to this repo. Maintained by their original authors.
 | `firecrawl` | [firecrawl/cli](https://github.com/firecrawl/cli) |
 | `excalidraw-diagram` | [coleam00/excalidraw-diagram-skill](https://github.com/coleam00/excalidraw-diagram-skill) |
 
+### Subagents
+
+Custom subagents live in `dotfiles/agents/` and are installed to
+`~/.pi/agent/agents/` by `setup.mjs`.
+
+| Agent | Description |
+|-------|-------------|
+| `db-researcher` | Read-only database investigation agent for MCP-connected databases. It has `mcp` access, no edit/write tools, and explicit safety rules against mutations, DDL, migrations, backfills, or large exports. |
+
 ### Prompt templates (2)
 
 Prompt templates live in `dotfiles/prompts/` and are installed to
@@ -234,10 +243,11 @@ Configured in `mcp.json` (created from template during setup):
 
 ## How to add new components
 
-### Extensions, skills, and prompts
+### Extensions, skills, prompts, agents, and themes
 
 1. Create the file in `dotfiles/extensions/`, `dotfiles/agent-skills/`,
-   `dotfiles/global-skills/`, or `dotfiles/prompts/`.
+   `dotfiles/global-skills/`, `dotfiles/prompts/`, `dotfiles/agents/`,
+   or `dotfiles/themes/`.
 2. If using `--link` mode, it's already live. Otherwise re-run `setup.mjs`.
 3. Commit and push.
 

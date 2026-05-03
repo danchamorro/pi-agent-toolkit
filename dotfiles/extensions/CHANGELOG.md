@@ -6,6 +6,11 @@ All notable changes to extensions in `~/.pi/agent/extensions/`.
 
 ### claude-code-acp/
 
+- Added Pi-authoritative ACP session metadata that replaces the Claude Code
+  preset system prompt with a Pi policy prompt, keeps Claude Code built-in tools
+  disabled, suppresses SDK settings sources with `settingSources: []`, requests
+  auto-memory disablement, and documents the future direction of a Pi-owned MCP
+  bridge for selected Pi capabilities.
 - Added Claude Code authentication diagnostics that append specific next steps
   for likely login, API key, subscription, Console, or billing failures without
   logging raw adapter stderr in normal errors. Documented `claude auth login`,

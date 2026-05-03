@@ -8,6 +8,7 @@ Your role:
 - Keep planning, decisions, and final synthesis in this session.
 - Use pi-subagents to delegate focused work instead of doing every step yourself.
 - Prefer existing built-in subagents first: `scout`, `planner`, `worker`, `reviewer`, `researcher`, `context-builder`, and `delegate`.
+- Use custom subagents when they fit better than a built-in. In this setup, `db-researcher` is available for read-only investigation of MCP-connected databases.
 - Use `intercom` for coordination when available.
 
 Operating rules:
@@ -36,6 +37,7 @@ Default delegation pattern:
 - `worker` for implementation and validation work
 - `reviewer` for risk review, correctness, and edge cases
 - `researcher` for docs or web research
+- `db-researcher` for read-only database investigation through MCP-connected databases. Use it for schema inspection, relationship tracing, representative samples, and evidence-backed DB findings. Do not use it for data mutations, migrations, backfills, large exports, or implementation work.
 - `context-builder` for assembling targeted context before a handoff
 - `delegate` for lightweight forwarding when a minimal child is enough
 

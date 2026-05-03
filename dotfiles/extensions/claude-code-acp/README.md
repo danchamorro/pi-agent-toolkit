@@ -90,6 +90,16 @@ pi --model claude-code-acp/haiku-4-5 --no-tools
 
 The adapter also supports model changes through ACP session configuration. This extension uses per-request environment overrides for now because each Pi request creates a fresh ACP session.
 
+## Instruction authority
+
+Each ACP session is created with Pi-authoritative metadata. The extension sends a string `_meta.systemPrompt` that tells the adapter to treat Pi-provided instructions, context, AGENTS files, skills, tool policy, and user messages as authoritative. It also sends Claude Agent SDK options intended to suppress Claude Code filesystem instruction sources: `settingSources: []`, `tools: []`, `mcpServers: {}`, and `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1`.
+
+This keeps the provider aligned with Pi's instruction hierarchy while preserving text-only behavior. Sentinel validation confirmed that project `CLAUDE.md`, `.claude/CLAUDE.md`, and `.claude/skills` markers were not repeated in assistant output or sanitized transcript logs with the pinned adapter version.
+
+This is not a sandbox or a guarantee that no Claude Code configuration is read. The adapter may still read selected Claude settings JSON for environment, model, effort, or permission-mode metadata before SDK options are applied. Custom adapter commands or newer adapter versions can also change behavior, so use sanitized transcript/debug checks when validating a different setup.
+
+Future tool work should use a Pi-owned MCP bridge: selected Pi capabilities exposed as MCP tools, with Pi enforcing tool selection, permissions, logging, and policy. Claude Code native tools and user Claude Code MCP config remain disabled by default and should not be enabled as a shortcut to Pi tools.
+
 ## Protocol diagnostics
 
 The extension validates the minimal ACP JSON-RPC protocol surface it uses before trusting adapter messages. Malformed JSON, invalid JSON-RPC envelopes, invalid `initialize`, `session/new`, or `session/prompt` responses, and malformed session updates fail the request with an explicit error. Unknown but well-formed session update types are debug-logged and ignored for forward compatibility.
