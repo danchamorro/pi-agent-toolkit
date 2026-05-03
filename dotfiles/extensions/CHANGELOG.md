@@ -2,62 +2,15 @@
 
 All notable changes to extensions in `~/.pi/agent/extensions/`.
 
-## 2026-05-02
+## 2026-05-03
 
 ### claude-code-acp/
 
-- Added an opt-in Pi-owned read-only MCP bridge with `pi.files.read_text`,
-  `pi.files.list`, and `pi.files.search_text`. The bridge is disabled by
-  default, keeps Claude Code native tools and user Claude MCP config disabled,
-  and enforces cwd, symlink, binary, size, result, and secret-path policy checks
-  before returning file content.
-- Added Pi-authoritative ACP session metadata that replaces the Claude Code
-  preset system prompt with a Pi policy prompt, keeps Claude Code built-in tools
-  disabled, suppresses SDK settings sources with `settingSources: []`, requests
-  auto-memory disablement, and documents the future direction of a Pi-owned MCP
-  bridge for selected Pi capabilities.
-- Added Claude Code authentication diagnostics that append specific next steps
-  for likely login, API key, subscription, Console, or billing failures without
-  logging raw adapter stderr in normal errors. Documented `claude auth login`,
-  `claude auth status --text`, and the fact that `ANTHROPIC_API_KEY` or
-  `ANTHROPIC_AUTH_TOKEN` can take precedence over subscription OAuth in Claude
-  Code terminal sessions.
-- Added opt-in adapter process persistence with `PI_CLAUDE_ACP_PERSIST`. The
-  default remains one process per prompt; persistent mode reuses a compatible
-  adapter process while creating a fresh ACP session per prompt, keeping tools
-  disabled on every session, serializing prompts per process, and discarding the
-  process after unsafe lifecycle failures.
-- Added opt-in sanitized ACP transcript diagnostics with
-  `PI_CLAUDE_ACP_DEBUG_TRANSCRIPT`. Transcript logs include protocol method
-  names, request ids, response status, update types, text lengths, stop
-  reasons, selected routes, requested models, stderr byte counts, and process
-  lifecycle events without logging raw prompts, rendered context, raw agent text
-  chunks, raw JSON-RPC messages, environment variables, auth tokens, raw stderr,
-  or raw tool payloads.
-- Added ACP protocol validation and clearer diagnostics for malformed JSON-RPC
-  envelopes, invalid `initialize`, `session/new`, and `session/prompt`
-  responses, malformed session updates, and adapter method errors. Unknown
-  well-formed session update types are ignored for forward compatibility.
-  Permission requests remain denied and ACP tool-call updates still cancel the
-  prompt because file, terminal, tool, and MCP passthrough are disabled.
-- Added explicit verified model routes for `sonnet-4-6`, `sonnet-4-5`,
-  `opus-4-7-1m`, `opus-4-7`, `opus-4-6`, and `haiku-4-5`. The named routes set
-  `ANTHROPIC_MODEL` only for the spawned adapter subprocess, omit broad model
-  aliases from the picker, and use debug output as the source of truth for the
-  adapter-resolved model.
-- Documented how the maintained ACP adapter chooses the underlying Claude
-  model, including `ANTHROPIC_MODEL`, Claude Code settings, and sanitized debug
-  output from `session/new`. Added debug summaries for ACP `initialize` and
-  `session/new` responses without logging prompts, environment variables, file
-  contents, or raw payloads. Disabled Claude Code built-in tools when creating
-  ACP sessions so milestone-one text-only behavior does not depend on the
-  user's Claude Code permission mode.
-- Added an experimental text-only Claude Code provider backed by an ACP agent
-  process. The first milestone uses `npx -y @agentclientprotocol/claude-agent-acp@0.31.4`
-  by default, renders Pi context into a single text prompt, denies permission
-  requests, and cancels unsupported tool-call updates so Pi does not provide
-  ACP filesystem or terminal passthrough. The adapter process still runs with
-  normal OS permissions, so this is not a sandbox.
+- Removed the experimental Claude Code ACP provider from the public toolkit
+  because ACP session lifecycle, subscription usage visibility, and tool
+  boundary behavior are not mature enough for a polished shared extension. The
+  implementation and notes were archived locally in the workbench shelf for
+  possible future reuse.
 
 ## 2026-04-24
 
