@@ -8,6 +8,7 @@ const ACP_PROTOCOL_VERSION = 1;
 const METHOD_NOT_FOUND = -32601;
 const PROCESS_EXIT_GRACE_MS = 1_000;
 const STDERR_LIMIT = 8_000;
+const PERSIST_IDLE_GRACE_MS = 5_000;
 const CHUNK_SESSION_UPDATES = new Set(["agent_message_chunk", "agent_thought_chunk", "user_message_chunk"]);
 const TOOL_CALL_SESSION_UPDATES = new Set(["tool_call", "tool_call_update"]);
 
@@ -116,17 +117,123 @@ export interface AcpModelSelection {
 	modelPreference?: string;
 }
 
-export async function runAcpTextPrompt(params: {
+export interface AcpTextPromptParams {
 	config: ClaudeCodeAcpConfig;
 	cwd: string;
 	prompt: string;
 	modelSelection: AcpModelSelection;
 	signal?: AbortSignal;
 	callbacks: AcpPromptCallbacks;
-}): Promise<AcpPromptResult> {
-	const client = new MinimalAcpClient(params.config, params.cwd, params.callbacks, params.modelSelection);
-	return await client.runPrompt(params.prompt, params.signal);
 }
+
+export async function runAcpTextPrompt(params: AcpTextPromptParams): Promise<AcpPromptResult> {
+	if (params.config.persist) return await persistentAcpClients.runPrompt(params);
+
+	const client = new MinimalAcpClient(params.config, params.cwd, params.callbacks, params.modelSelection);
+	return await client.runPrompt(params.prompt, params.signal, true);
+}
+
+interface PersistentAcpEntry {
+	client: MinimalAcpClient;
+	queue: Promise<void>;
+	idleTimer: NodeJS.Timeout | undefined;
+}
+
+class PersistentAcpClientManager {
+	private readonly entries = new Map<string, PersistentAcpEntry>();
+	private cleanupHooksRegistered = false;
+
+	async runPrompt(params: AcpTextPromptParams): Promise<AcpPromptResult> {
+		this.registerCleanupHooks();
+		const key = getPersistentClientKey(params);
+		const entry = this.getOrCreateEntry(key, params);
+		entry.client.transcriptEvent("persist_queue", { keyHash: hashString(key) });
+
+		const run = entry.queue.then(async () => {
+			this.clearIdleTimer(entry);
+			entry.client.setCallbacks(params.callbacks);
+			entry.client.transcriptEvent("persist_reuse", { keyHash: hashString(key), healthy: entry.client.isHealthy() });
+			try {
+				const result = await entry.client.runPrompt(params.prompt, params.signal, false);
+				if (!entry.client.isHealthy()) await this.discard(key, entry, "unhealthy_after_prompt");
+				return result;
+			} catch (error) {
+				await this.discard(key, entry, "prompt_error");
+				throw error;
+			}
+		});
+
+		entry.queue = run.then(
+			() => {
+				if (this.entries.get(key) === entry) this.scheduleIdleShutdown(key, entry);
+			},
+			() => undefined,
+		);
+		return await run;
+	}
+
+	private getOrCreateEntry(key: string, params: AcpTextPromptParams): PersistentAcpEntry {
+		const existing = this.entries.get(key);
+		if (existing?.client.canReuse()) return existing;
+		if (existing) void this.discard(key, existing, "unhealthy_on_acquire");
+
+		const entry: PersistentAcpEntry = {
+			client: new MinimalAcpClient(params.config, params.cwd, params.callbacks, params.modelSelection),
+			queue: Promise.resolve(),
+			idleTimer: undefined,
+		};
+		entry.client.transcriptEvent("persist_acquire", { keyHash: hashString(key) });
+		this.entries.set(key, entry);
+		return entry;
+	}
+
+	private async discard(key: string, entry: PersistentAcpEntry, reason: string): Promise<void> {
+		this.clearIdleTimer(entry);
+		if (this.entries.get(key) === entry) this.entries.delete(key);
+		entry.client.transcriptEvent("persist_discard", { keyHash: hashString(key), reason });
+		await entry.client.shutdown(reason);
+	}
+
+	private scheduleIdleShutdown(key: string, entry: PersistentAcpEntry): void {
+		this.clearIdleTimer(entry);
+		entry.client.transcriptEvent("persist_idle", { keyHash: hashString(key), graceMs: PERSIST_IDLE_GRACE_MS });
+		entry.idleTimer = setTimeout(() => {
+			this.discard(key, entry, "idle").catch(() => undefined);
+		}, PERSIST_IDLE_GRACE_MS);
+	}
+
+	private clearIdleTimer(entry: PersistentAcpEntry): void {
+		if (!entry.idleTimer) return;
+		clearTimeout(entry.idleTimer);
+		entry.idleTimer = undefined;
+	}
+
+	private registerCleanupHooks(): void {
+		if (this.cleanupHooksRegistered) return;
+		this.cleanupHooksRegistered = true;
+		process.once("beforeExit", () => {
+			void this.shutdownAll("beforeExit");
+		});
+		for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) {
+			process.once(signal, () => {
+				void this.shutdownAll(signal).finally(() => process.kill(process.pid, signal));
+			});
+		}
+	}
+
+	private async shutdownAll(reason: string): Promise<void> {
+		const entries = [...this.entries.entries()];
+		this.entries.clear();
+		await Promise.all(
+			entries.map(([, entry]) => {
+				this.clearIdleTimer(entry);
+				return entry.client.shutdown(reason).catch(() => undefined);
+			}),
+		);
+	}
+}
+
+const persistentAcpClients = new PersistentAcpClientManager();
 
 class MinimalAcpClient {
 	private child: ChildProcessWithoutNullStreams | undefined;
@@ -142,17 +249,34 @@ class MinimalAcpClient {
 	private sessionId: string | undefined;
 	private stderr = "";
 	private closed = false;
+	private initialized = false;
 	private fatalError: Error | undefined;
 
 	constructor(
 		private readonly config: ClaudeCodeAcpConfig,
 		private readonly cwd: string,
-		private readonly callbacks: AcpPromptCallbacks,
+		private callbacks: AcpPromptCallbacks,
 		private readonly modelSelection: AcpModelSelection,
 	) {}
 
-	async runPrompt(prompt: string, signal?: AbortSignal): Promise<AcpPromptResult> {
-		this.spawnChild();
+	setCallbacks(callbacks: AcpPromptCallbacks): void {
+		this.callbacks = callbacks;
+	}
+
+	transcriptEvent(event: string, fields: Record<string, TranscriptFieldValue> = {}): void {
+		this.transcript(event, fields);
+	}
+
+	isHealthy(): boolean {
+		return Boolean(this.child) && !this.closed && !this.fatalError;
+	}
+
+	canReuse(): boolean {
+		return !this.closed && !this.fatalError;
+	}
+
+	async runPrompt(prompt: string, signal?: AbortSignal, closeAfterPrompt = true): Promise<AcpPromptResult> {
+		await this.ensureStartedAndInitialized();
 
 		const timeout = setTimeout(() => {
 			this.fail(new Error(`Claude Code ACP timed out after ${this.config.timeoutMs} ms.`));
@@ -168,31 +292,7 @@ class MinimalAcpClient {
 		signal?.addEventListener("abort", abort, { once: true });
 
 		try {
-			const initialize = validateInitializeResponse(
-				await this.sendRequest("initialize", {
-					protocolVersion: ACP_PROTOCOL_VERSION,
-					clientInfo: {
-						name: "pi-claude-code-acp",
-						version: "0.1.0",
-					},
-					clientCapabilities: {},
-				}),
-			);
-			this.debugInitializeSummary(initialize);
-
-			const session = validateNewSessionResponse(
-				await this.sendRequest("session/new", {
-					cwd: resolve(this.cwd),
-					mcpServers: [],
-					_meta: {
-						claudeCode: {
-							options: {
-								tools: [],
-							},
-						},
-					},
-				}),
-			);
+			const session = validateNewSessionResponse(await this.sendRequest("session/new", createSessionNewParams(this.cwd)));
 			this.sessionId = session.sessionId;
 			this.debugSessionSummary(session);
 
@@ -209,19 +309,40 @@ class MinimalAcpClient {
 		} finally {
 			clearTimeout(timeout);
 			signal?.removeEventListener("abort", abort);
-			await this.closeProcess();
+			this.sessionId = undefined;
+			if (closeAfterPrompt) await this.closeProcess();
 		}
+	}
+
+	async shutdown(reason = "requested"): Promise<void> {
+		this.transcript("persist_shutdown", { reason });
+		await this.closeProcess();
+	}
+
+	private async ensureStartedAndInitialized(): Promise<void> {
+		if (!this.child || this.closed) this.spawnChild();
+		if (this.initialized) return;
+
+		const initialize = validateInitializeResponse(
+			await this.sendRequest("initialize", {
+				protocolVersion: ACP_PROTOCOL_VERSION,
+				clientInfo: {
+					name: "pi-claude-code-acp",
+					version: "0.1.0",
+				},
+				clientCapabilities: {},
+			}),
+		);
+		this.initialized = true;
+		this.debugInitializeSummary(initialize);
 	}
 
 	private spawnChild(): void {
 		this.debug(
 			`Starting ACP command: ${this.config.command} ${this.config.args.join(" ")} ` +
-				`route=${this.modelSelection.routeId} requestedModel=${this.modelSelection.modelPreference ?? "adapter-default"}`,
+				`route=${this.modelSelection.routeId} requestedModel=${formatRequestedModel(this.modelSelection)}`,
 		);
-		const env = {
-			...process.env,
-			...(this.modelSelection.modelPreference ? { ANTHROPIC_MODEL: this.modelSelection.modelPreference } : {}),
-		};
+		const env = createChildEnv(this.modelSelection);
 		this.transcript("process_start", {
 			command: this.config.command,
 			args: this.config.args.length,
@@ -259,6 +380,8 @@ class MinimalAcpClient {
 		});
 		this.child.on("exit", (code, signal) => {
 			this.closed = true;
+			this.initialized = false;
+			this.sessionId = undefined;
 			this.transcript("process_exit", { code: code ?? "null", signal: signal ?? "null", pending: this.pending.size });
 			if (this.pending.size > 0 && !this.fatalError) {
 				const detail = this.stderr.trim() ? ` stderr: ${this.stderr.trim()}` : "";
@@ -420,10 +543,7 @@ class MinimalAcpClient {
 	}
 
 	private protocolError(message: string): Error {
-		return new Error(
-			`${message} route=${this.modelSelection.routeId} ` +
-				`requestedModel=${this.modelSelection.modelPreference ?? "adapter-default"}`,
-		);
+		return new Error(`${message} route=${this.modelSelection.routeId} requestedModel=${formatRequestedModel(this.modelSelection)}`);
 	}
 
 	private async cancelAndClose(): Promise<void> {
@@ -443,7 +563,11 @@ class MinimalAcpClient {
 	}
 
 	private async closeProcess(): Promise<void> {
-		if (!this.child || this.closed) return;
+		if (!this.child) return;
+		if (this.closed) {
+			this.child = undefined;
+			return;
+		}
 
 		this.transcript("close_process", { action: "sigterm" });
 		this.child.stdin.end();
@@ -455,6 +579,7 @@ class MinimalAcpClient {
 
 		await once(this.child, "exit");
 		clearTimeout(killTimer);
+		this.child = undefined;
 	}
 
 	private debugInitializeSummary(response: InitializeResponse): void {
@@ -496,7 +621,7 @@ class MinimalAcpClient {
 		if (!this.config.debugTranscript) return;
 		const shared = {
 			route: this.modelSelection.routeId,
-			requestedModel: this.modelSelection.modelPreference ?? "adapter-default",
+			requestedModel: formatRequestedModel(this.modelSelection),
 			...fields,
 		};
 		this.callbacks.onDebug?.(`[claude-code-acp:transcript] ${event}${formatTranscriptFields(shared)}`);
@@ -505,6 +630,49 @@ class MinimalAcpClient {
 	private debug(message: string): void {
 		if (this.config.debug) this.callbacks.onDebug?.(`[claude-code-acp] ${message}`);
 	}
+}
+
+function createChildEnv(modelSelection: AcpModelSelection): NodeJS.ProcessEnv {
+	return {
+		...process.env,
+		...(modelSelection.modelPreference ? { ANTHROPIC_MODEL: modelSelection.modelPreference } : {}),
+	};
+}
+
+function formatRequestedModel(modelSelection: AcpModelSelection): string {
+	return modelSelection.modelPreference ?? "adapter-default";
+}
+
+function createSessionNewParams(cwd: string): Record<string, unknown> {
+	return {
+		cwd: resolve(cwd),
+		mcpServers: [],
+		_meta: {
+			claudeCode: {
+				options: {
+					tools: [],
+				},
+			},
+		},
+	};
+}
+
+function getPersistentClientKey(params: AcpTextPromptParams): string {
+	return JSON.stringify({
+		command: params.config.command,
+		args: params.config.args,
+		cwd: resolve(params.cwd),
+		routeId: params.modelSelection.routeId,
+		modelPreference: params.modelSelection.modelPreference ?? "",
+	});
+}
+
+function hashString(value: string): string {
+	let hash = 0;
+	for (let i = 0; i < value.length; i += 1) {
+		hash = (hash * 31 + value.charCodeAt(i)) >>> 0;
+	}
+	return hash.toString(16);
 }
 
 function validateJsonRpcMessage(value: unknown): JsonRpcMessage | Error {

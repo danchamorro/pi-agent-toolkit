@@ -6,6 +6,11 @@ All notable changes to extensions in `~/.pi/agent/extensions/`.
 
 ### claude-code-acp/
 
+- Added opt-in adapter process persistence with `PI_CLAUDE_ACP_PERSIST`. The
+  default remains one process per prompt; persistent mode reuses a compatible
+  adapter process while creating a fresh ACP session per prompt, keeping tools
+  disabled on every session, serializing prompts per process, and discarding the
+  process after unsafe lifecycle failures.
 - Added opt-in sanitized ACP transcript diagnostics with
   `PI_CLAUDE_ACP_DEBUG_TRANSCRIPT`. Transcript logs include protocol method
   names, request ids, response status, update types, text lengths, stop

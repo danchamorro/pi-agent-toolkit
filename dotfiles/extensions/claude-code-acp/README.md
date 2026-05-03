@@ -110,6 +110,7 @@ Set these environment variables before launching Pi if you need to override the 
 | `PI_CLAUDE_ACP_TIMEOUT_MS` | Prompt timeout in milliseconds | `300000` |
 | `PI_CLAUDE_ACP_DEBUG` | Set to `true`, `1`, `yes`, or `on` for debug logs on stderr | unset |
 | `PI_CLAUDE_ACP_DEBUG_TRANSCRIPT` | Set to `true`, `1`, `yes`, or `on` for sanitized ACP protocol transcript logs on stderr | unset |
+| `PI_CLAUDE_ACP_PERSIST` | Set to `true`, `1`, `yes`, or `on` to reuse a compatible adapter process while still creating a fresh ACP session per prompt | unset |
 
 Example using a globally installed adapter:
 
@@ -136,6 +137,10 @@ Ask for explanations, plans, or patches in text. Do not rely on this provider to
 
 ## Runtime behavior
 
-Each Pi model request starts the configured ACP command over stdio, initializes ACP, creates a fresh ACP session for the current working directory, sends one rendered text prompt, streams text chunks back into Pi, and then stops the child process.
+By default, each Pi model request starts the configured ACP command over stdio, initializes ACP, creates a fresh ACP session for the current working directory, sends one rendered text prompt, streams text chunks back into Pi, and then stops the child process.
 
-The implementation uses a minimal JSON-RPC newline-delimited ACP client instead of the TypeScript SDK so the first milestone remains small and explicit.
+Set `PI_CLAUDE_ACP_PERSIST=1` to opt into reusing a compatible adapter process across prompts. Persistent mode still creates a fresh ACP session for every prompt and keeps Claude Code built-in tools disabled on every `session/new`. Processes are reused only when the configured command, arguments, resolved working directory, Pi model route, and requested adapter model match. Prompts sharing one persistent process are serialized because ACP adapter concurrency has not been validated.
+
+Persistent mode is not the default because background process lifecycle bugs can leave orphaned adapter processes. The extension attempts to close persistent children on process shutdown, discards idle persistent processes after a short grace period, and discards a persistent process after timeout, abort, fatal protocol errors, child exit/error, tool-call cancellation, or other unsafe states. Use `PI_CLAUDE_ACP_DEBUG_TRANSCRIPT=1` when validating persistent behavior so process reuse and discard events are visible.
+
+The implementation uses a minimal JSON-RPC newline-delimited ACP client instead of the TypeScript SDK so the milestone remains small and explicit.
