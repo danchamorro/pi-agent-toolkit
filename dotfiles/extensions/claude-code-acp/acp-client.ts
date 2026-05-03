@@ -11,6 +11,8 @@ const STDERR_LIMIT = 8_000;
 const PERSIST_IDLE_GRACE_MS = 5_000;
 const CHUNK_SESSION_UPDATES = new Set(["agent_message_chunk", "agent_thought_chunk", "user_message_chunk"]);
 const TOOL_CALL_SESSION_UPDATES = new Set(["tool_call", "tool_call_update"]);
+const AUTH_FAILURE_PATTERN = /auth|login|log in|logged in|unauthorized|forbidden|api.?key|oauth|subscription|console|credit|billing/;
+const CREDENTIAL_ENV_VARS = ["ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN"];
 
 type TranscriptFieldValue = string | number | boolean | undefined;
 
@@ -384,8 +386,7 @@ class MinimalAcpClient {
 			this.sessionId = undefined;
 			this.transcript("process_exit", { code: code ?? "null", signal: signal ?? "null", pending: this.pending.size });
 			if (this.pending.size > 0 && !this.fatalError) {
-				const detail = this.stderr.trim() ? ` stderr: ${this.stderr.trim()}` : "";
-				this.fail(new Error(`Claude Code ACP process exited before completing. code=${code} signal=${signal}.${detail}`));
+				this.fail(this.processExitError(code, signal));
 			}
 		});
 	}
@@ -440,6 +441,7 @@ class MinimalAcpClient {
 			pending.reject(
 				this.protocolError(
 					`ACP ${pending.method} failed: ${message.error.message} (${message.error.code})${formatErrorData(message.error.data)}`,
+					message.error.message,
 				),
 			);
 		} else {
@@ -542,8 +544,24 @@ class MinimalAcpClient {
 		}
 	}
 
-	private protocolError(message: string): Error {
-		return new Error(`${message} route=${this.modelSelection.routeId} requestedModel=${formatRequestedModel(this.modelSelection)}`);
+	private protocolError(message: string, diagnosticSource = message): Error {
+		return new Error(
+			formatSummaryParts(
+				`${message} route=${this.modelSelection.routeId} requestedModel=${formatRequestedModel(this.modelSelection)}`,
+				formatAuthDiagnostic(diagnosticSource),
+			),
+		);
+	}
+
+	private processExitError(code: number | null, signal: NodeJS.Signals | null): Error {
+		const stderrBytes = Buffer.byteLength(this.stderr, "utf8");
+		return new Error(
+			formatSummaryParts(
+				`Claude Code ACP process exited before completing. code=${code} signal=${signal}.`,
+				stderrBytes > 0 ? `Adapter stderr captured ${stderrBytes} bytes and was omitted from this error. Set PI_CLAUDE_ACP_DEBUG=1 only for local raw stderr debugging.` : undefined,
+				formatAuthDiagnostic(this.stderr),
+			),
+		);
 	}
 
 	private async cancelAndClose(): Promise<void> {
@@ -834,6 +852,23 @@ function formatErrorData(value: unknown): string {
 	} catch {
 		return " data=[unserializable]";
 	}
+}
+
+function formatAuthDiagnostic(source: string, env: NodeJS.ProcessEnv = process.env): string | undefined {
+	if (!AUTH_FAILURE_PATTERN.test(source.toLowerCase())) return undefined;
+
+	const credentialHints = getCredentialEnvHints(env);
+	const credentialNote = formatCredentialEnvNote(credentialHints);
+	return `Claude Code authentication diagnostic: run 'claude auth status --text' to inspect the active Claude Code login. If you expect subscription-backed Claude Code auth, run 'claude auth login' and unset ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN if they should not override your subscription.${credentialNote}`;
+}
+
+function getCredentialEnvHints(env: NodeJS.ProcessEnv): string[] {
+	return CREDENTIAL_ENV_VARS.filter((name) => Boolean(env[name]));
+}
+
+function formatCredentialEnvNote(credentialHints: string[]): string {
+	if (credentialHints.length === 0) return "";
+	return ` Detected credential env var(s): ${credentialHints.join(", ")}. Claude Code may prefer these over subscription login in terminal sessions.`;
 }
 
 function summarizeParams(method: string, params: unknown): string {

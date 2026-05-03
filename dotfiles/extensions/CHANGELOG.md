@@ -6,6 +6,12 @@ All notable changes to extensions in `~/.pi/agent/extensions/`.
 
 ### claude-code-acp/
 
+- Added Claude Code authentication diagnostics that append specific next steps
+  for likely login, API key, subscription, Console, or billing failures without
+  logging raw adapter stderr in normal errors. Documented `claude auth login`,
+  `claude auth status --text`, and the fact that `ANTHROPIC_API_KEY` or
+  `ANTHROPIC_AUTH_TOKEN` can take precedence over subscription OAuth in Claude
+  Code terminal sessions.
 - Added opt-in adapter process persistence with `PI_CLAUDE_ACP_PERSIST`. The
   default remains one process per prompt; persistent mode reuses a compatible
   adapter process while creating a fresh ACP session per prompt, keeping tools

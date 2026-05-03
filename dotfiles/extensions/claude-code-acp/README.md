@@ -30,11 +30,22 @@ This package was verified on npm at `0.31.4` while implementing the first milest
 
 ## Authentication and billing boundary
 
-Claude Code authentication is separate from Pi and from Anthropic API keys. The ACP adapter is responsible for Claude Code login and billing behavior.
+Claude Code authentication is separate from Pi and from Pi's Anthropic API provider settings. This ACP provider launches Claude Code through the adapter, so Claude Code decides which credential and billing path is active.
 
-Pre-authenticate outside Pi before using this provider. The extension does not implement ACP `authenticate`, `/login`, or a login UI. To use a Claude Pro or Max subscription, authenticate through Claude Code or through the ACP adapter's own login flow. Do not assume Pi's Anthropic API key settings apply to this provider, and verify the adapter's current billing behavior before relying on subscription usage.
+Pre-authenticate outside Pi before using this provider. The extension does not implement ACP `authenticate`, `/login`, or a login UI. For subscription-backed Claude Code usage, run:
 
-If `ANTHROPIC_API_KEY` is present in your environment, Claude Code or its adapter may choose API billing instead of subscription billing. Check the adapter documentation and your environment before using this provider for real work.
+```bash
+claude auth login
+claude auth status --text
+```
+
+`claude auth status --text` is an opt-in preflight check you can run manually. It exits successfully when Claude Code is logged in and shows the active login in human-readable form.
+
+Claude Code's terminal authentication can prefer credential environment variables over subscription OAuth. If `ANTHROPIC_AUTH_TOKEN` or `ANTHROPIC_API_KEY` is present, Claude Code may use that credential instead of your Claude Pro, Max, Team, or Enterprise subscription login. If you expect subscription-backed usage, check your environment and unset those variables before launching Pi when they should not apply.
+
+Claude Code also supports Console login and API-key-based usage. Those paths can affect billing differently from subscription-backed usage. Verify the active method with Claude Code's own status and billing tools before relying on a specific billing path.
+
+When the adapter emits likely authentication or billing failures, this extension adds a short next-step diagnostic to the Pi error without logging raw stderr. `PI_CLAUDE_ACP_DEBUG=1` still prints raw adapter stderr for local debugging only.
 
 ## Underlying Claude model selection
 
