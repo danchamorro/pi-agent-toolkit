@@ -1,7 +1,7 @@
 # pi-agent-toolkit
 
 Extensions, skills, and configs for the
-[Pi](https://github.com/badlogic/pi-mono) coding agent. My versioned
+[Pi](https://github.com/earendil-works/pi) coding agent. My versioned
 backup so I can restore or sync my setup across machines, and a reference
 for anyone looking to customize their own Pi environment.
 

@@ -12,10 +12,10 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { existsSync } from "node:fs";
 
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import { StringEnum } from "@mariozechner/pi-ai";
-import { Text } from "@mariozechner/pi-tui";
+import { StringEnum } from "@earendil-works/pi-ai";
+import { Text } from "@earendil-works/pi-tui";
 
 // ── Script resolution ─────────────────────────────────────────────────
 const SCRIPT_CANDIDATES = [

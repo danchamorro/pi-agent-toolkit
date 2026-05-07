@@ -11,11 +11,11 @@
  * the selected session.
  */
 
-import { completeSimple } from "@mariozechner/pi-ai";
+import { completeSimple } from "@earendil-works/pi-ai";
 import type {
   ExtensionAPI,
   ExtensionCommandContext,
-} from "@mariozechner/pi-coding-agent";
+} from "@earendil-works/pi-coding-agent";
 import {
   Input,
   KeybindingsManager,
@@ -24,7 +24,7 @@ import {
   type Component,
   type Focusable,
   type TUI,
-} from "@mariozechner/pi-tui";
+} from "@earendil-works/pi-tui";
 import { createReadStream, type Dirent, promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";

@@ -13,8 +13,8 @@
  *   /dc rules - Show all loaded rules in detail
  */
 
-import type { ExtensionAPI, ExtensionContext, ToolCallEventResult } from "@mariozechner/pi-coding-agent";
-import { isToolCallEventType } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext, ToolCallEventResult } from "@earendil-works/pi-coding-agent";
+import { isToolCallEventType } from "@earendil-works/pi-coding-agent";
 import { readFileSync, existsSync } from "node:fs";
 import { resolve, basename } from "node:path";
 import { homedir } from "node:os";
@@ -34,6 +34,7 @@ interface DamageControlRules {
 	bashToolPatterns: BashPattern[];
 	zeroAccessPaths: string[];
 	askAccessPaths: string[];
+	writeAccessPaths: string[];
 	readOnlyPaths: string[];
 	noDeletePaths: string[];
 }
@@ -108,6 +109,7 @@ function mergeRules(...sources: (Partial<DamageControlRules> | null)[]): DamageC
 		bashToolPatterns: [],
 		zeroAccessPaths: [],
 		askAccessPaths: [],
+		writeAccessPaths: [],
 		readOnlyPaths: [],
 		noDeletePaths: [],
 	};
@@ -117,6 +119,7 @@ function mergeRules(...sources: (Partial<DamageControlRules> | null)[]): DamageC
 		if (src.bashToolPatterns) merged.bashToolPatterns.push(...src.bashToolPatterns);
 		if (src.zeroAccessPaths) merged.zeroAccessPaths.push(...src.zeroAccessPaths);
 		if (src.askAccessPaths) merged.askAccessPaths.push(...src.askAccessPaths);
+		if (src.writeAccessPaths) merged.writeAccessPaths.push(...src.writeAccessPaths);
 		if (src.readOnlyPaths) merged.readOnlyPaths.push(...src.readOnlyPaths);
 		if (src.noDeletePaths) merged.noDeletePaths.push(...src.noDeletePaths);
 	}
@@ -124,6 +127,7 @@ function mergeRules(...sources: (Partial<DamageControlRules> | null)[]): DamageC
 	// Deduplicate paths
 	merged.zeroAccessPaths = [...new Set(merged.zeroAccessPaths)];
 	merged.askAccessPaths = [...new Set(merged.askAccessPaths)];
+	merged.writeAccessPaths = [...new Set(merged.writeAccessPaths)];
 	merged.readOnlyPaths = [...new Set(merged.readOnlyPaths)];
 	merged.noDeletePaths = [...new Set(merged.noDeletePaths)];
 
@@ -192,7 +196,12 @@ export default function (pi: ExtensionAPI) {
 	function extractCommandPathCandidates(command: string): string[] {
 		const candidates = new Set<string>();
 		const tokens = command.match(/"[^"]*"|'[^']*'|`[^`]*`|\S+/g) ?? [];
-		const inlinePathMatches = command.match(/~\/[^\s"'`;$(){}\[\]]+|\/(?:[^\s"'`;$(){}\[\]]+\/)*[^\s"'`;$(){}\[\]]+/g) ?? [];
+		const inlinePathMatches = [...command.matchAll(/~\/[^\s"'`;$(){}\[\]]+|\/(?:[^\s"'`;$(){}\[\]]+\/)*[^\s"'`;$(){}\[\]]+/g)]
+			.filter((match) => {
+				const before = command[(match.index ?? 0) - 1];
+				return !before || /[\s"'`=:$({\[]/.test(before);
+			})
+			.map((match) => match[0]);
 
 		for (const token of [...tokens, ...inlinePathMatches]) {
 			const stripped = token
@@ -215,7 +224,7 @@ export default function (pi: ExtensionAPI) {
 
 	function getBashPathAccess(command: string): { path: string; access: PathAccess } | null {
 		for (const candidate of extractCommandPathCandidates(command)) {
-			const access = checkPathAccess(candidate);
+			const access = checkWritePathAccess(candidate);
 			if (access !== "allowed" && access !== "noDelete") return { path: candidate, access };
 		}
 		return null;
@@ -235,6 +244,15 @@ export default function (pi: ExtensionAPI) {
 
 	function checkPathAccess(filePath: string): PathAccess {
 		if (rules.zeroAccessPaths.some((p) => pathMatches(filePath, p))) return "zero";
+		if (rules.askAccessPaths.some((p) => pathMatches(filePath, p))) return "ask";
+		if (rules.readOnlyPaths.some((p) => pathMatches(filePath, p))) return "readOnly";
+		if (rules.noDeletePaths.some((p) => pathMatches(filePath, p))) return "noDelete";
+		return "allowed";
+	}
+
+	function checkWritePathAccess(filePath: string): PathAccess {
+		if (rules.zeroAccessPaths.some((p) => pathMatches(filePath, p))) return "zero";
+		if (rules.writeAccessPaths.some((p) => pathMatches(filePath, p))) return "allowed";
 		if (rules.askAccessPaths.some((p) => pathMatches(filePath, p))) return "ask";
 		if (rules.readOnlyPaths.some((p) => pathMatches(filePath, p))) return "readOnly";
 		if (rules.noDeletePaths.some((p) => pathMatches(filePath, p))) return "noDelete";
@@ -297,6 +315,7 @@ export default function (pi: ExtensionAPI) {
 			rules.bashToolPatterns.length +
 			rules.zeroAccessPaths.length +
 			rules.askAccessPaths.length +
+			rules.writeAccessPaths.length +
 			rules.readOnlyPaths.length +
 			rules.noDeletePaths.length;
 		if (total > 0) {
@@ -436,10 +455,10 @@ export default function (pi: ExtensionAPI) {
 			}
 		}
 
-		// --- Write tool: check zero-access, ask-access, and read-only paths ---
+		// --- Write tool: check zero-access, write-access, ask-access, and read-only paths ---
 		if (event.toolName === "write") {
 			const filePath = (event.input as Record<string, unknown>).path as string;
-			const access = checkPathAccess(filePath);
+			const access = checkWritePathAccess(filePath);
 
 			if (access === "zero") {
 				recordEvent({
@@ -487,10 +506,10 @@ export default function (pi: ExtensionAPI) {
 			}
 		}
 
-		// --- Edit tool: check zero-access, ask-access, and read-only paths ---
+		// --- Edit tool: check zero-access, write-access, ask-access, and read-only paths ---
 		if (isToolCallEventType("edit", event)) {
 			const filePath = event.input.path;
-			const access = checkPathAccess(filePath);
+			const access = checkWritePathAccess(filePath);
 
 			if (access === "zero") {
 				recordEvent({
@@ -563,6 +582,9 @@ export default function (pi: ExtensionAPI) {
 				lines.push("--- Ask-before-access paths ---");
 				for (const p of rules.askAccessPaths) lines.push(`  ${p}`);
 				lines.push("");
+				lines.push("--- Write-access paths ---");
+				for (const p of rules.writeAccessPaths) lines.push(`  ${p}`);
+				lines.push("");
 				lines.push("--- Read-only paths ---");
 				for (const p of rules.readOnlyPaths) lines.push(`  ${p}`);
 				lines.push("");
@@ -580,6 +602,7 @@ export default function (pi: ExtensionAPI) {
 			lines.push(`Bash patterns:      ${rules.bashToolPatterns.length} (${allowCount} allow, ${askCount} ask, ${blockCount} block)`);
 			lines.push(`Zero-access paths:  ${rules.zeroAccessPaths.length}`);
 			lines.push(`Ask-access paths:   ${rules.askAccessPaths.length}`);
+			lines.push(`Write-access paths: ${rules.writeAccessPaths.length}`);
 			lines.push(`Read-only paths:    ${rules.readOnlyPaths.length}`);
 			lines.push(`No-delete paths:    ${rules.noDeletePaths.length}`);
 

@@ -16,8 +16,8 @@ import {
 	type ExtensionCommandContext,
 	type ExtensionContext,
 	type ToolResultEvent,
-} from "@mariozechner/pi-coding-agent";
-import { Container, Key, Text, matchesKey, type Component, type TUI } from "@mariozechner/pi-tui";
+} from "@earendil-works/pi-coding-agent";
+import { Container, Key, Text, matchesKey, type Component, type TUI } from "@earendil-works/pi-tui";
 import os from "node:os";
 import path from "node:path";
 

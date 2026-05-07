@@ -312,7 +312,7 @@ Before every commit, scan changes for artifacts. If `git diff` shows `console.lo
 - Treat `node_modules/` as off-limits unless the user explicitly asks to inspect an installed dependency/package or the installed package is the only source of truth for the behavior in question.
 - If inspection of `node_modules/` is genuinely necessary and the user did not explicitly ask for it, ask for permission first.
 - When inspection is allowed, keep it tightly scoped to the smallest possible set of named files and never run broad recursive searches over `node_modules/`.
-- **Exception — Pi packages:** Reading files under `@mariozechner/` is always allowed without permission. This namespace contains Pi and its related packages (docs, examples, extensions, themes, skills, SDK source).
+- **Exception — Pi packages:** Reading files under `@earendil-works/` is always allowed without permission. This namespace contains Pi and its related packages (docs, examples, extensions, themes, skills, SDK source).
 
 ### Pi toolkit repo awareness
 

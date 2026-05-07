@@ -2,6 +2,22 @@
 
 All notable changes to extensions in `~/.pi/agent/extensions/`.
 
+## 2026-05-07
+
+### all extensions
+
+- Migrated Pi imports from `@mariozechner/*` to `@earendil-works/*` so
+  local extension type checking follows Pi 0.74.0 and newer package names.
+
+### damage-control/
+
+- Added `writeAccessPaths` so narrow paths can remain writable through the write
+  and edit tools, and usable by bash commands, even when a broader generated-output rule is read-only.
+- Allowed writes under `scripts/build/` without relaxing the broader `build/`
+  read-only rule. Existing bash pattern guards still apply to destructive commands.
+- Fixed bash path extraction so relative paths like `scripts/build` are not also
+  checked as the absolute suffix `/build`.
+
 ## 2026-05-03
 
 ### claude-code-acp/

@@ -18,9 +18,9 @@
  *   - Auto-nudge when agent finishes with incomplete tasks
  */
 
-import { StringEnum } from "@mariozechner/pi-ai";
-import type { ExtensionAPI, ExtensionContext, ToolCallEventResult } from "@mariozechner/pi-coding-agent";
-import { truncateToWidth } from "@mariozechner/pi-tui";
+import { StringEnum } from "@earendil-works/pi-ai";
+import type { ExtensionAPI, ExtensionContext, ToolCallEventResult } from "@earendil-works/pi-coding-agent";
+import { truncateToWidth } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 
 // -- Types ------------------------------------------------------------------

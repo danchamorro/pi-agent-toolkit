@@ -7,6 +7,7 @@
 #                       "ask: true" prompts for confirmation instead of hard-blocking
 #   zeroAccessPaths   - agent cannot read, search, or modify these paths
 #   askAccessPaths    - agent must ask before reading or searching these paths
+#   writeAccessPaths  - agent can write/edit these paths and use bash on them even if a broader read-only rule matches
 #   readOnlyPaths     - agent can read but not write or delete
 #   noDeletePaths     - agent can read and write but not delete
 #
@@ -250,6 +251,9 @@ askAccessPaths:
   - ~/.zshrc
   - ~/.profile
   - ~/.bash_profile
+
+writeAccessPaths:
+  - scripts/build/
 
 readOnlyPaths:
   - /etc/

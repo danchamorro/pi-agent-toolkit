@@ -6,7 +6,7 @@
  * because Pi handles built-in /quit before extension commands or input hooks.
  */
 
-import { CustomEditor, type ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import { CustomEditor, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 function normalizeName(name: string | undefined | null): string {
   return (name ?? "").trim();

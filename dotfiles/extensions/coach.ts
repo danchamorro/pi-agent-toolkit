@@ -13,7 +13,7 @@
  * This is intentionally a slow, expensive command. Quality over speed.
  */
 
-import { complete } from "@mariozechner/pi-ai";
+import { complete } from "@earendil-works/pi-ai";
 import {
   BorderedLoader,
   DynamicBorder,
@@ -23,7 +23,7 @@ import {
   type ExtensionCommandContext,
   type SessionEntry,
   type SessionInfo,
-} from "@mariozechner/pi-coding-agent";
+} from "@earendil-works/pi-coding-agent";
 import {
   Container,
   Key,
@@ -34,7 +34,7 @@ import {
   type Component,
   type SelectItem,
   type TUI,
-} from "@mariozechner/pi-tui";
+} from "@earendil-works/pi-tui";
 
 type CoachScope = "current" | "all";
 
@@ -580,7 +580,7 @@ class CoachModePicker implements Component {
   private readonly container: Container;
   private readonly selectList: SelectList;
 
-  constructor(tui: TUI, theme: import("@mariozechner/pi-coding-agent").Theme, onDone: (scope: CoachScope | null) => void) {
+  constructor(tui: TUI, theme: import("@earendil-works/pi-coding-agent").Theme, onDone: (scope: CoachScope | null) => void) {
     const items: SelectItem[] = [
       {
         value: "current",

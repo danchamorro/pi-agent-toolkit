@@ -42,10 +42,10 @@
  *   Events are JSON objects with { type: "event", event, data?, subscriptionId? }
  */
 
-import type { ExtensionAPI, ExtensionContext, TurnEndEvent, MessageRenderer } from "@mariozechner/pi-coding-agent";
-import { getMarkdownTheme, keyHint } from "@mariozechner/pi-coding-agent";
-import { complete, type Model, type Api, type UserMessage, type TextContent } from "@mariozechner/pi-ai";
-import { StringEnum } from "@mariozechner/pi-ai";
+import type { ExtensionAPI, ExtensionContext, TurnEndEvent, MessageRenderer } from "@earendil-works/pi-coding-agent";
+import { getMarkdownTheme, keyHint } from "@earendil-works/pi-coding-agent";
+import { complete, type Model, type Api, type UserMessage, type TextContent } from "@earendil-works/pi-ai";
+import { StringEnum } from "@earendil-works/pi-ai";
 import {
 	Box,
 	Container,
@@ -56,7 +56,7 @@ import {
 	type AutocompleteProvider,
 	type AutocompleteSuggestions,
 	fuzzyFilter,
-} from "@mariozechner/pi-tui";
+} from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import { promises as fs } from "node:fs";
 import * as net from "node:net";

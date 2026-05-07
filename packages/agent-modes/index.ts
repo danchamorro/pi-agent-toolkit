@@ -26,11 +26,11 @@ import type {
   ExtensionAPI,
   ExtensionContext,
   ToolCallEventResult,
-} from "@mariozechner/pi-coding-agent";
-import type { Api, Model } from "@mariozechner/pi-ai";
-import type { ThinkingLevel } from "@mariozechner/pi-agent-core";
-import { DynamicBorder, getAgentDir, isToolCallEventType } from "@mariozechner/pi-coding-agent";
-import { Container, Key, type SelectItem, SelectList, Text } from "@mariozechner/pi-tui";
+} from "@earendil-works/pi-coding-agent";
+import type { Api, Model } from "@earendil-works/pi-ai";
+import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
+import { DynamicBorder, getAgentDir, isToolCallEventType } from "@earendil-works/pi-coding-agent";
+import { Container, Key, type SelectItem, SelectList, Text } from "@earendil-works/pi-tui";
 import { loadModes, type ModesConfig } from "./config.ts";
 import {
   MODE_NAMES,

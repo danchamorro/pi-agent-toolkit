@@ -15,10 +15,10 @@ import type {
   UserBashEventResult,
   ToolCallEventResult,
   Theme,
-} from "@mariozechner/pi-coding-agent";
-import { isToolCallEventType } from "@mariozechner/pi-coding-agent";
-import type { TUI, KeybindingsManager } from "@mariozechner/pi-tui";
-import { matchesKey, wrapTextWithAnsi } from "@mariozechner/pi-tui";
+} from "@earendil-works/pi-coding-agent";
+import { isToolCallEventType } from "@earendil-works/pi-coding-agent";
+import type { TUI, KeybindingsManager } from "@earendil-works/pi-tui";
+import { matchesKey, wrapTextWithAnsi } from "@earendil-works/pi-tui";
 
 const APPROVE_OPTION = "Approve";
 const DENY_OPTION = "Deny";

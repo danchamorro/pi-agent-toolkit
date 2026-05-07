@@ -1,6 +1,6 @@
 # @danchamorro/pi-agent-modes
 
-Agent modes for [pi](https://github.com/badlogic/pi-mono). Switch between focused operational modes with enforced tool restrictions and distinct behavioral prompts.
+Agent modes for [pi](https://github.com/earendil-works/pi). Switch between focused operational modes with enforced tool restrictions and distinct behavioral prompts.
 
 ## Modes
 

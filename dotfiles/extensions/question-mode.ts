@@ -7,8 +7,8 @@
  * codebase without risking modifications.
  */
 
-import type { ExtensionAPI, ExtensionContext, ToolCallEventResult } from "@mariozechner/pi-coding-agent";
-import { Key } from "@mariozechner/pi-tui";
+import type { ExtensionAPI, ExtensionContext, ToolCallEventResult } from "@earendil-works/pi-coding-agent";
+import { Key } from "@earendil-works/pi-tui";
 
 const QUESTION_MODE_TOOLS = ["read", "grep", "find", "ls", "mcp", "exa_search"] as const;
 const FALLBACK_TOOLS = ["read", "bash", "edit", "write"] as const;

@@ -8,7 +8,7 @@ Run all `node setup.mjs ...` commands from the repo root.
 
 ### Required
 
-- **[Pi](https://github.com/badlogic/pi-mono)** coding agent
+- **[Pi](https://github.com/earendil-works/pi)** coding agent
 - **Node.js** (v18+) and **npm**
 - **Git**
 

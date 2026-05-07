@@ -6,6 +6,15 @@ this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+### Changed
+
+- Migrated Pi peer dependencies and imports from `@mariozechner/*` to
+  `@earendil-works/*` for Pi 0.74.0 and newer.
+- Added an explicit peer dependency on `@earendil-works/pi-agent-core`
+  because the extension imports `ThinkingLevel` from that package.
+
 ## [1.1.3] - 2026-04-03
 
 ### Fixed

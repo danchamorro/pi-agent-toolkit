@@ -7,7 +7,7 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { getAgentDir } from "@mariozechner/pi-coding-agent";
+import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import { BUILTIN_MODES, MODE_NAMES, type ModeDefinition, type ModeName } from "./modes.ts";
 
 // ---------------------------------------------------------------------------

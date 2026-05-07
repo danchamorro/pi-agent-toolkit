@@ -5,8 +5,8 @@
  * and redirects the model to use the exa-search skill instead.
  */
 
-import type { ExtensionAPI, ToolCallEventResult } from "@mariozechner/pi-coding-agent";
-import { isToolCallEventType } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI, ToolCallEventResult } from "@earendil-works/pi-coding-agent";
+import { isToolCallEventType } from "@earendil-works/pi-coding-agent";
 
 export default function (pi: ExtensionAPI) {
   // Patterns that indicate ad-hoc web fetching
