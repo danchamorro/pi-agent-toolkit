@@ -69,6 +69,22 @@ Flags (copy and link modes):
   --skip-packages                 Skip installing Pi packages
 ```
 
+### Updating third-party skills and packages
+
+Re-run the manifest-driven installers periodically to pull the latest
+third-party marketplace skills and Pi packages:
+
+```bash
+npm run update:third-party
+```
+
+Use the narrower commands when you only want one category:
+
+```bash
+npm run update:skills     # External skills from manifest.json
+npm run update:packages   # Pi packages from manifest.json
+```
+
 ---
 
 ## What's in this repo
@@ -256,12 +272,16 @@ Or build locally in Pi, then absorb with `node setup.mjs sync`.
 
 1. Install: `npx skills add someone/repo -s skill-name -g -y`
 2. Add an entry to `manifest.json`.
+3. Run `npm run update:skills` later to refresh all tracked external
+   skills from the manifest.
 
 ### Pi packages
 
 1. Install: `pi install npm:package-name`
 2. Add it to `manifest.json` under `packages`.
 3. Update the README if it changes the documented setup.
+4. Run `npm run update:packages` later to refresh all tracked Pi packages
+   from the manifest.
 
 ---
 

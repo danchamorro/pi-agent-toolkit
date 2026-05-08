@@ -14,6 +14,9 @@
     "typecheck:dotfiles": "tsc --noEmit --project dotfiles/tsconfig.json",
     "test": "npm run test --workspaces --if-present",
     "check": "npm run lint && npm run format:check && npm run typecheck && npm run test",
+    "update:third-party": "node setup.mjs",
+    "update:skills": "node setup.mjs --skip-packages",
+    "update:packages": "node setup.mjs --skip-external",
     "prepare": "git config core.hooksPath .hooks"
   },
   "devDependencies": {
