@@ -2,6 +2,30 @@
 
 All notable changes to extensions in `~/.pi/agent/extensions/`.
 
+## 2026-05-10
+
+### inventory.ts
+
+- Added a Ctrl+Shift+S and `/inventory` overlay that reopens a startup-style Pi
+  resource inventory during active sessions, grouped by context files, skills,
+  prompt templates, extensions, and extension commands.
+- Deduplicated resources with the same display name so skills mirrored across
+  multiple user directories appear once in the inventory.
+- Limited the command section to extension-owned commands so skill and prompt
+  commands do not repeat resources already listed in their dedicated sections.
+- Switched the inventory from one long scrolling list to tabs for context,
+  skills, prompts, extensions, and extension commands.
+- Added descriptions to context files, discovered skills, prompt templates, and
+  extensions using frontmatter and extension JSDoc where available.
+- Refined the overlay visuals with a cleaner resource-map header, compact tab
+  rail, scoped section dividers, and number-key tab shortcuts.
+- Improved visual design with cleaner tab bar using dot separators, better
+  color hierarchy and consistency, more breathing room between sections,
+  simplified header and footer, and enhanced item layout for better readability.
+- Fixed overly compact item layout: label, description, and path are now on
+  separate indented lines with blank lines between items, and long descriptions
+  wrap cleanly within the available panel width.
+
 ## 2026-05-07
 
 ### all extensions

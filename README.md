@@ -5,7 +5,7 @@ Extensions, skills, and configs for the
 backup so I can restore or sync my setup across machines, and a reference
 for anyone looking to customize their own Pi environment.
 
-Includes 24 extensions, 36 skills, 2 prompt templates, 7 installable Pi
+Includes 25 extensions, 36 skills, 2 prompt templates, 7 installable Pi
 packages, MCP server configurations, and safety guardrails.
 
 ---
@@ -163,6 +163,7 @@ full list with descriptions.
 | `qna-interactive.ts` | Structured Q&A mode |
 | `question-mode.ts` | Read-only question mode (no file changes) |
 | `clean-sessions.ts` | Prunes old, low-value session files |
+| `inventory.ts` | Reopens Pi's startup-style resource inventory as a tabbed TUI overlay with scope grouping and descriptions |
 | `uv.ts` | Intercepts pip/python calls and redirects to uv |
 
 ### Skills
