@@ -1,12 +1,12 @@
 /**
  * Q&A extraction hook - extracts questions from assistant responses
  *
- * Shortcut: Ctrl+. — extract and answer questions.
+ * Command: /qna — extract questions from the last assistant response and answer them interactively.
  *
  * Custom interactive TUI for answering questions.
  *
  * Demonstrates the "prompt generator" pattern with custom TUI:
- * 1. /answer command gets the last assistant message
+ * 1. /qna command gets the last assistant message
  * 2. Shows a spinner while extracting questions as structured JSON
  * 3. Presents an interactive TUI to navigate and answer questions
  * 4. Submits the compiled answers when done
@@ -125,6 +125,22 @@ function parseExtractionResult(text: string): ExtractionResult | null {
 	} catch {
 		return null;
 	}
+}
+
+function extractQuestionsLocally(text: string): ExtractionResult {
+	const questions: ExtractedQuestion[] = [];
+	for (const rawLine of text.split("\n")) {
+		const line = rawLine.trim();
+		if (!line.includes("?")) continue;
+		const cleaned = line
+			.replace(/^[-*•]\s+/, "")
+			.replace(/^\d+[.)]\s+/, "")
+			.trim();
+		if (cleaned.endsWith("?")) {
+			questions.push({ question: cleaned });
+		}
+	}
+	return { questions };
 }
 
 /**
@@ -452,49 +468,54 @@ export default function (pi: ExtensionAPI) {
 				return;
 			}
 
-			// Select the best model for extraction (prefer Codex mini, then haiku)
-			const extractionModel = await selectExtractionModel(ctx.model, ctx.modelRegistry);
+			const localExtraction = extractQuestionsLocally(lastAssistantText);
+			let extractionResult = localExtraction.questions.length > 0 ? localExtraction : null;
+
+			// Select the best model for extraction when simple line-based extraction is not enough.
+			const extractionModel = extractionResult ? null : await selectExtractionModel(ctx.model, ctx.modelRegistry);
 
 			// Run extraction with loader UI
-			const extractionResult = await ctx.ui.custom<ExtractionResult | null>((tui, theme, _kb, done) => {
-				const loader = new BorderedLoader(tui, theme, `Extracting questions using ${extractionModel.id}...`);
-				loader.onAbort = () => done(null);
+			if (!extractionResult && extractionModel) {
+				extractionResult = await ctx.ui.custom<ExtractionResult | null>((tui, theme, _kb, done) => {
+					const loader = new BorderedLoader(tui, theme, `Extracting questions using ${extractionModel.id}...`);
+					loader.onAbort = () => done(null);
 
-				const doExtract = async () => {
-					const authResult = await ctx.modelRegistry.getApiKeyAndHeaders(extractionModel);
-					const userMessage: UserMessage = {
-						role: "user",
-						content: [{ type: "text", text: lastAssistantText! }],
-						timestamp: Date.now(),
+					const doExtract = async () => {
+						const authResult = await ctx.modelRegistry.getApiKeyAndHeaders(extractionModel);
+						const userMessage: UserMessage = {
+							role: "user",
+							content: [{ type: "text", text: lastAssistantText! }],
+							timestamp: Date.now(),
+						};
+
+						const response = await complete(
+							extractionModel,
+							{ systemPrompt: SYSTEM_PROMPT, messages: [userMessage] },
+							{ apiKey: authResult.ok ? authResult.apiKey : undefined, headers: authResult.ok ? authResult.headers : undefined, signal: loader.signal },
+						);
+
+						if (response.stopReason === "aborted") {
+							return null;
+						}
+
+						const responseText = response.content
+							.filter((c): c is { type: "text"; text: string } => c.type === "text")
+							.map((c) => c.text)
+							.join("\n");
+
+						return parseExtractionResult(responseText);
 					};
 
-					const response = await complete(
-						extractionModel,
-						{ systemPrompt: SYSTEM_PROMPT, messages: [userMessage] },
-						{ apiKey: authResult.ok ? authResult.apiKey : undefined, headers: authResult.ok ? authResult.headers : undefined, signal: loader.signal },
-					);
+					doExtract()
+						.then(done)
+						.catch(() => done(null));
 
-					if (response.stopReason === "aborted") {
-						return null;
-					}
-
-					const responseText = response.content
-						.filter((c): c is { type: "text"; text: string } => c.type === "text")
-						.map((c) => c.text)
-						.join("\n");
-
-					return parseExtractionResult(responseText);
-				};
-
-				doExtract()
-					.then(done)
-					.catch(() => done(null));
-
-				return loader;
-			});
+					return loader;
+				});
+			}
 
 			if (extractionResult === null) {
-				ctx.ui.notify("Cancelled", "info");
+				ctx.ui.notify("Could not extract questions from the last message", "error");
 				return;
 			}
 
@@ -529,8 +550,4 @@ export default function (pi: ExtensionAPI) {
 		handler: (_args, ctx) => answerHandler(ctx),
 	});
 
-	pi.registerShortcut("ctrl+.", {
-		description: "Extract and answer questions",
-		handler: answerHandler,
-	});
 }

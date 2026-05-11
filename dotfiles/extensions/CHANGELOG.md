@@ -4,6 +4,13 @@ All notable changes to extensions in `~/.pi/agent/extensions/`.
 
 ## 2026-05-10
 
+### qna-interactive.ts
+
+- Removed the unreliable Ctrl+. shortcut so Q&A extraction is triggered only
+  through the `/qna` slash command.
+- Added local extraction for straightforward numbered or bulleted questions and
+  changed extraction failures to report an error instead of saying cancelled.
+
 ### inventory.ts
 
 - Added a Ctrl+Shift+S and `/inventory` overlay that reopens a startup-style Pi
