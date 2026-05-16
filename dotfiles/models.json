@@ -30,6 +30,40 @@
           "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
         }
       ]
+    },
+    "ds4": {
+      "name": "ds4.c local",
+      "baseUrl": "http://127.0.0.1:18004/v1",
+      "api": "openai-completions",
+      "apiKey": "dsv4-local",
+      "compat": {
+        "supportsStore": false,
+        "supportsDeveloperRole": false,
+        "supportsReasoningEffort": true,
+        "supportsUsageInStreaming": true,
+        "maxTokensField": "max_tokens",
+        "supportsStrictMode": false,
+        "thinkingFormat": "deepseek",
+        "requiresReasoningContentOnAssistantMessages": true
+      },
+      "models": [
+        {
+          "id": "deepseek-v4-flash",
+          "name": "DeepSeek V4 Flash (ds4.c local)",
+          "reasoning": true,
+          "thinkingLevelMap": {
+            "minimal": null,
+            "low": null,
+            "medium": null,
+            "high": "high",
+            "xhigh": null
+          },
+          "input": ["text"],
+          "contextWindow": 100000,
+          "maxTokens": 384000,
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
+        }
+      ]
     }
   }
 }

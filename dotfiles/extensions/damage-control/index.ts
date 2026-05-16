@@ -104,6 +104,32 @@ function loadRulesFile(path: string): Partial<DamageControlRules> | null {
 	}
 }
 
+const readOnlyDiscoveryCommands = new Set([
+	"du",
+	"fd",
+	"file",
+	"find",
+	"grep",
+	"head",
+	"ls",
+	"rg",
+	"stat",
+	"tail",
+	"tree",
+	"wc",
+]);
+const readOnlyPipeCommands = new Set([
+	...readOnlyDiscoveryCommands,
+	"awk",
+	"cut",
+	"jq",
+	"sed",
+	"sort",
+	"uniq",
+	"yq",
+]);
+const unsafeFindPrimaryPattern = /(?:^|\s)-(?:delete|exec|execdir|ok|okdir|fprint|fprintf|fls)(?:\s|$)/;
+
 function mergeRules(...sources: (Partial<DamageControlRules> | null)[]): DamageControlRules {
 	const merged: DamageControlRules = {
 		bashToolPatterns: [],
@@ -193,9 +219,20 @@ export default function (pi: ExtensionAPI) {
 		return null;
 	}
 
+	function getShellTokens(command: string): string[] {
+		return command.match(/"[^"]*"|'[^']*'|`[^`]*`|\S+/g) ?? [];
+	}
+
+	function stripShellTokenQuotes(token: string): string {
+		return token
+			.trim()
+			.replace(/^["'`]+|["'`]+$/g, "")
+			.replace(/[;,]+$/g, "");
+	}
+
 	function extractCommandPathCandidates(command: string): string[] {
 		const candidates = new Set<string>();
-		const tokens = command.match(/"[^"]*"|'[^']*'|`[^`]*`|\S+/g) ?? [];
+		const tokens = getShellTokens(command);
 		const inlinePathMatches = [...command.matchAll(/~\/[^\s"'`;$(){}\[\]]+|\/(?:[^\s"'`;$(){}\[\]]+\/)*[^\s"'`;$(){}\[\]]+/g)]
 			.filter((match) => {
 				const before = command[(match.index ?? 0) - 1];
@@ -204,10 +241,7 @@ export default function (pi: ExtensionAPI) {
 			.map((match) => match[0]);
 
 		for (const token of [...tokens, ...inlinePathMatches]) {
-			const stripped = token
-				.trim()
-				.replace(/^["'`]+|["'`]+$/g, "")
-				.replace(/[;,]+$/g, "");
+			const stripped = stripShellTokenQuotes(token);
 
 			if (!stripped || stripped === "-" || stripped.startsWith("-")) continue;
 
@@ -228,6 +262,30 @@ export default function (pi: ExtensionAPI) {
 			if (access !== "allowed" && access !== "noDelete") return { path: candidate, access };
 		}
 		return null;
+	}
+
+	function isReadOnlyDiscoveryCommand(command: string): boolean {
+		const commandWithoutAllowedRedirects = command.replace(/\s*2>\s*\/dev\/null\b/g, "");
+		if (/[;&`]|\$\(|\|\||&&|(?:^|[^&])>{1,2}|&>/.test(commandWithoutAllowedRedirects)) return false;
+
+		const segments = command.split("|").map((segment) => segment.trim());
+		if (segments.length === 0 || segments.some((segment) => !segment)) return false;
+
+		return segments.every((segment, index) => {
+			const commandName = getShellCommandName(segment);
+			if (!commandName) return false;
+			if (commandName === "find" && unsafeFindPrimaryPattern.test(segment)) return false;
+			return index === 0
+				? readOnlyDiscoveryCommands.has(commandName)
+				: readOnlyPipeCommands.has(commandName);
+		});
+	}
+
+	function getShellCommandName(command: string): string | null {
+		const tokens = getShellTokens(command).map(stripShellTokenQuotes).filter(Boolean);
+		const commandToken = tokens.find((token) => !token.includes("="));
+		if (!commandToken) return null;
+		return basename(commandToken);
 	}
 
 	// -- Path access checking -------------------------------------------------
@@ -344,7 +402,7 @@ export default function (pi: ExtensionAPI) {
 				};
 			}
 
-			if (pathAccess?.access === "readOnly") {
+			if (pathAccess?.access === "readOnly" && !isReadOnlyDiscoveryCommand(cmd)) {
 				recordEvent({
 					timestamp: Date.now(),
 					type: "path",
@@ -354,7 +412,7 @@ export default function (pi: ExtensionAPI) {
 				ctx.ui.notify(`[DC] Blocked bash access: ${pathAccess.path} (read-only)`, "error");
 				return {
 					block: true,
-					reason: `Damage Control: bash command targets read-only path "${pathAccess.path}". Bash access is blocked because it can mutate files. Use the read tool for inspection instead.`,
+					reason: `Damage Control: bash command targets read-only path "${pathAccess.path}". Bash access is blocked because it can mutate files. Safe read-only discovery commands such as find, rg, grep, and ls are allowed when they do not write or execute helpers.`,
 				};
 			}
 

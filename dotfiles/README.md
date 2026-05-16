@@ -105,7 +105,9 @@ safety system that protects against destructive operations:
   destructive operations, and SQL `DROP`/`TRUNCATE`/`DELETE` without
   `WHERE`.
 - **Read-only paths**: System directories, lock files, minified bundles,
-  build output, `node_modules/`.
+  build output, `node_modules/`. Safe discovery commands such as `find`,
+  `rg`, `grep`, and `ls` may inspect these paths when they avoid writes,
+  helper execution, and mutating `find` primaries.
 - **No-delete paths**: `.git/`, config files (`LICENSE`, `README.md`,
   `Dockerfile`, CI configs), `~/.pi/`, `~/.claude/`.
 - **AWS S3 allowlist**: Only `ls` and `cp` are permitted; all other S3

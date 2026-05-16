@@ -2,6 +2,14 @@
 
 All notable changes to extensions in `~/.pi/agent/extensions/`.
 
+## 2026-05-15
+
+### damage-control/
+
+- Relaxed read-only path bash blocking for safe discovery commands such as
+  `find`, `rg`, `grep`, and `ls`, while still blocking shell redirection,
+  helper execution, and mutating `find` primaries like `-delete` and `-exec`.
+
 ## 2026-05-10
 
 ### qna-interactive.ts
