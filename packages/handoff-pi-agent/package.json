@@ -26,7 +26,8 @@
     "scripts/",
     "skills/",
     "references/",
-    "README.md"
+    "README.md",
+    "CHANGELOG.md"
   ],
   "scripts": {
     "test": "node --test *.test.ts",
