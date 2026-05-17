@@ -2,6 +2,12 @@
 
 All notable changes to `@danchamorro/pi-handoff-agent` will be documented in this file.
 
+## [Unreleased]
+
+### Changed
+
+- Expand documentation to explain portable continuity, receiving workflows, privacy protections, and why the export must be extension-backed.
+
 ## [0.1.0] - 2026-05-17
 
 ### Added
