@@ -1,0 +1,11 @@
+{
+  "sourceAgent": "pi-agent",
+  "cwd": "/tmp/project",
+  "entries": [
+    {
+      "role": "assistant",
+      "sourceRole": "assistant",
+      "content": [{ "type": "thinking" }, { "type": "text", "text": "Final answer only." }]
+    }
+  ]
+}

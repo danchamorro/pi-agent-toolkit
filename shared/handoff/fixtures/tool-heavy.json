@@ -1,0 +1,16 @@
+{
+  "sourceAgent": "pi-agent",
+  "cwd": "/tmp/project",
+  "entries": [
+    {
+      "role": "assistant",
+      "sourceRole": "assistant",
+      "content": [
+        { "type": "text", "text": "I found the file." },
+        { "type": "tool_call" },
+        { "type": "tool_result" },
+        { "type": "text", "text": "The fix is small." }
+      ]
+    }
+  ]
+}

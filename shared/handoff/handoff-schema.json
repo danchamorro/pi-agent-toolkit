@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://danchamorro.github.io/pi-agent-toolkit/handoff-schema.json",
+  "title": "Handoff Export",
+  "type": "object",
+  "required": [
+    "handoff_version",
+    "mode",
+    "source",
+    "output",
+    "stripped",
+    "stats",
+    "messages",
+    "warnings"
+  ],
+  "properties": {
+    "handoff_version": { "const": 1 },
+    "mode": { "const": "verbatim-clean-transcript" },
+    "source": {
+      "type": "object",
+      "required": ["agent", "session_id", "session_file", "cwd", "generated_at"],
+      "properties": {
+        "agent": { "enum": ["pi-agent", "claude-code"] },
+        "session_id": { "type": ["string", "null"] },
+        "session_file": { "type": ["string", "null"] },
+        "cwd": { "type": "string" },
+        "generated_at": { "type": "string", "format": "date-time" }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "required": ["directory", "json_file", "markdown_file"],
+      "properties": {
+        "directory": { "type": "string" },
+        "json_file": { "type": "string" },
+        "markdown_file": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "stripped": {
+      "type": "object",
+      "required": ["tool_calls", "tool_results", "thinking"],
+      "properties": {
+        "tool_calls": { "const": true },
+        "tool_results": { "const": true },
+        "thinking": { "const": true }
+      },
+      "additionalProperties": false
+    },
+    "stats": { "type": "object" },
+    "messages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "index",
+          "role",
+          "source_role",
+          "kind",
+          "timestamp",
+          "source_message_id",
+          "content"
+        ],
+        "properties": {
+          "index": { "type": "integer", "minimum": 1 },
+          "role": { "enum": ["user", "assistant", "context", "system", "other"] },
+          "source_role": { "type": "string" },
+          "kind": { "type": "string" },
+          "timestamp": { "type": ["string", "null"] },
+          "source_message_id": { "type": ["string", "null"] },
+          "content": { "type": "string", "minLength": 1 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "warnings": { "type": "array", "items": { "type": "string" } }
+  },
+  "additionalProperties": false
+}

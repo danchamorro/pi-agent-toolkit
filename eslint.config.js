@@ -7,7 +7,7 @@ export default tseslint.config(
   ...tseslint.configs.recommended,
   prettier,
   {
-    files: ["packages/**/*.ts"],
+    files: ["packages/**/*.ts", "shared/**/*.ts"],
     rules: {
       // Allow unused vars prefixed with _ (common pattern for intentional skips)
       "@typescript-eslint/no-unused-vars": [

@@ -1,0 +1,14 @@
+{
+  "sourceAgent": "pi-agent",
+  "cwd": "/tmp/project",
+  "entries": [
+    {
+      "role": "assistant",
+      "sourceRole": "assistant",
+      "content": [
+        { "type": "unknown", "label": "audio" },
+        { "type": "text", "text": "Known text." }
+      ]
+    }
+  ]
+}

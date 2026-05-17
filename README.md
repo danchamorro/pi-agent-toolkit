@@ -110,6 +110,12 @@ pi install git:https://github.com/badlogic/pi-diff-review
 | [agent-modes](packages/agent-modes) | Switch between code, architect, debug, ask, and review modes with enforced tool restrictions, bash allowlists, and per-mode model assignment | [![npm](https://img.shields.io/npm/v/@danchamorro/pi-agent-modes)](https://www.npmjs.com/package/@danchamorro/pi-agent-modes) |
 | [prompt-enhancer](packages/prompt-enhancer) | Rewrite prompts to be clearer and more actionable before sending | [![npm](https://img.shields.io/npm/v/@danchamorro/pi-prompt-enhancer)](https://www.npmjs.com/package/@danchamorro/pi-prompt-enhancer) |
 
+**In development in this repo:**
+
+| Package | Description | Status |
+|---|---|---|
+| [handoff-pi-agent](packages/handoff-pi-agent) | Export the active Pi session branch to clean handoff JSON and Markdown artifacts for portable continuity | Not installed by `manifest.json` until publish |
+
 **Also installed as part of this setup:**
 
 | Package | Description | Source |
