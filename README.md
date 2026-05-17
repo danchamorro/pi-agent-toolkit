@@ -5,7 +5,7 @@ Extensions, skills, and configs for the
 backup so I can restore or sync my setup across machines, and a reference
 for anyone looking to customize their own Pi environment.
 
-Includes 25 extensions, 36 skills, 2 prompt templates, 7 installable Pi
+Includes 25 extensions, 37 skills, 2 prompt templates, 8 installable Pi
 packages, MCP server configurations, and safety guardrails.
 
 ---
@@ -91,11 +91,12 @@ npm run update:packages   # Pi packages from manifest.json
 
 ### Packages (installable via pi)
 
-This setup installs seven Pi packages via `manifest.json`:
+This setup installs eight Pi packages via `manifest.json`:
 
 ```bash
 pi install npm:@danchamorro/pi-agent-modes
 pi install npm:@danchamorro/pi-prompt-enhancer
+pi install npm:@danchamorro/pi-handoff-agent
 pi install npm:pi-design-deck
 pi install npm:pi-annotate
 pi install npm:pi-subagents
@@ -109,12 +110,7 @@ pi install git:https://github.com/badlogic/pi-diff-review
 |---|---|---|
 | [agent-modes](packages/agent-modes) | Switch between code, architect, debug, ask, and review modes with enforced tool restrictions, bash allowlists, and per-mode model assignment | [![npm](https://img.shields.io/npm/v/@danchamorro/pi-agent-modes)](https://www.npmjs.com/package/@danchamorro/pi-agent-modes) |
 | [prompt-enhancer](packages/prompt-enhancer) | Rewrite prompts to be clearer and more actionable before sending | [![npm](https://img.shields.io/npm/v/@danchamorro/pi-prompt-enhancer)](https://www.npmjs.com/package/@danchamorro/pi-prompt-enhancer) |
-
-**In development in this repo:**
-
-| Package | Description | Status |
-|---|---|---|
-| [handoff-pi-agent](packages/handoff-pi-agent) | Export the active Pi session branch to clean handoff JSON and Markdown artifacts for portable continuity | Not installed by `manifest.json` until publish |
+| [handoff-pi-agent](packages/handoff-pi-agent) | Export the active Pi session branch to clean handoff JSON and Markdown artifacts for portable continuity | [![npm](https://img.shields.io/npm/v/@danchamorro/pi-handoff-agent)](https://www.npmjs.com/package/@danchamorro/pi-handoff-agent) |
 
 **Also installed as part of this setup:**
 
@@ -198,6 +194,7 @@ Installed automatically when these packages are present in
 | Skill | Source |
 |-------|--------|
 | `design-deck` | [`npm:pi-design-deck`](https://github.com/nicobailon/pi-design-deck) |
+| `handoff-pi-agent` | [`npm:@danchamorro/pi-handoff-agent`](https://www.npmjs.com/package/@danchamorro/pi-handoff-agent) |
 
 **External skills** (26, installed from source repos):
 
