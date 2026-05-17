@@ -37,14 +37,20 @@ function parseBranchEntry(entry: unknown): NormalizedSourceEntry | null {
       kind: "message",
       timestamp: readTimestamp(message, entry),
       sourceMessageId: readId(message, entry),
-      content: parseContent(message.content),
+      content: parseMessageContent(sourceRole, message.content),
     };
   }
 
   const summary = readSummary(entry);
   if (summary) return summary;
 
+  if (isKnownNonTranscriptEntry(entry.type)) return null;
+
   return unknownEntry(typeof entry.type === "string" ? entry.type : "unknown-entry");
+}
+
+function isKnownNonTranscriptEntry(type: unknown): boolean {
+  return type === "model_change" || type === "thinking_level_change" || type === "session_info";
 }
 
 function readSummary(entry: Record<string, unknown>): NormalizedSourceEntry | null {
@@ -66,6 +72,12 @@ function readSummary(entry: Record<string, unknown>): NormalizedSourceEntry | nu
     sourceMessageId: readId(entry),
     content: text,
   };
+}
+
+function parseMessageContent(role: string, content: unknown): string | NormalizedContentBlock[] {
+  if (isToolResultRole(role)) return [{ type: "tool_result" }];
+  if (isToolCallRole(role)) return [{ type: "tool_call" }];
+  return parseContent(content);
 }
 
 function parseContent(content: unknown): string | NormalizedContentBlock[] {
@@ -93,18 +105,25 @@ function portableRole(role: string): HandoffRole {
 }
 
 function isToolCall(type: unknown): boolean {
-  return (
-    type === "tool_call" || type === "tool_use" || type === "tool-use" || type === "function_call"
-  );
+  return typeof type === "string" && isToolCallRole(type);
+}
+
+function isToolCallRole(role: string): boolean {
+  return ["toolCall", "tool_call", "tool_use", "tool-use", "function_call"].includes(role);
 }
 
 function isToolResult(type: unknown): boolean {
-  return (
-    type === "tool_result" ||
-    type === "tool_result_content" ||
-    type === "tool-result" ||
-    type === "function_result"
-  );
+  return typeof type === "string" && isToolResultRole(type);
+}
+
+function isToolResultRole(role: string): boolean {
+  return [
+    "toolResult",
+    "tool_result",
+    "tool_result_content",
+    "tool-result",
+    "function_result",
+  ].includes(role);
 }
 
 function isThinking(type: unknown): boolean {

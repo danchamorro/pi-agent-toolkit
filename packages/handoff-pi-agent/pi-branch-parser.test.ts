@@ -46,6 +46,36 @@ describe("createPiBranchSnapshot", () => {
     assert.equal(handoff.messages[0].content, "Earlier context");
   });
 
+  it("strips tool-call and tool-result message entries", () => {
+    const snapshot = createPiBranchSnapshot({
+      cwd: "/tmp/project",
+      branch: [
+        { type: "message", message: { id: "tc1", role: "toolCall", content: "hidden" } },
+        { type: "message", message: { id: "tr1", role: "toolResult", content: "hidden" } },
+      ],
+    });
+    const handoff = createHandoffArtifact(snapshot);
+    assert.equal(handoff.messages.length, 0);
+    assert.equal(handoff.stats.omitted_empty_messages, 2);
+    assert.equal(handoff.stats.tool_calls_removed, 1);
+    assert.equal(handoff.stats.tool_results_removed, 1);
+  });
+
+  it("omits known non-transcript settings entries without warnings", () => {
+    const snapshot = createPiBranchSnapshot({
+      cwd: "/tmp/project",
+      branch: [
+        { type: "model_change" },
+        { type: "thinking_level_change" },
+        { type: "session_info" },
+      ],
+    });
+    const handoff = createHandoffArtifact(snapshot);
+    assert.deepEqual(handoff.warnings, []);
+    assert.equal(handoff.stats.source_entries_seen, 0);
+    assert.equal(handoff.messages.length, 0);
+  });
+
   it("warns on unknown entries", () => {
     const snapshot = createPiBranchSnapshot({
       cwd: "/tmp/project",
