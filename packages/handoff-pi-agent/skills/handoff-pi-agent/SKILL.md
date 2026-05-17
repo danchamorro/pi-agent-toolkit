@@ -49,6 +49,7 @@ The receiving session should summarize the current goal, key decisions, complete
 - exact user message text
 - exact assistant message text
 - context summaries when present in the active branch
+- raw pre-compact branch history when Pi has compacted the session
 - timestamps and source message IDs when available
 - source metadata such as session file, cwd, and generated time
 
@@ -60,9 +61,14 @@ The receiving session should summarize the current goal, key decisions, complete
 - MCP output
 - thinking or reasoning traces
 - known Pi settings events
+- extension state records such as `custom` and `label` entries
 - empty messages left after stripping
 
 Stripped counts are recorded in `stats` so reviewers can see how much nonportable material was removed.
+
+## Compaction Behavior
+
+Pi compaction appends a summary entry but keeps earlier raw messages in the session branch. The exporter reads the active branch, so it can preserve pre-compact user and assistant messages rather than relying only on the compact summary. Compaction summaries remain marked as context records.
 
 ## Privacy
 

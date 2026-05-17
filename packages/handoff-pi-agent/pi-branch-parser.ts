@@ -50,7 +50,16 @@ function parseBranchEntry(entry: unknown): NormalizedSourceEntry | null {
 }
 
 function isKnownNonTranscriptEntry(type: unknown): boolean {
-  return type === "model_change" || type === "thinking_level_change" || type === "session_info";
+  switch (type) {
+    case "custom":
+    case "label":
+    case "model_change":
+    case "thinking_level_change":
+    case "session_info":
+      return true;
+    default:
+      return false;
+  }
 }
 
 function readSummary(entry: Record<string, unknown>): NormalizedSourceEntry | null {
@@ -58,20 +67,22 @@ function readSummary(entry: Record<string, unknown>): NormalizedSourceEntry | nu
   const text = stringProperty(entry, ["summary", "content", "text"]);
   if (!text) return null;
 
-  const kind: HandoffKind = sourceRole.toLowerCase().includes("compact")
-    ? "compaction-summary"
-    : sourceRole.toLowerCase().includes("branch")
-      ? "branch-summary"
-      : "custom-message";
-
   return {
     role: "context",
     sourceRole,
-    kind,
+    kind: summaryKindForSourceRole(sourceRole),
     timestamp: readTimestamp(entry),
     sourceMessageId: readId(entry),
     content: text,
   };
+}
+
+function summaryKindForSourceRole(sourceRole: string): HandoffKind {
+  const normalizedSourceRole = sourceRole.toLowerCase();
+
+  if (normalizedSourceRole.includes("compact")) return "compaction-summary";
+  if (normalizedSourceRole.includes("branch")) return "branch-summary";
+  return "custom-message";
 }
 
 function parseMessageContent(role: string, content: unknown): string | NormalizedContentBlock[] {

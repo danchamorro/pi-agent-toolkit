@@ -4,6 +4,13 @@ All notable changes to `@danchamorro/pi-handoff-agent` will be documented in thi
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-05-17
+
+### Fixed
+
+- Omit Pi extension state entries such as `custom` and `label` from exports without warning noise.
+- Add regression coverage for compacted sessions so raw pre-compact transcript text is preserved while compaction summaries remain marked as context.
+
 ### Changed
 
 - Expand documentation to explain portable continuity, receiving workflows, privacy protections, and why the export must be extension-backed.

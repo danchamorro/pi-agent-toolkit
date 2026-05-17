@@ -46,6 +46,38 @@ describe("createPiBranchSnapshot", () => {
     assert.equal(handoff.messages[0].content, "Earlier context");
   });
 
+  it("preserves compacted branch history and marks compactions as context", () => {
+    const snapshot = createPiBranchSnapshot({
+      cwd: "/tmp/project",
+      branch: [
+        { type: "message", id: "u1", message: { role: "user", content: "Before compact" } },
+        {
+          type: "message",
+          id: "a1",
+          message: { role: "assistant", content: "Pre-compact answer" },
+        },
+        {
+          type: "compaction",
+          id: "c1",
+          summary: "Compact summary of earlier context",
+          firstKeptEntryId: "u2",
+        },
+        { type: "message", id: "u2", message: { role: "user", content: "After compact" } },
+      ],
+    });
+
+    const handoff = createHandoffArtifact(snapshot);
+    assert.deepEqual(
+      handoff.messages.map((message) => [message.role, message.kind, message.content]),
+      [
+        ["user", "message", "Before compact"],
+        ["assistant", "message", "Pre-compact answer"],
+        ["context", "compaction-summary", "Compact summary of earlier context"],
+        ["user", "message", "After compact"],
+      ],
+    );
+  });
+
   it("strips tool-call and tool-result message entries", () => {
     const snapshot = createPiBranchSnapshot({
       cwd: "/tmp/project",
@@ -61,10 +93,12 @@ describe("createPiBranchSnapshot", () => {
     assert.equal(handoff.stats.tool_results_removed, 1);
   });
 
-  it("omits known non-transcript settings entries without warnings", () => {
+  it("omits known non-transcript state entries without warnings", () => {
     const snapshot = createPiBranchSnapshot({
       cwd: "/tmp/project",
       branch: [
+        { type: "custom", customType: "tilldone-state", data: { enabled: true } },
+        { type: "label", targetId: "u1", label: "bookmark" },
         { type: "model_change" },
         { type: "thinking_level_change" },
         { type: "session_info" },

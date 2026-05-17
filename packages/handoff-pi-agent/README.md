@@ -10,7 +10,8 @@ Long-running agent work often outlives a single session. You may need to move fr
 
 - preserves the exact user and assistant message text
 - keeps branch or compaction summaries when they are part of active context
-- strips tool calls, tool results, command output, MCP output, and thinking traces
+- preserves raw pre-compact branch history instead of relying only on lossy compact summaries
+- strips tool calls, tool results, command output, MCP output, thinking traces, and extension state records
 - writes a canonical JSON file for the next agent session
 - writes a Markdown companion for human review
 - protects `.handoffs/` with `.gitignore` so private context is not accidentally committed
@@ -76,9 +77,14 @@ The exporter removes nonportable artifacts by default:
 - MCP output
 - thinking or reasoning blocks
 - known Pi settings events such as model changes
+- extension state records such as `custom` and `label` entries
 - empty messages left after stripping
 
 The output stats record how many items were seen, written, omitted, and stripped.
+
+## Compaction behavior
+
+Pi compaction is append-only: compacting a session appends a summary entry but does not delete the earlier raw messages from the session file. Because this package exports the active branch path, handoffs can still include pre-compact user and assistant messages. Compaction summaries are preserved as `context` records so a receiving agent can see that compaction occurred, but they are not the only source of continuity.
 
 ## CLI for explicit snapshots
 
