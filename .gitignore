@@ -35,3 +35,5 @@ dotfiles/agent-skills/exa-search/.env
 __pycache__/
 .venv/
 *.pyc
+
+.handoffs/
