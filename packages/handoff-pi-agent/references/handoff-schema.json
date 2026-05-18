@@ -8,14 +8,15 @@
     "mode",
     "source",
     "output",
-    "stripped",
+    "policy",
+    "briefing",
     "stats",
     "messages",
     "warnings"
   ],
   "properties": {
-    "handoff_version": { "const": 1 },
-    "mode": { "const": "verbatim-clean-transcript" },
+    "handoff_version": { "const": 2 },
+    "mode": { "const": "continuity-packet" },
     "source": {
       "type": "object",
       "required": ["agent", "session_id", "session_file", "cwd", "generated_at"],
@@ -38,17 +39,60 @@
       },
       "additionalProperties": false
     },
-    "stripped": {
+    "policy": {
       "type": "object",
-      "required": ["tool_calls", "tool_results", "thinking"],
+      "required": [
+        "thinking_traces_removed",
+        "tool_calls_preserved",
+        "tool_results_preserved",
+        "command_output_preserved",
+        "extension_state_removed"
+      ],
       "properties": {
-        "tool_calls": { "const": true },
-        "tool_results": { "const": true },
-        "thinking": { "const": true }
+        "thinking_traces_removed": { "const": true },
+        "tool_calls_preserved": { "const": true },
+        "tool_results_preserved": { "const": true },
+        "command_output_preserved": { "const": true },
+        "extension_state_removed": { "const": true }
       },
       "additionalProperties": false
     },
-    "stats": { "type": "object" },
+    "briefing": {
+      "type": "object",
+      "required": ["generated_by", "content", "model"],
+      "properties": {
+        "generated_by": { "enum": ["deterministic", "model"] },
+        "content": { "type": "string", "minLength": 1 },
+        "model": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "stats": {
+      "type": "object",
+      "required": [
+        "source_entries_seen",
+        "messages_written",
+        "omitted_empty_messages",
+        "omitted_non_context_entries",
+        "tool_calls_preserved",
+        "tool_results_preserved",
+        "bash_executions_preserved",
+        "thinking_blocks_removed",
+        "unknown_entries_seen"
+      ],
+      "properties": {
+        "source_entries_seen": { "type": "integer", "minimum": 0 },
+        "messages_written": { "type": "integer", "minimum": 0 },
+        "omitted_empty_messages": { "type": "integer", "minimum": 0 },
+        "omitted_non_context_entries": { "type": "integer", "minimum": 0 },
+        "tool_calls_preserved": { "type": "integer", "minimum": 0 },
+        "tool_results_preserved": { "type": "integer", "minimum": 0 },
+        "bash_executions_preserved": { "type": "integer", "minimum": 0 },
+        "thinking_blocks_removed": { "type": "integer", "minimum": 0 },
+        "unknown_entries_seen": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
     "messages": {
       "type": "array",
       "items": {
@@ -66,7 +110,18 @@
           "index": { "type": "integer", "minimum": 1 },
           "role": { "enum": ["user", "assistant", "context", "system", "other"] },
           "source_role": { "type": "string" },
-          "kind": { "type": "string" },
+          "kind": {
+            "enum": [
+              "message",
+              "tool-call",
+              "tool-result",
+              "bash-execution",
+              "compaction-summary",
+              "branch-summary",
+              "custom-message",
+              "system-event"
+            ]
+          },
           "timestamp": { "type": ["string", "null"] },
           "source_message_id": { "type": ["string", "null"] },
           "content": { "type": "string", "minLength": 1 }

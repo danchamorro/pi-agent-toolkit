@@ -4,6 +4,15 @@ All notable changes to `@danchamorro/pi-handoff-agent` will be documented in thi
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-05-17
+
+### Changed
+
+- Replace transcript-only exports with a single continuity-packet format that includes a briefing and timeline evidence.
+- Preserve tool calls, tool results, shell command output, MCP output, and subagent context while removing thinking traces.
+- Generate the handoff briefing with a fresh one-shot call to the active model when available, with a deterministic fallback when model access is unavailable.
+- Update schema, format docs, README, and skill instructions for the evidence-aware handoff format and its briefing flow.
+
 ## [0.1.1] - 2026-05-17
 
 ### Fixed

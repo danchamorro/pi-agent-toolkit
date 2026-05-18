@@ -19,37 +19,109 @@ export function createPiBranchSnapshot(options: PiBranchSnapshotOptions): Handof
     sessionId: options.sessionId ?? null,
     sessionFile: options.sessionFile ?? null,
     cwd: options.cwd,
-    entries: options.branch
-      .map(parseBranchEntry)
-      .filter((entry): entry is NormalizedSourceEntry => entry !== null),
+    entries: options.branch.map(parseBranchEntry),
   };
 }
 
-function parseBranchEntry(entry: unknown): NormalizedSourceEntry | null {
+function parseBranchEntry(entry: unknown): NormalizedSourceEntry {
   if (!isRecord(entry)) return unknownEntry("malformed-entry");
 
   if (entry.type === "message" && isRecord(entry.message)) {
-    const message = entry.message;
-    const sourceRole = typeof message.role === "string" ? message.role : "unknown";
+    return parseMessageEntry(entry, entry.message);
+  }
+
+  if (entry.type === "custom_message") {
     return {
-      role: portableRole(sourceRole),
-      sourceRole,
-      kind: "message",
-      timestamp: readTimestamp(message, entry),
-      sourceMessageId: readId(message, entry),
-      content: parseMessageContent(sourceRole, message.content),
+      role: "context",
+      sourceRole: "custom_message",
+      kind: "custom-message",
+      timestamp: readTimestamp(entry),
+      sourceMessageId: readId(entry),
+      content: parseContent(entry.content),
     };
   }
 
   const summary = readSummary(entry);
   if (summary) return summary;
 
-  if (isKnownNonTranscriptEntry(entry.type)) return null;
+  if (isKnownNonContextEntry(entry.type)) {
+    return omittedEntry(entry, typeof entry.type === "string" ? entry.type : "non-context-entry");
+  }
 
   return unknownEntry(typeof entry.type === "string" ? entry.type : "unknown-entry");
 }
 
-function isKnownNonTranscriptEntry(type: unknown): boolean {
+function parseMessageEntry(
+  entry: Record<string, unknown>,
+  message: Record<string, unknown>,
+): NormalizedSourceEntry {
+  const sourceRole = typeof message.role === "string" ? message.role : "unknown";
+  const base = {
+    role: portableRole(sourceRole),
+    sourceRole,
+    timestamp: readTimestamp(message, entry),
+    sourceMessageId: readId(message, entry),
+  };
+
+  if (isBashExecutionRole(sourceRole)) {
+    return {
+      ...base,
+      role: "other",
+      kind: "bash-execution",
+      content: [
+        {
+          type: "bash_execution",
+          command: stringValue(message.command),
+          output: stringValue(message.output),
+          exitCode: numberOrNullValue(message.exitCode),
+          cancelled: booleanValue(message.cancelled),
+          truncated: booleanValue(message.truncated),
+          fullOutputPath: stringValue(message.fullOutputPath),
+        },
+      ],
+    };
+  }
+
+  if (isToolResultRole(sourceRole)) {
+    return {
+      ...base,
+      role: "other",
+      kind: "tool-result",
+      content: [
+        {
+          type: "tool_result",
+          toolName: stringValue(message.toolName),
+          toolCallId: stringValue(message.toolCallId),
+          content: contentToText(message.content),
+          isError: booleanValue(message.isError),
+        },
+      ],
+    };
+  }
+
+  if (isToolCallRole(sourceRole)) {
+    return {
+      ...base,
+      role: "other",
+      kind: "tool-call",
+      content: [
+        {
+          type: "tool_call",
+          name: stringValue(message.name),
+          arguments: message.arguments,
+        },
+      ],
+    };
+  }
+
+  return {
+    ...base,
+    kind: "message",
+    content: parseContent(message.content),
+  };
+}
+
+function isKnownNonContextEntry(type: unknown): boolean {
   switch (type) {
     case "custom":
     case "label":
@@ -85,29 +157,63 @@ function summaryKindForSourceRole(sourceRole: string): HandoffKind {
   return "custom-message";
 }
 
-function parseMessageContent(role: string, content: unknown): string | NormalizedContentBlock[] {
-  if (isToolResultRole(role)) return [{ type: "tool_result" }];
-  if (isToolCallRole(role)) return [{ type: "tool_call" }];
-  return parseContent(content);
-}
-
 function parseContent(content: unknown): string | NormalizedContentBlock[] {
   if (typeof content === "string") return content;
   if (!Array.isArray(content)) return [{ type: "unknown", label: "non-array-content" }];
 
-  return content.map((block): NormalizedContentBlock => {
-    if (typeof block === "string") return { type: "text", text: block };
-    if (!isRecord(block)) return { type: "unknown", label: "malformed-content-block" };
-    if (block.type === "text" && typeof block.text === "string")
-      return { type: "text", text: block.text };
-    if (isToolCall(block.type)) return { type: "tool_call" };
-    if (isToolResult(block.type)) return { type: "tool_result" };
-    if (isThinking(block.type)) return { type: "thinking" };
+  return content.map(parseContentBlock);
+}
+
+function parseContentBlock(block: unknown): NormalizedContentBlock {
+  if (typeof block === "string") return { type: "text", text: block };
+  if (!isRecord(block)) return { type: "unknown", label: "malformed-content-block" };
+  if (block.type === "text" && typeof block.text === "string") {
+    return { type: "text", text: block.text };
+  }
+  if (block.type === "image") return { type: "text", text: imagePlaceholder(block) };
+  if (isToolCall(block.type)) {
     return {
-      type: "unknown",
-      label: typeof block.type === "string" ? block.type : "unknown-content-block",
+      type: "tool_call",
+      name: stringValue(block.name),
+      arguments: block.arguments,
     };
-  });
+  }
+  if (isToolResult(block.type)) {
+    return {
+      type: "tool_result",
+      toolName: stringValue(block.toolName),
+      toolCallId: stringValue(block.toolCallId),
+      content: contentToText(block.content),
+      isError: booleanValue(block.isError),
+    };
+  }
+  if (isThinking(block.type)) return { type: "thinking" };
+  return {
+    type: "unknown",
+    label: typeof block.type === "string" ? block.type : "unknown-content-block",
+  };
+}
+
+function contentToText(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return stringifyUnknownContent(content);
+
+  const textParts: string[] = [];
+  for (const block of content) {
+    const textPart = contentBlockToTextPart(block);
+    if (textPart !== null) textParts.push(textPart);
+  }
+
+  return textParts.filter((part) => part.trim()).join("\n");
+}
+
+function contentBlockToTextPart(block: unknown): string | null {
+  if (typeof block === "string") return block;
+  if (!isRecord(block)) return stringifyUnknownContent(block);
+  if (block.type === "text" && typeof block.text === "string") return block.text;
+  if (block.type === "image") return imagePlaceholder(block);
+  if (isThinking(block.type)) return null;
+  return stringifyUnknownContent(block);
 }
 
 function portableRole(role: string): HandoffRole {
@@ -135,6 +241,10 @@ function isToolResultRole(role: string): boolean {
     "tool-result",
     "function_result",
   ].includes(role);
+}
+
+function isBashExecutionRole(role: string): boolean {
+  return role === "bashExecution" || role === "bash_execution";
 }
 
 function isThinking(type: unknown): boolean {
@@ -165,6 +275,17 @@ function stringProperty(record: Record<string, unknown>, keys: string[]): string
   return null;
 }
 
+function omittedEntry(entry: Record<string, unknown>, label: string): NormalizedSourceEntry {
+  return {
+    role: "other",
+    sourceRole: label,
+    kind: "system-event",
+    timestamp: readTimestamp(entry),
+    sourceMessageId: readId(entry),
+    content: [{ type: "omitted", label }],
+  };
+}
+
 function unknownEntry(label: string): NormalizedSourceEntry {
   return {
     role: "other",
@@ -174,6 +295,34 @@ function unknownEntry(label: string): NormalizedSourceEntry {
     sourceMessageId: null,
     content: [{ type: "unknown", label }],
   };
+}
+
+function imagePlaceholder(block: Record<string, unknown>): string {
+  const mediaType = stringValue(block.mediaType) ?? stringValue(block.mimeType) ?? "unknown";
+  return `[image content preserved as placeholder: ${mediaType}]`;
+}
+
+function stringifyUnknownContent(value: unknown): string {
+  if (value === undefined || value === null) return "";
+  if (typeof value === "string") return value;
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return "[unserializable content]";
+  }
+}
+
+function stringValue(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
+
+function numberOrNullValue(value: unknown): number | null | undefined {
+  if (value === null) return null;
+  return typeof value === "number" ? value : undefined;
+}
+
+function booleanValue(value: unknown): boolean | undefined {
+  return typeof value === "boolean" ? value : undefined;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

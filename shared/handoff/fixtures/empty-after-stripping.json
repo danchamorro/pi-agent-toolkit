@@ -5,7 +5,7 @@
     {
       "role": "assistant",
       "sourceRole": "assistant",
-      "content": [{ "type": "tool_call" }, { "type": "tool_result" }]
+      "content": [{ "type": "thinking" }]
     }
   ]
 }

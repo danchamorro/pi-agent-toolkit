@@ -110,7 +110,7 @@ pi install git:https://github.com/badlogic/pi-diff-review
 |---|---|---|
 | [agent-modes](packages/agent-modes) | Switch between code, architect, debug, ask, and review modes with enforced tool restrictions, bash allowlists, and per-mode model assignment | [![npm](https://img.shields.io/npm/v/@danchamorro/pi-agent-modes)](https://www.npmjs.com/package/@danchamorro/pi-agent-modes) |
 | [prompt-enhancer](packages/prompt-enhancer) | Rewrite prompts to be clearer and more actionable before sending | [![npm](https://img.shields.io/npm/v/@danchamorro/pi-prompt-enhancer)](https://www.npmjs.com/package/@danchamorro/pi-prompt-enhancer) |
-| [handoff-pi-agent](packages/handoff-pi-agent) | Hand off active Pi work to a fresh session or another agent with clean JSON and Markdown artifacts that preserve user and assistant text while stripping tool output, MCP payloads, and thinking traces | [![npm](https://img.shields.io/npm/v/@danchamorro/pi-handoff-agent)](https://www.npmjs.com/package/@danchamorro/pi-handoff-agent) |
+| [handoff-pi-agent](packages/handoff-pi-agent) | Hand off active Pi work to a fresh session or another agent with a continuity briefing plus preserved tool evidence while removing thinking traces and native Pi state | [![npm](https://img.shields.io/npm/v/@danchamorro/pi-handoff-agent)](https://www.npmjs.com/package/@danchamorro/pi-handoff-agent) |
 
 **Also installed as part of this setup:**
 
