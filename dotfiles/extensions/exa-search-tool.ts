@@ -6,6 +6,9 @@
  * and plan-mode since it does not depend on bash.
  *
  * Supports all 5 Exa endpoints: search, contents, findsimilar, answer, research.
+ * Renders a compact, non-interactive stats card for completed searches.
+ *
+ * Shortcut: none.
  */
 
 import { homedir } from "node:os";
@@ -248,7 +251,183 @@ interface ExaSearchDetails {
 	query?: string;
 	url?: string;
 	resultCount: number;
+	requestedCount?: number;
 	cost?: number;
+	searchType?: string;
+	domains?: Array<{ domain: string; count: number }>;
+	freshness?: Array<{ label: string; count: number }>;
+	content?: {
+		text: number;
+		summaries: number;
+		highlights: number;
+		total: number;
+	};
+	filters?: string[];
+	sourceRequestCount?: number;
+	hasAnswer?: boolean;
+	hasResearchData?: boolean;
+}
+
+function getRequestedCount(params: Params): number | undefined {
+	switch (params.endpoint) {
+		case "search":
+		case "findsimilar":
+			return params.numResults ?? 10;
+		case "contents":
+			return params.ids?.length ?? 0;
+		default:
+			return undefined;
+	}
+}
+
+function getSourceRequestCount(params: Params): number | undefined {
+	return params.endpoint === "answer" ? (params.numResults ?? 5) : undefined;
+}
+
+function getDomain(url: string): string | undefined {
+	try {
+		return new URL(url).hostname.replace(/^www\./, "");
+	} catch {
+		return undefined;
+	}
+}
+
+function summarizeDomains(results: ExaResult[] = []): Array<{ domain: string; count: number }> {
+	const counts = new Map<string, number>();
+	for (const result of results) {
+		if (!result.url) continue;
+		const domain = getDomain(result.url);
+		if (!domain) continue;
+		counts.set(domain, (counts.get(domain) ?? 0) + 1);
+	}
+	return [...counts.entries()]
+		.map(([domain, count]) => ({ domain, count }))
+		.sort((a, b) => b.count - a.count || a.domain.localeCompare(b.domain))
+		.slice(0, 4);
+}
+
+function summarizeFreshness(results: ExaResult[] = []): Array<{ label: string; count: number }> {
+	const currentYear = new Date().getFullYear();
+	const counts = new Map<string, number>([
+		[String(currentYear), 0],
+		[String(currentYear - 1), 0],
+		["older", 0],
+		["unknown", 0],
+	]);
+
+	for (const result of results) {
+		const year = result.publishedDate ? new Date(result.publishedDate).getFullYear() : Number.NaN;
+		if (!Number.isFinite(year)) {
+			counts.set("unknown", (counts.get("unknown") ?? 0) + 1);
+		} else if (year === currentYear || year === currentYear - 1) {
+			const label = String(year);
+			counts.set(label, (counts.get(label) ?? 0) + 1);
+		} else {
+			counts.set("older", (counts.get("older") ?? 0) + 1);
+		}
+	}
+
+	return [...counts.entries()]
+		.filter(([, count]) => count > 0)
+		.map(([label, count]) => ({ label, count }));
+}
+
+function summarizeContent(results: ExaResult[] = []): ExaSearchDetails["content"] {
+	return {
+		text: results.filter((result) => Boolean(result.text)).length,
+		summaries: results.filter((result) => Boolean(result.summary)).length,
+		highlights: results.filter((result) => (result.highlights?.length ?? 0) > 0).length,
+		total: results.length,
+	};
+}
+
+function summarizeFilters(params: Params): string[] {
+	const filters: string[] = [];
+	if (params.includeDomains?.length) filters.push(`include ${params.includeDomains.join(", ")}`);
+	if (params.excludeDomains?.length) filters.push(`exclude ${params.excludeDomains.join(", ")}`);
+	if (params.startPublishedDate) filters.push(`after ${params.startPublishedDate}`);
+	if (params.endPublishedDate) filters.push(`before ${params.endPublishedDate}`);
+	if (params.category) filters.push(`category ${params.category}`);
+	return filters;
+}
+
+function truncate(value: string, maxLength: number): string {
+	return value.length > maxLength ? `${value.slice(0, maxLength - 3)}...` : value;
+}
+
+function formatCost(cost: number | undefined): string | undefined {
+	if (cost == null) return undefined;
+	const numericCost = Number(cost);
+	return Number.isFinite(numericCost) ? `$${numericCost.toFixed(4)}` : `$${cost}`;
+}
+
+function formatResultBar(resultCount: number, requestedCount: number | undefined): string {
+	const width = 10;
+	const denominator = requestedCount && requestedCount > 0 ? requestedCount : Math.max(resultCount, 1);
+	const filled = Math.max(0, Math.min(width, Math.round((resultCount / denominator) * width)));
+	return `${"█".repeat(filled)}${"░".repeat(width - filled)}`;
+}
+
+function getHeaderStatus(details: ExaSearchDetails): string {
+	if (details.endpoint === "answer") return details.hasAnswer ? "answer ready" : "no answer";
+	if (details.endpoint === "research") return details.hasResearchData ? "research complete" : "no research data";
+	return details.resultCount === 1 ? "1 result" : `${details.resultCount} results`;
+}
+
+function addProgressLine(lines: string[], details: ExaSearchDetails): void {
+	if (details.endpoint === "answer") {
+		const sources = details.sourceRequestCount;
+		lines.push(sources ? `Sources   requested ${sources}` : "Sources   requested default");
+		return;
+	}
+
+	if (details.endpoint === "research") {
+		lines.push(`Status    ${details.hasResearchData ? "complete" : "empty"}`);
+		return;
+	}
+
+	const requested = details.requestedCount;
+	const countLabel = requested != null ? `${details.resultCount}/${requested}` : String(details.resultCount);
+	lines.push(`Results   [${formatResultBar(details.resultCount, requested)}] ${countLabel}`);
+}
+
+function formatStatsCard(details: ExaSearchDetails): string[] {
+	const cost = formatCost(details.cost);
+	const headerParts = [`Exa ${details.endpoint}`, getHeaderStatus(details), cost].filter(Boolean);
+
+	const lines = [headerParts.join("  ")];
+	if (details.query) lines.push(`Query     ${truncate(details.query, 76)}`);
+	addProgressLine(lines, details);
+	if (details.searchType) lines.push(`Profile   ${details.endpoint}:${details.searchType}`);
+
+	if (details.domains?.length) {
+		lines.push(
+			truncate(
+				`Domains   ${details.domains.map((entry) => `${entry.domain} ${entry.count}`).join(" | ")}`,
+				96,
+			),
+		);
+	}
+
+	if (details.freshness?.length) {
+		lines.push(`Freshness ${details.freshness.map((entry) => `${entry.label} ${entry.count}`).join(" | ")}`);
+	}
+
+	if (details.content && details.content.total > 0) {
+		const content = details.content;
+		lines.push(
+			truncate(
+				`Content   text ${content.text}/${content.total} | summaries ${content.summaries}/${content.total} | highlights ${content.highlights}/${content.total}`,
+				96,
+			),
+		);
+	}
+
+	if (details.filters?.length) {
+		lines.push(`Filters   ${truncate(details.filters.join(" | "), 76)}`);
+	}
+
+	return lines;
 }
 
 // ── Extension ─────────────────────────────────────────────────────────
@@ -320,7 +499,11 @@ export default function exaSearchTool(pi: ExtensionAPI): void {
 			}
 
 			const formatted = formatResultsForLLM(endpoint, response);
-			const resultCount = response.results?.length ?? (response.answer ? 1 : 0);
+			const resultCount =
+				endpoint === "research" && response.data
+					? 1
+					: response.results?.length ?? (response.answer ? 1 : 0);
+			const results = response.results ?? [];
 
 			return {
 				content: [{ type: "text", text: formatted }],
@@ -328,7 +511,16 @@ export default function exaSearchTool(pi: ExtensionAPI): void {
 					endpoint,
 					query: params.query ?? params.url ?? params.input,
 					resultCount,
+					requestedCount: getRequestedCount(params),
 					cost: response.costDollars,
+					searchType: response.searchType ?? params.type,
+					domains: summarizeDomains(results),
+					freshness: summarizeFreshness(results),
+					content: summarizeContent(results),
+					filters: summarizeFilters(params),
+					sourceRequestCount: getSourceRequestCount(params),
+					hasAnswer: Boolean(response.answer),
+					hasResearchData: Boolean(response.data),
 				} satisfies ExaSearchDetails,
 			};
 		},
@@ -359,23 +551,14 @@ export default function exaSearchTool(pi: ExtensionAPI): void {
 				return new Text(first?.type === "text" ? first.text : "(no output)", 0, 0);
 			}
 
-			const countLabel =
-				details.resultCount === 1
-					? "1 result"
-					: `${details.resultCount} results`;
-
-			let text = theme.fg("success", countLabel);
-			text += " " + theme.fg("muted", `(${details.endpoint})`);
-
-			if (details.cost != null) {
-				const cost = Number(details.cost);
-				text += " " + theme.fg("dim", `[$${Number.isFinite(cost) ? cost.toFixed(4) : details.cost}]`);
-			}
+			let text = formatStatsCard(details)
+				.map((line, index) => (index === 0 ? theme.fg("success", line) : theme.fg("dim", line)))
+				.join("\n");
 
 			if (expanded) {
 				const content = result.content[0];
 				if (content?.type === "text") {
-					text += "\n" + theme.fg("dim", content.text);
+					text += "\n\n" + theme.fg("dim", content.text);
 				}
 			}
 

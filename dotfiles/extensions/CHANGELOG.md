@@ -2,6 +2,13 @@
 
 All notable changes to extensions in `~/.pi/agent/extensions/`.
 
+## 2026-05-18
+
+### exa-search-tool.ts
+
+- Added a compact, non-interactive stats card for Exa results with result bars,
+  query context, domains, freshness, content coverage, filters, and cost.
+
 ## 2026-05-15
 
 ### damage-control/
