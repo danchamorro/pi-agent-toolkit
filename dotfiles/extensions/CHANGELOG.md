@@ -15,6 +15,12 @@ All notable changes to extensions in `~/.pi/agent/extensions/`.
   metadata summaries, checklists, and focused previews for commits, PRs, merges,
   and protected or force pushes.
 
+### question-mode.ts
+
+- Added a compact read-only status widget and always inject the current mode
+  state before agent turns so stale question-mode instructions are explicitly
+  cleared after disabling the mode.
+
 ## 2026-05-15
 
 ### damage-control/

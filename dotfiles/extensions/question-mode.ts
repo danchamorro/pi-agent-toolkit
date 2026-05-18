@@ -4,14 +4,30 @@
  * Toggleable read-only mode (Ctrl+Q or /question-mode) that restricts the
  * agent to exploration-only tools (read, grep, find, search) and blocks
  * file edits and bash commands. Useful for asking questions about a
- * codebase without risking modifications.
+ * codebase without risking modifications. Shows a compact status widget and
+ * injects the current mode state so stale read-only instructions do not linger.
+ *
+ * Shortcut: Ctrl+Q.
  */
 
 import type { ExtensionAPI, ExtensionContext, ToolCallEventResult } from "@earendil-works/pi-coding-agent";
-import { Key } from "@earendil-works/pi-tui";
+import { Key, truncateToWidth } from "@earendil-works/pi-tui";
 
 const QUESTION_MODE_TOOLS = ["read", "grep", "find", "ls", "mcp", "exa_search"] as const;
 const FALLBACK_TOOLS = ["read", "bash", "edit", "write"] as const;
+const ACTIVE_CONTEXT = `[QUESTION MODE ACTIVE]
+You are answering a user question in strict read-only mode.
+
+Rules:
+- Focus on explanation and analysis.
+- Do not edit or create files.
+- Do not run shell commands that modify files, install dependencies, or change git state.
+- Use only available read-only tools to gather evidence.
+- For codebase discovery, audits, and cross-referencing, prefer augment_context_engine over exhaustive ls/Read traversals.
+- If code changes would help, describe them as a follow-up and ask for confirmation first.`;
+const INACTIVE_CONTEXT = `[CURRENT MODE STATE]
+question-mode: off
+Only earlier question-mode extension instructions are inactive. Continue following all current system, developer, and user instructions, including any current no-edit or read-only constraints.`;
 
 interface QuestionModeState {
 	enabled: boolean;
@@ -26,6 +42,7 @@ function normalizeTools(input: unknown): string[] {
 export default function questionModeExtension(pi: ExtensionAPI): void {
 	let enabled = false;
 	let restoreTools: string[] = [];
+	let injectInactiveContextOnce = false;
 
 	function getAvailableToolNames(): Set<string> {
 		return new Set(pi.getAllTools().map((tool) => tool.name));
@@ -74,9 +91,26 @@ export default function questionModeExtension(pi: ExtensionAPI): void {
 
 	function updateStatus(ctx: ExtensionContext): void {
 		if (enabled) {
-			ctx.ui.setStatus("question-mode", "question-mode:on");
+			ctx.ui.setStatus("question-mode", ctx.ui.theme.fg("warning", "QM:on"));
+			ctx.ui.setWidget(
+				"question-mode",
+				(_tui, theme) => ({
+					render(width: number): string[] {
+						const tools = getQuestionModeTools().join(", ");
+						const line =
+							theme.fg("warning", "Question mode ON") +
+							theme.fg("dim", " | active tools: ") +
+							theme.fg("accent", tools) +
+							theme.fg("dim", " | blocked: edit, write, bash");
+						return [truncateToWidth(line, width)];
+					},
+					invalidate() {},
+				}),
+				{ placement: "belowEditor" },
+			);
 		} else {
 			ctx.ui.setStatus("question-mode", undefined);
+			ctx.ui.setWidget("question-mode", undefined);
 		}
 	}
 
@@ -147,6 +181,7 @@ export default function questionModeExtension(pi: ExtensionAPI): void {
 		}
 
 		enabled = false;
+		injectInactiveContextOnce = true;
 		const restored = applyRestoreTools();
 		persistState();
 		updateStatus(ctx);
@@ -218,12 +253,15 @@ export default function questionModeExtension(pi: ExtensionAPI): void {
 	});
 
 	pi.on("before_agent_start", async () => {
-		if (!enabled) return undefined;
+		if (!enabled && !injectInactiveContextOnce) return undefined;
+
+		const content = enabled ? ACTIVE_CONTEXT : INACTIVE_CONTEXT;
+		injectInactiveContextOnce = false;
 
 		return {
 			message: {
 				customType: "question-mode-context",
-				content: `[QUESTION MODE ACTIVE]\nYou are answering a user question in strict read-only mode.\n\nRules:\n- Focus on explanation and analysis.\n- Do not edit or create files.\n- Do not run shell commands that modify files, install dependencies, or change git state.\n- Use only available read-only tools to gather evidence.\n- For codebase discovery, audits, and cross-referencing, prefer augment_context_engine over exhaustive ls/Read traversals.\n- If code changes would help, describe them as a follow-up and ask for confirmation first.`,
+				content,
 				display: false,
 			},
 		};
