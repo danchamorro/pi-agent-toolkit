@@ -6,6 +6,8 @@
  * preview staged files, warn when staged files still match gitignore rules,
  * and require interactive approval before the commit proceeds. Blocks
  * commits with missing, vague, or overly thin bodies and malformed subjects.
+ *
+ * Shortcut: none.
  */
 
 import { basename } from "node:path";
@@ -595,6 +597,78 @@ function formatValidationIssues(issues: ValidationIssue[]): string {
     .join("\n");
 }
 
+type CommitRiskLabel = "blocked" | "needs attention" | "normal";
+
+interface CommitBodyStats {
+  paragraphs: number;
+  words: number;
+}
+
+function getRiskLabel(
+  review: CommitReviewDetails,
+  issues: ValidationIssue[] = [],
+): CommitRiskLabel {
+  if (issues.some((issue) => issue.level === "error")) {
+    return "blocked";
+  }
+
+  const hasWarnings = issues.some((issue) => issue.level === "warning");
+  if (hasWarnings || review.ignoredStagedFiles.length > 0) {
+    return "needs attention";
+  }
+
+  return "normal";
+}
+
+function styleRisk(theme: Theme, risk: CommitRiskLabel): string {
+  switch (risk) {
+    case "blocked":
+      return theme.fg("error", risk);
+    case "needs attention":
+      return theme.fg("warning", risk);
+    case "normal":
+      return theme.fg("success", risk);
+  }
+}
+
+function statusMark(theme: Theme, ok: boolean, label: string): string {
+  const mark = ok ? "[ok]" : "[!]";
+  const color = ok ? "success" : "warning";
+  return `${theme.fg(color, mark)} ${label}`;
+}
+
+function neutralMark(theme: Theme, label: string): string {
+  return `${theme.fg("dim", "[--]")} ${label}`;
+}
+
+function getCommitBodyStats(body: string): CommitBodyStats {
+  const compact = getCompactCommitBody(body);
+  const paragraphs = body
+    .split(/\n\s*\n/)
+    .map((part) => part.trim())
+    .filter(Boolean).length;
+
+  return {
+    paragraphs,
+    words: compact ? compact.split(/\s+/).filter(Boolean).length : 0,
+  };
+}
+
+function appendSectionHeader(lines: string[], theme: Theme, title: string): void {
+  lines.push("");
+  lines.push(theme.fg("accent", theme.bold(title)));
+}
+
+function appendKeyValue(
+  lines: string[],
+  theme: Theme,
+  key: string,
+  value: string,
+  width: number,
+): void {
+  appendWrappedText(lines, `${theme.fg("dim", key.padEnd(10))} ${value}`, width);
+}
+
 // ---------------------------------------------------------------------------
 // Approval prompt
 // ---------------------------------------------------------------------------
@@ -618,34 +692,75 @@ async function requestApproval(
 
       function render(width: number): string[] {
         const lines: string[] = [];
-        const rule = theme.fg("dim", "-".repeat(Math.min(width, 60)));
+        const rule = theme.fg("dim", "-".repeat(Math.min(width, 72)));
+        const allIssues = issues ?? [];
+        const risk = getRiskLabel(review, allIssues);
+        const subject = getCommitSubject(metadata) || "(no subject provided)";
+        const body = getCommitBody(metadata);
+        const bodyStats = getCommitBodyStats(body);
+        const messageWillOpenEditor = metadata.messages.length === 0 && !metadata.hasNoEdit;
+        const messageReusesPrevious = metadata.messages.length === 0 && metadata.hasNoEdit;
+        const messageIsDeferred = messageWillOpenEditor || messageReusesPrevious;
+        const hasConventionalSubject =
+          messageIsDeferred || CONVENTIONAL_COMMIT_RE.test(subject);
+        const hasBody = messageIsDeferred || bodyStats.words > 0;
 
-        lines.push(theme.bold("Commit message preview:"));
-        lines.push("");
+        let bodySummary = `${bodyStats.paragraphs} paragraphs, ${bodyStats.words} words`;
+        if (messageReusesPrevious) {
+          bodySummary = "reusing previous commit message";
+        }
+
+        let subjectChecklist = statusMark(
+          theme,
+          hasConventionalSubject,
+          "Conventional Commit subject",
+        );
+        let bodyChecklist = statusMark(theme, hasBody, "Commit body present");
+        if (messageWillOpenEditor) {
+          subjectChecklist = neutralMark(theme, "Subject will be provided by editor");
+          bodyChecklist = neutralMark(theme, "Body will be provided by editor");
+        } else if (messageReusesPrevious) {
+          subjectChecklist = neutralMark(theme, "Subject will be reused from previous commit");
+          bodyChecklist = neutralMark(theme, "Body will be reused from previous commit");
+        }
+
+        lines.push(theme.bold("Commit Approval") + theme.fg("dim", "  preflight review"));
+        lines.push(rule);
+        appendKeyValue(lines, theme, "Risk", styleRisk(theme, risk), width);
+        appendKeyValue(lines, theme, "Subject", subject, width);
+        appendKeyValue(lines, theme, "Body", bodySummary, width);
+        appendKeyValue(lines, theme, "Staged", `${review.stagedFiles.length} files`, width);
+        appendKeyValue(
+          lines,
+          theme,
+          "Ignored",
+          `${review.ignoredStagedFiles.length} staged ignored files`,
+          width,
+        );
+
+        appendSectionHeader(lines, theme, "Checklist");
+        lines.push("  " + subjectChecklist);
+        lines.push("  " + bodyChecklist);
+        lines.push("  " + statusMark(theme, review.stagedFiles.length > 0, "Staged files detected"));
+        lines.push("  " + statusMark(theme, review.ignoredStagedFiles.length === 0, "No staged ignored files"));
+
+        appendSectionHeader(lines, theme, "Message Preview");
         appendWrappedText(lines, messagePreview, width, "  ");
 
-        lines.push("");
-        lines.push(rule);
-        lines.push(theme.bold(`Staged files (${review.stagedFiles.length}):`));
+        appendSectionHeader(lines, theme, `Staged Files (${review.stagedFiles.length})`);
         appendFilePreview(lines, review.stagedFiles, width);
 
         if (review.ignoredStagedFiles.length > 0) {
-          lines.push("");
-          appendWrappedText(
+          appendSectionHeader(
             lines,
-            theme.fg(
-              "warning",
-              `Still matched by gitignore rules (${review.ignoredStagedFiles.length}):`,
-            ),
-            width,
+            theme,
+            `Still Matched By Gitignore (${review.ignoredStagedFiles.length})`,
           );
           appendFilePreview(lines, review.ignoredStagedFiles, width, 8);
         }
 
         if (issueLines) {
-          lines.push("");
-          lines.push(rule);
-          appendWrappedText(lines, theme.fg("warning", "Issues:"), width);
+          appendSectionHeader(lines, theme, "Issues");
           for (const line of issueLines.split("\n")) {
             appendWrappedText(lines, theme.fg("warning", line), width);
           }

@@ -9,6 +9,12 @@ All notable changes to extensions in `~/.pi/agent/extensions/`.
 - Added a compact, non-interactive stats card for Exa results with result bars,
   query context, domains, freshness, content coverage, filters, and cost.
 
+### commit-approval.ts, pr-approval.ts
+
+- Upgraded approval prompts into preflight review dashboards with risk labels,
+  metadata summaries, checklists, and focused previews for commits, PRs, merges,
+  and protected or force pushes.
+
 ## 2026-05-15
 
 ### damage-control/

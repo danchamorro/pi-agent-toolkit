@@ -5,6 +5,8 @@
  * force/protected-branch pushes (git push) to validate metadata and
  * require interactive approval before the operation proceeds. Blocks
  * PRs with missing titles or bodies.
+ *
+ * Shortcut: none.
  */
 
 import { basename } from "node:path";
@@ -449,6 +451,241 @@ function formatValidationIssues(issues: ValidationIssue[]): string {
     .join("\n");
 }
 
+function getOperationTitle(op: PrOperation): string {
+  switch (op.kind) {
+    case "pr-create": return "PR Create Approval";
+    case "pr-merge": return "PR Merge Approval";
+    case "push": return "Push Approval";
+  }
+}
+
+type PrRiskLabel = "blocked" | "critical" | "high" | "needs attention" | "normal";
+
+function getRiskLabel(
+  op: PrOperation,
+  issues: ValidationIssue[] = [],
+): PrRiskLabel {
+  if (issues.some((issue) => issue.level === "error")) {
+    return "blocked";
+  }
+
+  if (op.kind === "push" && op.metadata.isForce && op.metadata.isProtected) {
+    return "critical";
+  }
+
+  if (op.kind === "push" && (op.metadata.isForce || op.metadata.isProtected)) {
+    return "high";
+  }
+
+  if (op.kind === "pr-merge") {
+    return "high";
+  }
+
+  if (issues.some((issue) => issue.level === "warning")) {
+    return "needs attention";
+  }
+
+  return "normal";
+}
+
+function styleRisk(theme: Theme, risk: PrRiskLabel): string {
+  switch (risk) {
+    case "blocked":
+    case "critical":
+      return theme.fg("error", risk);
+    case "high":
+    case "needs attention":
+      return theme.fg("warning", risk);
+    case "normal":
+      return theme.fg("success", risk);
+  }
+}
+
+function statusMark(theme: Theme, ok: boolean, label: string): string {
+  const mark = ok ? "[ok]" : "[!]";
+  const color = ok ? "success" : "warning";
+  return `${theme.fg(color, mark)} ${label}`;
+}
+
+function neutralMark(theme: Theme, label: string): string {
+  return `${theme.fg("dim", "[--]")} ${label}`;
+}
+
+function appendSectionHeader(lines: string[], theme: Theme, title: string): void {
+  lines.push("");
+  lines.push(theme.fg("accent", theme.bold(title)));
+}
+
+function appendKeyValue(
+  lines: string[],
+  theme: Theme,
+  key: string,
+  value: string,
+  width: number,
+): void {
+  appendWrappedLine(lines, `${theme.fg("dim", key.padEnd(10))} ${value}`, width);
+}
+
+interface BodyStats {
+  sections: number;
+  words: number;
+}
+
+function getBodyStats(body: string | null): BodyStats {
+  if (!body?.trim()) {
+    return { sections: 0, words: 0 };
+  }
+
+  const normalized = formatTextForPreview(body);
+  const words = normalized
+    .replace(/\s+/g, " ")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean).length;
+
+  return {
+    sections: (normalized.match(/^##\s+/gm) ?? []).length,
+    words,
+  };
+}
+
+function appendBodyPreview(
+  lines: string[],
+  theme: Theme,
+  body: string,
+  width: number,
+): void {
+  appendSectionHeader(lines, theme, "Body Preview");
+  const bodyPreviewLines = formatTextForPreview(body).split("\n");
+
+  for (const line of bodyPreviewLines.slice(0, 12)) {
+    appendWrappedLine(lines, `  ${line}`, width);
+  }
+
+  if (bodyPreviewLines.length > 12) {
+    const remainingLines = bodyPreviewLines.length - 12;
+    appendWrappedLine(
+      lines,
+      theme.fg("dim", `  ... ${remainingLines} more lines`),
+      width,
+    );
+  }
+}
+
+function appendPrCreateReview(
+  lines: string[],
+  theme: Theme,
+  meta: PrCreateMetadata,
+  width: number,
+): void {
+  const bodyStats = getBodyStats(meta.body);
+  const branches = `${meta.head ?? "(current branch)"} -> ${meta.base ?? "(default branch)"}`;
+  const reviewers = meta.reviewers.length > 0 ? meta.reviewers.join(", ") : "none";
+  const bodySummary = `${bodyStats.sections} sections, ${bodyStats.words} words`;
+
+  appendKeyValue(
+    lines,
+    theme,
+    "Title",
+    meta.title ?? "(will prompt interactively)",
+    width,
+  );
+  appendKeyValue(lines, theme, "Branches", branches, width);
+  appendKeyValue(lines, theme, "Draft", meta.isDraft ? "yes" : "no", width);
+  appendKeyValue(lines, theme, "Reviewers", reviewers, width);
+  appendKeyValue(lines, theme, "Body", bodySummary, width);
+
+  appendSectionHeader(lines, theme, "Checklist");
+  lines.push("  " + statusMark(theme, Boolean(meta.title?.trim()), "Title present"));
+  lines.push("  " + statusMark(theme, Boolean(meta.body?.trim()), "Body present"));
+  lines.push("  " + statusMark(theme, !meta.isDraft, "Ready for review"));
+
+  const branchChecklist = meta.base || meta.head
+    ? statusMark(theme, true, "Explicit branch supplied")
+    : neutralMark(theme, "Using gh default branch behavior");
+  lines.push("  " + branchChecklist);
+
+  if (meta.body) {
+    appendBodyPreview(lines, theme, meta.body, width);
+  }
+}
+
+function appendPrMergeReview(
+  lines: string[],
+  theme: Theme,
+  meta: PrMergeMetadata,
+  width: number,
+): void {
+  appendKeyValue(lines, theme, "PR", meta.prRef ?? "(current branch)", width);
+  appendKeyValue(
+    lines,
+    theme,
+    "Strategy",
+    meta.strategy ?? "(will prompt interactively)",
+    width,
+  );
+  appendKeyValue(lines, theme, "Delete", meta.deleteBranch ? "yes" : "no", width);
+  appendKeyValue(lines, theme, "Auto", meta.autoMerge ? "yes" : "no", width);
+
+  appendSectionHeader(lines, theme, "Effects");
+  lines.push(
+    "  " + statusMark(theme, Boolean(meta.strategy), "Merge strategy selected"),
+  );
+  lines.push("  " + statusMark(theme, !meta.autoMerge, "Auto-merge disabled"));
+  lines.push("  " + statusMark(theme, !meta.deleteBranch, "Branch retained after merge"));
+  appendWrappedLine(
+    lines,
+    theme.fg(
+      "warning",
+      "  Review carefully: merge operations change shared repository state.",
+    ),
+    width,
+  );
+}
+
+function appendPushReview(
+  lines: string[],
+  theme: Theme,
+  meta: PushMetadata,
+  width: number,
+): void {
+  appendKeyValue(lines, theme, "Remote", meta.remote ?? "(default)", width);
+  appendKeyValue(lines, theme, "Branch", meta.branch ?? "(current branch)", width);
+  appendKeyValue(lines, theme, "Force", meta.isForce ? "yes" : "no", width);
+  appendKeyValue(lines, theme, "Protected", meta.isProtected ? "yes" : "no", width);
+
+  appendSectionHeader(lines, theme, "Checks");
+  lines.push("  " + statusMark(theme, !meta.isForce, "Not a force push"));
+  lines.push("  " + statusMark(theme, !meta.isProtected, "Not a protected branch"));
+
+  if (meta.isForce || meta.isProtected) {
+    appendWrappedLine(
+      lines,
+      theme.fg("warning", "  Verify this push is intentional before approving."),
+      width,
+    );
+  }
+}
+
+function appendOperationReview(
+  lines: string[],
+  theme: Theme,
+  op: PrOperation,
+  width: number,
+): void {
+  switch (op.kind) {
+    case "pr-create":
+      appendPrCreateReview(lines, theme, op.metadata, width);
+      return;
+    case "pr-merge":
+      appendPrMergeReview(lines, theme, op.metadata, width);
+      return;
+    case "push":
+      appendPushReview(lines, theme, op.metadata, width);
+      return;
+  }
+}
+
 function formatTextForPreview(text: string): string {
   return text
     .replace(/\\r\\n/g, "\n")
@@ -558,46 +795,6 @@ function shouldGate(op: PrOperation): boolean {
   return false;
 }
 
-function getPreviewLines(op: PrOperation): string[] {
-  switch (op.kind) {
-    case "pr-create": {
-      const m = op.metadata;
-      const lines = ["PR Create:"];
-      lines.push(`  Title: ${m.title ?? "(will prompt interactively)"}`);
-      lines.push(`  Base:  ${m.base ?? "(default branch)"}`);
-      if (m.head) lines.push(`  Head:  ${m.head}`);
-      lines.push(`  Draft: ${m.isDraft ? "yes" : "no"}`);
-      if (m.reviewers.length > 0) lines.push(`  Reviewers: ${m.reviewers.join(", ")}`);
-      if (m.body) {
-        lines.push("");
-        lines.push("  Body:");
-        for (const line of formatTextForPreview(m.body).split("\n")) {
-          lines.push(`    ${line}`);
-        }
-      }
-      return lines;
-    }
-    case "pr-merge": {
-      const m = op.metadata;
-      const lines = ["PR Merge:"];
-      lines.push(`  PR:       ${m.prRef ?? "(current branch)"}`);
-      lines.push(`  Strategy: ${m.strategy ?? "(will prompt interactively)"}`);
-      lines.push(`  Delete branch: ${m.deleteBranch ? "yes" : "no"}`);
-      if (m.autoMerge) lines.push("  Auto-merge: yes");
-      return lines;
-    }
-    case "push": {
-      const m = op.metadata;
-      const lines = ["Git Push:"];
-      lines.push(`  Remote: ${m.remote ?? "(default)"}`);
-      lines.push(`  Branch: ${m.branch ?? "(current branch)"}`);
-      if (m.isForce) lines.push("  ** FORCE PUSH **");
-      if (m.isProtected) lines.push(`  ** PROTECTED BRANCH: ${m.branch} **`);
-      return lines;
-    }
-  }
-}
-
 function getApprovalQuestion(op: PrOperation): string {
   switch (op.kind) {
     case "pr-create": return "Approve this PR creation?";
@@ -611,7 +808,6 @@ async function requestApproval(
   op: PrOperation,
   issues?: ValidationIssue[],
 ): Promise<boolean> {
-  const previewLines = getPreviewLines(op);
   const question = getApprovalQuestion(op);
   const issueText = issues && issues.length > 0
     ? formatValidationIssues(issues)
@@ -624,16 +820,17 @@ async function requestApproval(
 
       function render(width: number): string[] {
         const lines: string[] = [];
-        const rule = theme.fg("dim", "-".repeat(Math.min(width, 60)));
+        const rule = theme.fg("dim", "-".repeat(Math.min(width, 72)));
+        const risk = getRiskLabel(op, issues ?? []);
 
-        for (const line of previewLines) {
-          appendWrappedLine(lines, line, width);
-        }
+        lines.push(theme.bold(getOperationTitle(op)) + theme.fg("dim", "  preflight review"));
+        lines.push(rule);
+        appendKeyValue(lines, theme, "Risk", styleRisk(theme, risk), width);
+
+        appendOperationReview(lines, theme, op, width);
 
         if (issueText) {
-          lines.push("");
-          lines.push(rule);
-          appendWrappedLine(lines, theme.fg("warning", "Issues:"), width);
+          appendSectionHeader(lines, theme, "Issues");
           for (const line of issueText.split("\n")) {
             appendWrappedLine(lines, theme.fg("warning", line), width);
           }
