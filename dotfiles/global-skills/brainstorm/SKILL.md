@@ -13,8 +13,6 @@ If a question can be answered by exploring the codebase, explore the codebase in
 
 Use a markdown notes file as the durable source of truth for the brainstorm. Long brainstorms are easy to lose track of, so do not rely on chat history alone.
 
-Do not ask the user to choose between Markdown and HTML. Always create or update the Markdown notes file during the brainstorm. At the end, generate a companion visual HTML plan from the finalized Markdown notes.
-
 Before the first question, create or identify the notes file. When working inside a repository, prefer:
 
 ```text
@@ -27,15 +25,9 @@ Use a short, descriptive, kebab-case topic. Examples:
 - `plans/brainstorm-migration-design.md`
 - `plans/brainstorm-auth-flow.md`
 
-Reserve the matching HTML path for the final visual plan:
-
-```text
-plans/brainstorm-<topic>.html
-```
-
 If there is no `plans/` directory, create it when appropriate. If the right location is unclear, ask where to save the notes file before continuing.
 
-At the start of the session, tell the user which Markdown file you will update and that you will generate the matching HTML plan when the brainstorm is finalized. If the Markdown file already exists, read it first and resume from its open questions, unresolved decisions, or latest status.
+At the start of the session, tell the user which file you will update. If the file already exists, read it first and resume from its open questions, unresolved decisions, or latest status.
 
 ## Update the notes only when decision state changes
 
@@ -135,9 +127,9 @@ A completed brainstorm should not contain stale open questions or broad assumpti
 
 ## Finalizing a brainstorm for handoff
 
-When the user says the brainstorm is complete, asks to stop, or asks another session to implement the result, rewrite the notes into an implementation-ready handoff. After the Markdown handoff is finalized, generate the matching visual HTML plan from the Markdown file.
+When the user says the brainstorm is complete, asks to stop, or asks another session to implement the result, rewrite the notes into an implementation-ready handoff.
 
-The final Markdown handoff should:
+The final handoff should:
 
 - Remove `Open Questions` if all questions were answered.
 - Remove `Operating Assumptions So Far` if assumptions were confirmed or no longer needed.
@@ -147,7 +139,7 @@ The final Markdown handoff should:
 - Include an implementation order or next steps section when useful.
 - Make the file understandable to a new LLM or developer without relying on chat history.
 
-Prefer final Markdown sections such as:
+Prefer final sections such as:
 
 ```markdown
 ## Final Summary
@@ -163,44 +155,13 @@ Prefer final Markdown sections such as:
 
 Use `Explicitly Deferred Future Options` for choices that are not open v1 questions but may become relevant later. For example, moving from SQLite to Postgres later is a deferred future option if SQLite was chosen for v1.
 
-## Generating the final visual HTML plan
-
-Generate the HTML file only after the Markdown notes are finalized or intentionally paused for handoff. The Markdown file remains the source of truth. The HTML file is a visual companion that helps the user understand the implementation plan at a glance.
-
-Create a self-contained `.html` file at the reserved matching path. Make it useful when opened locally in a browser:
-
-- Use embedded CSS in the file. Do not rely on external stylesheets, CDNs, images, or scripts unless the user asks.
-- Keep the layout readable, responsive, and accessible with semantic headings, descriptive labels, and sufficient contrast.
-- Prefer simple visual structures that communicate planning state clearly: phase cards, decision maps, timelines, dependency lists, status badges, risk matrices, and compact architecture diagrams.
-- Use lightweight inline SVG, CSS grids, tables, or lists when they make the plan easier to understand.
-- Preserve the underlying reasoning from the Markdown notes. A visual plan still needs enough text for another LLM or developer to implement from it.
-
-Include sections like these unless the topic needs a different structure:
-
-```text
-Goal and current recommendation
-Implementation plan at a glance
-Decision map
-Architecture or workflow view
-Phases and sequencing
-Dependencies and blockers
-Risks and tradeoffs
-Evidence gathered
-Parked unresolved decisions
-Follow-ups
-```
-
-For HTML handoffs, make the final plan visibly implementation-ready. Include a clear summary, phase order, decision map, dependencies, risks, and remaining parked items if any. Do not include stale questions or assumptions that were already resolved in the Markdown notes.
-
 ## Resuming long brainstorms
 
 When continuing a prior brainstorm:
 
-1. Read the existing Markdown notes file.
+1. Read the existing notes file.
 2. Summarize the current decisions and open questions briefly.
 3. Ask the next highest-leverage unresolved question.
-4. Continue updating the same Markdown file only when decision state changes, following the rules above.
-
-If a matching HTML file already exists, treat it as a generated companion view. Do not use it as the source of truth. Regenerate it from the Markdown notes when the brainstorm is finalized again.
+4. Continue updating the same file only when decision state changes, following the rules above.
 
 The notes file should make it possible to come back days later and understand what was decided, why it was decided, what remains unresolved, and what question should be asked next.
