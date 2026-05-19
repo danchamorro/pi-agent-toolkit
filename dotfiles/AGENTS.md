@@ -309,6 +309,7 @@ Before every commit, scan changes for artifacts. If `git diff` shows `console.lo
 ### Path discipline
 
 - Do **not** read, search, or inspect files inside `node_modules/` by default.
+- For dependency internals, prefer `opensrc` source lookups over inspecting `node_modules/` when available.
 - Treat `node_modules/` as off-limits unless the user explicitly asks to inspect an installed dependency/package or the installed package is the only source of truth for the behavior in question.
 - If inspection of `node_modules/` is genuinely necessary and the user did not explicitly ask for it, ask for permission first.
 - When inspection is allowed, keep it tightly scoped to the smallest possible set of named files and never run broad recursive searches over `node_modules/`.

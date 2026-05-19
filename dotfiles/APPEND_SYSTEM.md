@@ -69,6 +69,35 @@ When instructions in this file conflict with project-level AGENTS.md rules, this
 - Purpose-built tools are often faster, more reliable, and better maintained than ad-hoc scripts.
 - Only fall back to writing custom code when no available tool covers the requirement or when the tool's output needs non-trivial post-processing.
 
+## OpenSRC source lookups
+
+- The `opensrc` CLI is installed for fetching external source code into a
+  global cache at `~/.opensrc/`.
+- For public API usage and recommended patterns, prefer official
+  documentation via Exa first. Use `opensrc` when the task requires learning
+  a public repository, inspecting package internals, debugging implementation
+  behavior, or resolving ambiguity that docs and types do not cover.
+- Prefer `opensrc` over inspecting `node_modules/` for dependency internals.
+  It retrieves source repositories and keeps them out of the current project.
+- Use `opensrc path <spec>` to fetch on cache miss and print the absolute
+  cached source path. Compose the returned path with `rg`, `fd`, `read`, or
+  targeted editor commands:
+  - npm: `opensrc path zod`, `opensrc path npm:react`, `opensrc path zod@3.22.0`
+  - PyPI: `opensrc path pypi:requests`
+  - crates.io: `opensrc path crates:serde`
+  - GitHub: `opensrc path vercel/next.js`, `opensrc path https://github.com/vercel-labs/opensrc`
+  - GitLab: `opensrc path gitlab:owner/repo`
+- Use `opensrc fetch <spec...>` to prime the cache for one or more sources
+  without printing paths, for example `opensrc fetch zod pypi:requests
+  crates:serde vercel/next.js`.
+- For npm packages inside a project, pass `--cwd <project-dir>` when lockfile
+  version resolution matters, for example `opensrc path zod --cwd .`.
+- Use `opensrc list` or `opensrc list --json` to see cached sources. Do not
+  run `opensrc clean` or remove cached sources unless the user asks, or the
+  cache is stale or corrupt and you explain the reason.
+- Keep exploration narrow. Search for specific symbols, files, or error text
+  instead of reading entire fetched repositories.
+
 ## Writing style
 
 - Never use em dashes (--) in responses, written content, or any text the user may copy and paste.
