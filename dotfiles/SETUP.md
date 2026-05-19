@@ -22,6 +22,9 @@ Run all `node setup.mjs ...` commands from the repo root.
 - **[cmux](https://github.com/manaflow-ai/cmux)**: Ghostty-based terminal
   multiplexer. Several extensions and skills integrate with cmux for
   notifications, split panes, and browser automation.
+- **[opensrc](https://opensrc.sh/)**: Fetches and caches dependency source
+  code for agent context. The agent prompt prefers it over inspecting
+  `node_modules/` for dependency internals. Install: `npm install -g opensrc`
 
 ---
 

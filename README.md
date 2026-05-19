@@ -25,6 +25,11 @@ node setup.mjs
 This copies everything into the right Pi directories. Template configs
 (`auth.json`, `mcp.json`) are created only if they don't already exist.
 
+For full functionality on a new machine, review the prerequisites in
+[`dotfiles/SETUP.md`](dotfiles/SETUP.md). Some helper tools, including
+`opensrc` for dependency source lookups, are documented there rather than
+installed by this repo.
+
 Skip external skills or packages if you don't want them:
 
 ```bash
