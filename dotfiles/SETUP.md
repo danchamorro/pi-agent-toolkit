@@ -25,6 +25,10 @@ Run all `node setup.mjs ...` commands from the repo root.
 - **[opensrc](https://opensrc.sh/)**: Fetches and caches dependency source
   code for agent context. The agent prompt prefers it over inspecting
   `node_modules/` for dependency internals. Install: `npm install -g opensrc`
+- **[Browser Harness](https://github.com/browser-use/browser-harness)**:
+  Direct Chrome control for agent-driven browser tasks. The `browser` skill
+  is tracked in `manifest.json`, but the CLI must also be installed with
+  `uv` as shown below.
 
 ---
 
@@ -152,6 +156,34 @@ Add your database connection under `mcpServers` in `mcp.json`:
 [chrome-devtools-mcp](https://github.com/nicobailon/chrome-devtools-mcp)
 connects to Chrome DevTools for browser automation. Works out of the box
 with `npx`.
+
+### Browser Harness (agent browser control)
+
+[Browser Harness](https://github.com/browser-use/browser-harness) connects
+an agent directly to your running Chrome via CDP. The skill is installed
+from `manifest.json`; the CLI is installed separately as an editable `uv`
+tool so agent-authored helpers in the checkout take effect immediately.
+
+```bash
+mkdir -p ~/Developer
+git clone https://github.com/browser-use/browser-harness ~/Developer/browser-harness
+cd ~/Developer/browser-harness
+uv tool install -e .
+command -v browser-harness
+```
+
+For the normal local-browser flow, open Chrome to
+`chrome://inspect/#remote-debugging` and enable remote debugging for the
+profile. Then verify the connection:
+
+```bash
+browser-harness <<'PY'
+print(page_info())
+PY
+```
+
+Optional cloud browser support requires `BROWSER_USE_API_KEY`. Optional
+local profile syncing requires `profile-use` from Browser Use.
 
 ---
 

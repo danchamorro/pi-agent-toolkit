@@ -25,7 +25,8 @@
     { "source": "getsentry/skills", "skills": ["code-simplifier", "iterate-pr"] },
     { "source": "microsoft/playwright-cli", "skills": [] },
     { "source": "firecrawl/cli", "skills": ["firecrawl"] },
-    { "source": "coleam00/excalidraw-diagram-skill", "skills": [] }
+    { "source": "coleam00/excalidraw-diagram-skill", "skills": [] },
+    { "source": "browser-use/browser-harness", "skills": ["browser"] }
   ],
   "packages": [
     "npm:@danchamorro/pi-agent-modes",

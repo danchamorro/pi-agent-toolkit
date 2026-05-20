@@ -5,7 +5,7 @@ Extensions, skills, and configs for the
 backup so I can restore or sync my setup across machines, and a reference
 for anyone looking to customize their own Pi environment.
 
-Includes 25 extensions, 37 skills, 2 prompt templates, 8 installable Pi
+Includes 25 extensions, 38 skills, 2 prompt templates, 8 installable Pi
 packages, MCP server configurations, and safety guardrails.
 
 ---
@@ -201,7 +201,7 @@ Installed automatically when these packages are present in
 | `design-deck` | [`npm:pi-design-deck`](https://github.com/nicobailon/pi-design-deck) |
 | `handoff-pi-agent` | [`npm:@danchamorro/pi-handoff-agent`](https://www.npmjs.com/package/@danchamorro/pi-handoff-agent) |
 
-**External skills** (26, installed from source repos):
+**External skills** (27, installed from source repos):
 
 Listed in `manifest.json` and installed automatically by `setup.mjs`.
 Not committed to this repo. Maintained by their original authors.
@@ -219,6 +219,7 @@ Not committed to this repo. Maintained by their original authors.
 | `playwright-cli` | [microsoft/playwright-cli](https://github.com/microsoft/playwright-cli) |
 | `firecrawl` | [firecrawl/cli](https://github.com/firecrawl/cli) |
 | `excalidraw-diagram` | [coleam00/excalidraw-diagram-skill](https://github.com/coleam00/excalidraw-diagram-skill) |
+| `browser` | [browser-use/browser-harness](https://github.com/browser-use/browser-harness) |
 
 ### Subagents
 
