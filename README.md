@@ -5,7 +5,7 @@ Extensions, skills, and configs for the
 backup so I can restore or sync my setup across machines, and a reference
 for anyone looking to customize their own Pi environment.
 
-Includes 25 extensions, 38 skills, 2 prompt templates, 8 installable Pi
+Includes 25 extensions, 39 skills, 2 prompt templates, 8 installable Pi
 packages, MCP server configurations, and safety guardrails.
 
 ---
@@ -175,7 +175,7 @@ full list with descriptions.
 
 ### Skills
 
-**Bundled skills** (11, committed to this repo):
+**Bundled skills** (12, committed to this repo):
 
 | Skill | Description |
 |-------|-------------|
@@ -183,6 +183,7 @@ full list with descriptions.
 | `brainstorm` | Interview-driven plan stress-testing |
 | `cli-detector` | Scan repos for service integrations and their CLIs |
 | `code-review` | AI-powered code review using CodeRabbit CLI |
+| `code-structure-cleanup` | Behavior-preserving cleanup after working features have duplicated mechanics or messy structure |
 | `exa-search` | Semantic web search via Exa API |
 | `gh-issue-creator` | Create GitHub issues via `gh` CLI |
 | `google-chat-cards-v2` | Google Chat Cards v2 notifications |
@@ -308,6 +309,7 @@ modified to suit my needs:
 - [Disler](https://github.com/disler)
 - [Jesse Vincent (obra)](https://github.com/obra)
 - [Nico Bailon](https://github.com/nicobailon)
+- [pawel-cell/micky-podcast-agentic-engineering](https://github.com/pawel-cell/micky-podcast-agentic-engineering)
 
 ## License
 
