@@ -69,7 +69,7 @@ echo 'EXA_API_KEY=your_key' > ~/.pi/agent/skills/exa-search/.env
 
 ### jCodeMunch (code indexing)
 
-[jCodeMunch](https://github.com/jcodemunch/jcodemunch-mcp) provides code
+[jCodeMunch](https://github.com/jgravelle/jcodemunch-mcp) provides code
 indexing, symbol search, and context-aware code exploration. Works
 immediately with the template config. Requires `uvx` (`brew install uv`).
 

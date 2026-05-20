@@ -258,7 +258,7 @@ Configured in `mcp.json` (created from template during setup):
 
 | Server | Purpose | Source |
 |--------|---------|--------|
-| [jCodeMunch](https://github.com/jcodemunch/jcodemunch-mcp) | Code indexing, symbol search, context-aware exploration | `uvx jcodemunch-mcp@latest` |
+| [jCodeMunch](https://github.com/jgravelle/jcodemunch-mcp) | Code indexing, symbol search, context-aware exploration | `uvx jcodemunch-mcp` |
 | [Postgres MCP](https://github.com/crystaldba/postgres-mcp) | Read-only PostgreSQL access via Docker | `crystaldba/postgres-mcp` |
 | [MariaDB MCP](https://github.com/MariaDB/mcp) | Read-only MariaDB or MySQL access via `uvx` | `uvx --from iflow-mcp_mariadb-mariadb-server mariadb-server` |
 | [chrome-devtools](https://github.com/nicobailon/chrome-devtools-mcp) | Browser automation via Chrome DevTools Protocol | `npx chrome-devtools-mcp@latest` |

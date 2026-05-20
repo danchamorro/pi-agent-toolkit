@@ -2,7 +2,7 @@
   "mcpServers": {
     "jcodemunch": {
       "command": "uvx",
-      "args": ["jcodemunch-mcp@latest"]
+      "args": ["jcodemunch-mcp"]
     },
     "pg-example-prod": {
       "command": "docker",
