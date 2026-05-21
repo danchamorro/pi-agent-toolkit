@@ -31,7 +31,6 @@
   "packages": [
     "npm:@danchamorro/pi-agent-modes",
     "npm:@danchamorro/pi-prompt-enhancer",
-    "npm:@danchamorro/pi-handoff-agent",
     "npm:pi-design-deck",
     "npm:pi-annotate",
     "npm:pi-subagents",

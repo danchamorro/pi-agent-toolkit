@@ -5,10 +5,10 @@
     "packages/*"
   ],
   "scripts": {
-    "lint": "eslint packages/ shared/",
-    "lint:fix": "eslint packages/ shared/ --fix",
-    "format": "prettier --write packages/ shared/",
-    "format:check": "prettier --check packages/ shared/",
+    "lint": "eslint packages/",
+    "lint:fix": "eslint packages/ --fix",
+    "format": "prettier --write packages/",
+    "format:check": "prettier --check packages/",
     "typecheck": "npm run typecheck:packages && npm run typecheck --workspaces --if-present",
     "typecheck:packages": "tsc --noEmit --project tsconfig.packages.json",
     "typecheck:dotfiles": "tsc --noEmit --project dotfiles/tsconfig.json",
