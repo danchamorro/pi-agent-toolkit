@@ -5,8 +5,8 @@ Extensions, skills, and configs for the
 backup so I can restore or sync my setup across machines, and a reference
 for anyone looking to customize their own Pi environment.
 
-Includes 25 extensions, 38 skills, 2 prompt templates, 7 installable Pi
-packages, MCP server configurations, and safety guardrails.
+Includes 25 extensions, 38 skills, 2 prompt templates, 1 theme,
+7 installable Pi packages, MCP server configurations, and safety guardrails.
 
 ---
 
@@ -237,6 +237,17 @@ Prompt templates live in `dotfiles/prompts/` and are installed to
 |--------|-------------|
 | `implementation-plan` | Convert an existing plan into actionable, committable checklist phases and write the result to a new Markdown file. |
 | `orchestrate` | Orchestrate a task using `pi-subagents` and `intercom`, keeping planning and final synthesis in the current session while delegating focused work to subagents. |
+
+### Themes (1)
+
+Themes live in `dotfiles/themes/` and are installed to
+`~/.pi/agent/themes/` by `setup.mjs`. They are available but not active by
+default; pick one via `/settings` or set `"theme"` in your local
+`~/.pi/agent/settings.json` (outside this repo, so it never affects other users).
+
+| Theme | Description |
+|-------|-------------|
+| `vscode-dark-modern` | Pi port of VS Code's Dark Modern palette. Pure black base, near-black tool surfaces, VS Code Dark+ syntax colors, and diffs.com-inspired diff colors. |
 
 ### Config files
 
