@@ -315,6 +315,13 @@ Before every commit, scan changes for artifacts. If `git diff` shows `console.lo
 - When inspection is allowed, keep it tightly scoped to the smallest possible set of named files and never run broad recursive searches over `node_modules/`.
 - **Exception — Pi packages:** Reading files under `@earendil-works/` is always allowed without permission. This namespace contains Pi and its related packages (docs, examples, extensions, themes, skills, SDK source).
 
+### jCodeMunch MCP usage
+
+- When `jcodemunch_index_folder` succeeds, store the returned `repo` value and pass it explicitly to every repo-scoped jCodeMunch tool.
+- If the current repo identifier is unknown, call `jcodemunch_resolve_repo` with the current working directory before calling any jCodeMunch tool whose schema requires `repo`.
+- Do not call repo-scoped tools with empty arguments. Examples include `jcodemunch_get_repo_outline`, `jcodemunch_get_file_tree`, `jcodemunch_search_symbols`, `jcodemunch_search_text`, and `jcodemunch_get_file_outline`.
+- If a repo-scoped call fails because `repo` is missing, retry once with the resolved repo identifier instead of repeating the same invalid call.
+
 ### Pi toolkit repo awareness
 
 - Treat `~/Documents/Personal/Code/my-projects/pi-agent-toolkit` as the user's personal and public Pi setup repository.
