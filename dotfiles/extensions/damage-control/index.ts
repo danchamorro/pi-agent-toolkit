@@ -403,17 +403,34 @@ export default function (pi: ExtensionAPI) {
 			}
 
 			if (pathAccess?.access === "readOnly" && !isReadOnlyDiscoveryCommand(cmd)) {
-				recordEvent({
-					timestamp: Date.now(),
-					type: "path",
-					detail: `read-only bash target: ${pathAccess.path}`,
-					action: "blocked",
-				});
-				ctx.ui.notify(`[DC] Blocked bash access: ${pathAccess.path} (read-only)`, "error");
-				return {
-					block: true,
-					reason: `Damage Control: bash command targets read-only path "${pathAccess.path}". Bash access is blocked because it can mutate files. Safe read-only discovery commands such as find, rg, grep, and ls are allowed when they do not write or execute helpers.`,
-				};
+				if (isNodeModulesPath(pathAccess.path)) {
+					const allowed = await confirmPathAccess("bash", pathAccess.path, cmd, ctx);
+					if (!allowed) {
+						recordEvent({
+							timestamp: Date.now(),
+							type: "path",
+							detail: `node_modules bash target denied: ${pathAccess.path}`,
+							action: "blocked",
+						});
+						ctx.ui.notify(`[DC] Blocked bash access: ${pathAccess.path} (node_modules approval required)`, "error");
+						return {
+							block: true,
+							reason: `Damage Control: bash command targets node_modules path "${pathAccess.path}" and requires interactive approval before it can mutate files.`,
+						};
+					}
+				} else {
+					recordEvent({
+						timestamp: Date.now(),
+						type: "path",
+						detail: `read-only bash target: ${pathAccess.path}`,
+						action: "blocked",
+					});
+					ctx.ui.notify(`[DC] Blocked bash access: ${pathAccess.path} (read-only)`, "error");
+					return {
+						block: true,
+						reason: `Damage Control: bash command targets read-only path "${pathAccess.path}". Bash access is blocked because it can mutate files. Safe read-only discovery commands such as find, rg, grep, and ls are allowed when they do not write or execute helpers.`,
+					};
+				}
 			}
 
 			if (pathAccess?.access === "ask") {
@@ -550,17 +567,34 @@ export default function (pi: ExtensionAPI) {
 			}
 
 			if (access === "readOnly") {
-				recordEvent({
-					timestamp: Date.now(),
-					type: "path",
-					detail: `read-only write: ${filePath}`,
-					action: "blocked",
-				});
-				ctx.ui.notify(`[DC] Blocked write: ${filePath} (read-only)`, "error");
-				return {
-					block: true,
-					reason: `Damage Control: "${filePath}" is read-only. Writing is not permitted.`,
-				};
+				if (isNodeModulesPath(filePath)) {
+					const allowed = await confirmPathAccess("write", filePath, filePath, ctx);
+					if (!allowed) {
+						recordEvent({
+							timestamp: Date.now(),
+							type: "path",
+							detail: `node_modules write denied: ${filePath}`,
+							action: "blocked",
+						});
+						ctx.ui.notify(`[DC] Blocked write: ${filePath} (node_modules approval required)`, "error");
+						return {
+							block: true,
+							reason: `Damage Control: "${filePath}" is in node_modules and requires interactive approval before it can be written.`,
+						};
+					}
+				} else {
+					recordEvent({
+						timestamp: Date.now(),
+						type: "path",
+						detail: `read-only write: ${filePath}`,
+						action: "blocked",
+					});
+					ctx.ui.notify(`[DC] Blocked write: ${filePath} (read-only)`, "error");
+					return {
+						block: true,
+						reason: `Damage Control: "${filePath}" is read-only. Writing is not permitted.`,
+					};
+				}
 			}
 		}
 
@@ -601,17 +635,34 @@ export default function (pi: ExtensionAPI) {
 			}
 
 			if (access === "readOnly") {
-				recordEvent({
-					timestamp: Date.now(),
-					type: "path",
-					detail: `read-only edit: ${filePath}`,
-					action: "blocked",
-				});
-				ctx.ui.notify(`[DC] Blocked edit: ${filePath} (read-only)`, "error");
-				return {
-					block: true,
-					reason: `Damage Control: "${filePath}" is read-only. Editing is not permitted.`,
-				};
+				if (isNodeModulesPath(filePath)) {
+					const allowed = await confirmPathAccess("edit", filePath, filePath, ctx);
+					if (!allowed) {
+						recordEvent({
+							timestamp: Date.now(),
+							type: "path",
+							detail: `node_modules edit denied: ${filePath}`,
+							action: "blocked",
+						});
+						ctx.ui.notify(`[DC] Blocked edit: ${filePath} (node_modules approval required)`, "error");
+						return {
+							block: true,
+							reason: `Damage Control: "${filePath}" is in node_modules and requires interactive approval before it can be edited.`,
+						};
+					}
+				} else {
+					recordEvent({
+						timestamp: Date.now(),
+						type: "path",
+						detail: `read-only edit: ${filePath}`,
+						action: "blocked",
+					});
+					ctx.ui.notify(`[DC] Blocked edit: ${filePath} (read-only)`, "error");
+					return {
+						block: true,
+						reason: `Damage Control: "${filePath}" is read-only. Editing is not permitted.`,
+					};
+				}
 			}
 		}
 

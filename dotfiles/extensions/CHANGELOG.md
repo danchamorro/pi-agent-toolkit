@@ -2,6 +2,14 @@
 
 All notable changes to extensions in `~/.pi/agent/extensions/`.
 
+## 2026-05-22
+
+### damage-control/
+
+- Changed `node_modules/` write, edit, and mutating bash attempts from hard
+  blocks to one-time interactive approval prompts, while keeping non-UI runs
+  denied and leaving other read-only paths hard-blocked.
+
 ## 2026-05-18
 
 ### exa-search-tool.ts
