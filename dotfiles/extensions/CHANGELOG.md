@@ -7,7 +7,8 @@ All notable changes to extensions in `~/.pi/agent/extensions/`.
 ### find-session.ts
 
 - Added a scope picker before session search so queries can be limited to the
-  current repo's session bucket or expanded to all saved Pi sessions.
+  current repo or workspace session bucket, or expanded to all saved Pi
+  sessions.
 
 ## 2026-05-22
 

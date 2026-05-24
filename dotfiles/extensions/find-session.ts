@@ -5,8 +5,8 @@
  *   /find-session [query]
  *
  * Opens a dedicated TUI for searching Pi session history. The extension first
- * asks whether to search the current repo's session bucket or all sessions,
- * then scans session metadata plus the first and last user messages, ranks the
+ * asks whether to search the local session bucket or all sessions, then scans
+ * session metadata plus the first and last user messages, ranks the
  * best matches with the active model via `completeSimple`, lets you refine the
  * search iteratively, and resumes into the selected session.
  */
@@ -218,16 +218,15 @@ async function getGitRoot(
   return root ? root : null;
 }
 
-function createSessionSearchScopes(gitRoot: string | null): SessionSearchScope[] {
-  const scopes: SessionSearchScope[] = [];
-  if (gitRoot) {
-    scopes.push({
+function createSessionSearchScopes(localRoot: string): SessionSearchScope[] {
+  const scopes: SessionSearchScope[] = [
+    {
       mode: "local",
-      label: `Local, current repo: ${path.basename(gitRoot)}`,
-      description: `Search ${toHomeRelative(gitRoot)} only`,
-      root: path.join(SESSION_ROOT, encodeSessionDirectory(gitRoot)),
-    });
-  }
+      label: `Local, current workspace: ${path.basename(localRoot)}`,
+      description: `Search ${toHomeRelative(localRoot)} only`,
+      root: path.join(SESSION_ROOT, encodeSessionDirectory(localRoot)),
+    },
+  ];
 
   scopes.push({
     mode: "global",
@@ -1485,7 +1484,8 @@ export default function findSessionExtension(pi: ExtensionAPI): void {
 
       const initialQuery = normalizeQuery(args ?? "");
       const gitRoot = await getGitRoot(pi, ctx.cwd);
-      const scopes = createSessionSearchScopes(gitRoot);
+      const localRoot = gitRoot ?? ctx.cwd;
+      const scopes = createSessionSearchScopes(localRoot);
       const selection = await ctx.ui.custom<FindSessionSelection | null>(
         (tui, theme, keybindings, done) => {
           const component = new FindSessionComponent({
