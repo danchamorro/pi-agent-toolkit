@@ -27,8 +27,8 @@ This copies everything into the right Pi directories. Template configs
 
 For full functionality on a new machine, review the prerequisites in
 [`dotfiles/SETUP.md`](dotfiles/SETUP.md). Some helper tools, including
-`opensrc` for dependency source lookups, are documented there rather than
-installed by this repo.
+`opensrc` for dependency source lookups and Tirith for local terminal
+security, are documented there rather than installed by this repo.
 
 Skip external skills or packages if you don't want them:
 
@@ -272,6 +272,7 @@ Configured in `mcp.json` (created from template during setup):
 | [Postgres MCP](https://github.com/crystaldba/postgres-mcp) | Read-only PostgreSQL access via Docker | `crystaldba/postgres-mcp` |
 | [MariaDB MCP](https://github.com/MariaDB/mcp) | Read-only MariaDB or MySQL access via `uvx` | `uvx --from iflow-mcp_mariadb-mariadb-server mariadb-server` |
 | [chrome-devtools](https://github.com/nicobailon/chrome-devtools-mcp) | Browser automation via Chrome DevTools Protocol | `npx chrome-devtools-mcp@latest` |
+| [Tirith](https://tirith.sh/) | Local security checks for commands, URLs, pasted content, files, directories, and MCP configs | `tirith mcp-server` |
 
 ---
 

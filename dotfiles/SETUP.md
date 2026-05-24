@@ -29,6 +29,10 @@ Run all `node setup.mjs ...` commands from the repo root.
   Direct Chrome control for agent-driven browser tasks. The `browser` skill
   is tracked in `manifest.json`, but the CLI must also be installed with
   `uv` as shown below.
+- **[Tirith](https://tirith.sh/)**: Offline terminal security for developers
+  and AI agents. It adds shell command checks, generated Pi bash-tool
+  protection, and MCP tools for checking commands, URLs, pasted content,
+  files, directories, and MCP configs. Install: `brew install sheeki03/tap/tirith`
 
 ---
 
@@ -49,9 +53,9 @@ Edit `~/.pi/agent/auth.json` with your provider API keys:
 ### MCP servers (`mcp.json`)
 
 Edit `~/.pi/agent/mcp.json` to configure your MCP servers. The template
-includes skeletons for jCodeMunch, Postgres MCP, MariaDB MCP, and
-chrome-devtools. `mcp.json` is always local-only: it is created from the
-template on first run and is never symlinked or committed.
+includes skeletons for jCodeMunch, Postgres MCP, MariaDB MCP,
+chrome-devtools, and Tirith. `mcp.json` is always local-only: it is created
+from the template on first run and is never symlinked or committed.
 
 ### Exa API key
 
@@ -156,6 +160,55 @@ Add your database connection under `mcpServers` in `mcp.json`:
 [chrome-devtools-mcp](https://github.com/nicobailon/chrome-devtools-mcp)
 connects to Chrome DevTools for browser automation. Works out of the box
 with `npx`.
+
+### Tirith (terminal and agent security)
+
+[Tirith](https://tirith.sh/) checks shell commands, pasted content, URLs,
+AI configuration files, and MCP configs locally. It is not installed by this
+repo because it is a system CLI with per-tool local setup, not a Pi package
+or external skill.
+
+Install Tirith on macOS:
+
+```bash
+brew install sheeki03/tap/tirith
+```
+
+Enable Pi's automatic bash-tool guard and the callable MCP tools:
+
+```bash
+tirith setup pi-cli --scope user
+```
+
+The setup command writes a generated extension to
+`~/.pi/agent/extensions/tirith-guard.ts`. Keep using this generated file
+rather than committing it to the repo, so future Tirith updates can refresh
+it. The MCP template also includes this lazy server entry:
+
+```json
+{
+  "mcpServers": {
+    "tirith": {
+      "command": "tirith",
+      "args": ["mcp-server"],
+      "lifecycle": "lazy"
+    }
+  }
+}
+```
+
+For other local AI tools, run the relevant setup commands after installing
+Tirith:
+
+```bash
+tirith setup cursor --scope user --install-zshenv
+tirith setup claude-code --scope user --with-mcp
+tirith setup codex --scope user --install-zshenv
+tirith setup windsurf --scope user --install-zshenv
+```
+
+Use `tirith doctor` after setup and restart any already-running agent
+sessions so they reload hooks and MCP config.
 
 ### Browser Harness (agent browser control)
 

@@ -45,6 +45,11 @@
         "chrome-devtools-mcp@latest",
         "--autoConnect"
       ]
+    },
+    "tirith": {
+      "command": "tirith",
+      "args": ["mcp-server"],
+      "lifecycle": "lazy"
     }
   }
 }
