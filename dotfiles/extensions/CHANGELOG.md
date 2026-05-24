@@ -2,6 +2,13 @@
 
 All notable changes to extensions in `~/.pi/agent/extensions/`.
 
+## 2026-05-24
+
+### damage-control/
+
+- Commented out the `node_modules/` read-only path rule so dependency files can
+  be read and searched without interactive Damage Control approval.
+
 ## 2026-05-23
 
 ### find-session.ts
