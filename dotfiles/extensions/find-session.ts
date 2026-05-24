@@ -4,11 +4,11 @@
  * Commands:
  *   /find-session [query]
  *
- * Opens a dedicated TUI for searching Pi session history across
- * ~/.pi/agent/sessions/. The extension scans session metadata plus the first
- * and last user messages, ranks the best matches with the active model via
- * `completeSimple`, lets you refine the search iteratively, and resumes into
- * the selected session.
+ * Opens a dedicated TUI for searching Pi session history. The extension first
+ * asks whether to search the current repo's session bucket or all sessions,
+ * then scans session metadata plus the first and last user messages, ranks the
+ * best matches with the active model via `completeSimple`, lets you refine the
+ * search iteratively, and resumes into the selected session.
  */
 
 import { completeSimple } from "@earendil-works/pi-ai";
@@ -166,6 +166,15 @@ interface SearchProgress {
   message: string;
 }
 
+interface SessionSearchScope {
+  mode: "global" | "local";
+  label: string;
+  description: string;
+  root: string;
+}
+
+type FindSessionPhase = "choose-scope" | "search";
+
 interface SearchTerms {
   normalizedQuery: string;
   keywords: string[];
@@ -182,7 +191,51 @@ interface FindSessionComponentOptions {
   model: NonNullable<ExtensionCommandContext["model"]>;
   modelRegistry: ExtensionCommandContext["modelRegistry"];
   initialQuery: string;
+  scopes: SessionSearchScope[];
   onDone: (value: FindSessionSelection | null) => void;
+}
+
+function encodeSessionDirectory(cwd: string): string {
+  const resolved = path.resolve(cwd);
+  const withoutRoot = resolved.startsWith(path.sep)
+    ? resolved.slice(path.sep.length)
+    : resolved;
+  return `--${withoutRoot.split(path.sep).join("-")}--`;
+}
+
+async function getGitRoot(
+  pi: ExtensionAPI,
+  cwd: string,
+): Promise<string | null> {
+  const result = await pi.exec("git", ["rev-parse", "--show-toplevel"], {
+    cwd,
+  });
+  if (result.code !== 0) {
+    return null;
+  }
+
+  const root = result.stdout.trim();
+  return root ? root : null;
+}
+
+function createSessionSearchScopes(gitRoot: string | null): SessionSearchScope[] {
+  const scopes: SessionSearchScope[] = [];
+  if (gitRoot) {
+    scopes.push({
+      mode: "local",
+      label: `Local, current repo: ${path.basename(gitRoot)}`,
+      description: `Search ${toHomeRelative(gitRoot)} only`,
+      root: path.join(SESSION_ROOT, encodeSessionDirectory(gitRoot)),
+    });
+  }
+
+  scopes.push({
+    mode: "global",
+    label: "Global, all Pi sessions",
+    description: `Search everything under ${toHomeRelative(SESSION_ROOT)}`,
+    root: SESSION_ROOT,
+  });
+  return scopes;
 }
 
 function parseSessionStartFromFilename(name: string): Date | null {
@@ -741,33 +794,34 @@ async function parseSessionCandidate(
   };
 }
 
-async function loadSessionCatalog(
-  signal?: AbortSignal,
-  onProgress?: (progress: SearchProgress) => void,
-): Promise<SessionCandidate[]> {
+async function loadSessionCatalog(options: {
+  scope: SessionSearchScope;
+  signal?: AbortSignal;
+  onProgress?: (progress: SearchProgress) => void;
+}): Promise<SessionCandidate[]> {
   try {
-    await fs.access(SESSION_ROOT);
+    await fs.access(options.scope.root);
   } catch {
     return [];
   }
 
-  const files = await walkSessionFiles(SESSION_ROOT, signal, (count) => {
-    onProgress?.({
+  const files = await walkSessionFiles(options.scope.root, options.signal, (count) => {
+    options.onProgress?.({
       phase: "scan",
-      message: `Scanning session files... ${count} found`,
+      message: `Scanning ${options.scope.label}... ${count} found`,
     });
   });
 
   const sessions: SessionCandidate[] = [];
   for (let index = 0; index < files.length; index += 1) {
-    if (signal?.aborted) break;
+    if (options.signal?.aborted) break;
     const filePath = files[index]!;
-    onProgress?.({
+    options.onProgress?.({
       phase: "parse",
-      message: `Reading session summaries... ${index + 1}/${files.length}`,
+      message: `Reading ${options.scope.label} summaries... ${index + 1}/${files.length}`,
     });
 
-    const candidate = await parseSessionCandidate(filePath, signal);
+    const candidate = await parseSessionCandidate(filePath, options.signal);
     if (candidate) {
       sessions.push(candidate);
     }
@@ -976,9 +1030,13 @@ class FindSessionComponent implements Component, Focusable {
   private readonly keybindings: KeybindingsManager;
   private readonly model: NonNullable<ExtensionCommandContext["model"]>;
   private readonly modelRegistry: ExtensionCommandContext["modelRegistry"];
+  private readonly scopes: SessionSearchScope[];
   private readonly onDone: (value: FindSessionSelection | null) => void;
   private readonly input = new Input();
 
+  private phase: FindSessionPhase = "choose-scope";
+  private selectedScopeIndex = 0;
+  private activeScope: SessionSearchScope | null = null;
   private sessions: SessionCandidate[] = [];
   private results: RankedSessionCandidate[] = [];
   private queryHistory: string[] = [];
@@ -996,6 +1054,7 @@ class FindSessionComponent implements Component, Focusable {
     this.keybindings = options.keybindings;
     this.model = options.model;
     this.modelRegistry = options.modelRegistry;
+    this.scopes = options.scopes;
     this.onDone = options.onDone;
     this.input.setValue(options.initialQuery);
   }
@@ -1010,7 +1069,13 @@ class FindSessionComponent implements Component, Focusable {
   }
 
   start(): void {
-    void this.initialize();
+    if (this.scopes.length === 1) {
+      void this.initialize(this.scopes[0]!);
+      return;
+    }
+
+    this.busy = false;
+    this.tui.requestRender();
   }
 
   invalidate(): void {
@@ -1020,6 +1085,39 @@ class FindSessionComponent implements Component, Focusable {
   handleInput(data: string): void {
     if (this.keybindings.matches(data, "tui.select.cancel")) {
       this.close();
+      return;
+    }
+
+    if (this.phase === "choose-scope") {
+      if (this.keybindings.matches(data, "tui.select.up")) {
+        this.selectedScopeIndex =
+          this.selectedScopeIndex === 0
+            ? this.scopes.length - 1
+            : this.selectedScopeIndex - 1;
+        this.tui.requestRender();
+        return;
+      }
+
+      if (this.keybindings.matches(data, "tui.select.down")) {
+        this.selectedScopeIndex =
+          this.selectedScopeIndex === this.scopes.length - 1
+            ? 0
+            : this.selectedScopeIndex + 1;
+        this.tui.requestRender();
+        return;
+      }
+
+      if (
+        this.keybindings.matches(data, "tui.select.confirm") ||
+        this.keybindings.matches(data, "tui.input.submit")
+      ) {
+        const scope = this.scopes[this.selectedScopeIndex];
+        if (scope) {
+          void this.initialize(scope);
+        }
+        return;
+      }
+
       return;
     }
 
@@ -1111,9 +1209,35 @@ class FindSessionComponent implements Component, Focusable {
     if (width <= 0) return [];
 
     const lines: string[] = [];
-    const heading = `${this.theme.fg("accent", this.theme.bold("Session Search"))}`;
+    const scopeSuffix = this.activeScope ? `: ${this.activeScope.label}` : "";
+    const heading = `${this.theme.fg("accent", this.theme.bold(`Session Search${scopeSuffix}`))}`;
     lines.push(fitLine(heading, width));
     lines.push("");
+
+    if (this.phase === "choose-scope") {
+      lines.push(fitLine(this.theme.fg("muted", "What scope do you want?"), width));
+      lines.push("");
+      for (let index = 0; index < this.scopes.length; index += 1) {
+        const scope = this.scopes[index]!;
+        const selected = index === this.selectedScopeIndex;
+        const pointer = selected ? this.theme.fg("accent", ">") : " ";
+        const label = selected
+          ? this.theme.bold(scope.label)
+          : scope.label;
+        lines.push(fitLine(`${pointer} ${label}`, width));
+        lines.push(
+          fitLine(`    ${this.theme.fg("dim", scope.description)}`, width),
+        );
+      }
+      lines.push("");
+      lines.push(
+        fitLine(
+          this.theme.fg("dim", "Enter choose scope  •  Up/Down select  •  Esc exit"),
+          width,
+        ),
+      );
+      return lines;
+    }
 
     if (this.busy || this.errorMessage) {
       const statusColor = this.errorMessage ? "error" : "warning";
@@ -1129,7 +1253,7 @@ class FindSessionComponent implements Component, Focusable {
         fitLine(
           this.theme.fg(
             "warning",
-            `No saved sessions found under ${toHomeRelative(SESSION_ROOT)}`,
+            `No saved sessions found for ${this.activeScope?.label ?? "selected scope"}`,
           ),
           width,
         ),
@@ -1140,7 +1264,7 @@ class FindSessionComponent implements Component, Focusable {
         fitLine(
           this.theme.fg(
             "muted",
-            `Indexed ${this.sessions.length} sessions. Press Enter to search, then Enter again to resume the highlighted match.`,
+            `Indexed ${this.sessions.length} sessions for ${this.activeScope?.label ?? "selected scope"}. Press Enter to search, then Enter again to resume the highlighted match.`,
           ),
           width,
         ),
@@ -1227,23 +1351,31 @@ class FindSessionComponent implements Component, Focusable {
     return lines;
   }
 
-  private async initialize(): Promise<void> {
+  private async initialize(scope: SessionSearchScope): Promise<void> {
+    this.phase = "search";
+    this.activeScope = scope;
+    this.sessions = [];
+    this.results = [];
+    this.queryHistory = [];
+    this.lastSearchInput = "";
+    this.selectedIndex = 0;
     this.busy = true;
     this.errorMessage = null;
     this.cancelActiveController();
     const controller = new AbortController();
     this.activeController = controller;
-    this.busyMessage = "Scanning session history...";
+    this.busyMessage = `Scanning ${scope.label}...`;
     this.tui.requestRender();
 
     try {
-      this.sessions = await loadSessionCatalog(
-        controller.signal,
-        (progress) => {
+      this.sessions = await loadSessionCatalog({
+        scope,
+        signal: controller.signal,
+        onProgress: (progress) => {
           this.busyMessage = progress.message;
           this.tui.requestRender();
         },
-      );
+      });
       this.busy = false;
       this.activeController = null;
       this.tui.requestRender();
@@ -1352,6 +1484,8 @@ export default function findSessionExtension(pi: ExtensionAPI): void {
       }
 
       const initialQuery = normalizeQuery(args ?? "");
+      const gitRoot = await getGitRoot(pi, ctx.cwd);
+      const scopes = createSessionSearchScopes(gitRoot);
       const selection = await ctx.ui.custom<FindSessionSelection | null>(
         (tui, theme, keybindings, done) => {
           const component = new FindSessionComponent({
@@ -1361,6 +1495,7 @@ export default function findSessionExtension(pi: ExtensionAPI): void {
             model: ctx.model!,
             modelRegistry: ctx.modelRegistry,
             initialQuery,
+            scopes,
             onDone: done,
           });
           component.start();
