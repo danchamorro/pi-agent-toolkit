@@ -5,7 +5,7 @@ Extensions, skills, and configs for the
 backup so I can restore or sync my setup across machines, and a reference
 for anyone looking to customize their own Pi environment.
 
-Includes 25 extensions, 33 skills, 2 prompt templates, 1 theme,
+Includes 25 extensions, 31 skills, 2 prompt templates, 1 theme,
 7 installable Pi packages, MCP server configurations, and safety guardrails.
 
 ---
@@ -173,7 +173,7 @@ full list with descriptions.
 
 ### Skills
 
-**Bundled skills** (12, committed to this repo):
+**Bundled skills** (11, committed to this repo):
 
 | Skill | Description |
 |-------|-------------|
@@ -185,7 +185,6 @@ full list with descriptions.
 | `exa-search` | Semantic web search via Exa API |
 | `gh-issue-creator` | Create GitHub issues via `gh` CLI |
 | `google-chat-cards-v2` | Google Chat Cards v2 notifications |
-| `nushell-shell` | Interactive Nushell usage, shell one-liner translation to Nu, and choosing Nu vs traditional shells |
 | `plan-reviewer` | Review implementation plans for evidence, trackability, dependencies, risks, and validation before execution |
 | `technical-docs` | Technical documentation standards |
 | `whats-new` | Git changelog generation between branches |
@@ -199,7 +198,7 @@ Installed automatically when these packages are present in
 |-------|--------|
 | `design-deck` | [`npm:pi-design-deck`](https://github.com/nicobailon/pi-design-deck) |
 
-**External skills** (20, installed from source repos):
+**External skills** (19, installed from source repos):
 
 Listed in `manifest.json` and installed automatically by `setup.mjs`.
 Not committed to this repo. Maintained by their original authors.
@@ -210,7 +209,6 @@ Not committed to this repo. Maintained by their original authors.
 | `vercel-react-best-practices`, `web-design-guidelines`, `find-skills` | [vercel-labs/skills](https://github.com/vercel-labs/skills) |
 | `learn-codebase`, `self-improve` | [HazAT/pi-config](https://github.com/HazAT/pi-config) |
 | `vue-best-practices` | [hyf0/vue-skills](https://github.com/hyf0/vue-skills) |
-| `nushell-pro` | [hustcer/nushell-pro](https://github.com/hustcer/nushell-pro) |
 | `code-simplifier`, `iterate-pr` | [getsentry/skills](https://github.com/getsentry/skills) |
 | `playwright-cli` | [microsoft/playwright-cli](https://github.com/microsoft/playwright-cli) |
 | `firecrawl` | [firecrawl/cli](https://github.com/firecrawl/cli) |
