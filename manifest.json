@@ -10,6 +10,7 @@
     },
     { "source": "HazAT/pi-config", "skills": ["learn-codebase", "self-improve"] },
     { "source": "hyf0/vue-skills", "skills": ["vue-best-practices"] },
+    { "source": "coderabbitai/skills", "skills": ["autofix", "code-review"] },
     { "source": "microsoft/playwright-cli", "skills": [] },
     { "source": "firecrawl/cli", "skills": ["firecrawl"] },
     { "source": "coleam00/excalidraw-diagram-skill", "skills": [] },

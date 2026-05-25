@@ -5,7 +5,7 @@ Extensions, skills, and configs for the
 backup so I can restore or sync my setup across machines, and a reference
 for anyone looking to customize their own Pi environment.
 
-Includes 25 extensions, 26 skills, 2 prompt templates, 1 theme,
+Includes 25 extensions, 27 skills, 2 prompt templates, 1 theme,
 7 installable Pi packages, MCP server configurations, and safety guardrails.
 
 ---
@@ -173,14 +173,13 @@ full list with descriptions.
 
 ### Skills
 
-**Bundled skills** (11, committed to this repo):
+**Bundled skills** (10, committed to this repo):
 
 | Skill | Description |
 |-------|-------------|
 | `1password-developer` | 1Password SSH agent, Environments, and op CLI workflows |
 | `brainstorm` | Interview-driven plan stress-testing |
 | `cli-detector` | Discover repo SaaS integrations and identify official provider CLIs for setup, debugging, and automation |
-| `code-review` | AI-powered code review using CodeRabbit CLI |
 | `code-structure-cleanup` | Behavior-preserving cleanup after working features have duplicated mechanics or messy structure |
 | `exa-search` | Semantic web search via Exa API |
 | `gh-issue-creator` | Create GitHub issues via `gh` CLI |
@@ -198,7 +197,7 @@ Installed automatically when these packages are present in
 |-------|--------|
 | `design-deck` | [`npm:pi-design-deck`](https://github.com/nicobailon/pi-design-deck) |
 
-**External skills** (14, installed from source repos):
+**External skills** (16, installed from source repos):
 
 Listed in `manifest.json` and installed automatically by `setup.mjs`.
 Not committed to this repo. Maintained by their original authors.
@@ -209,6 +208,7 @@ Not committed to this repo. Maintained by their original authors.
 | `find-skills` | [vercel-labs/skills](https://github.com/vercel-labs/skills) |
 | `learn-codebase`, `self-improve` | [HazAT/pi-config](https://github.com/HazAT/pi-config) |
 | `vue-best-practices` | [hyf0/vue-skills](https://github.com/hyf0/vue-skills) |
+| `autofix`, `code-review` | [coderabbitai/skills](https://github.com/coderabbitai/skills) |
 | `playwright-cli` | [microsoft/playwright-cli](https://github.com/microsoft/playwright-cli) |
 | `firecrawl` | [firecrawl/cli](https://github.com/firecrawl/cli) |
 | `excalidraw-diagram` | [coleam00/excalidraw-diagram-skill](https://github.com/coleam00/excalidraw-diagram-skill) |
