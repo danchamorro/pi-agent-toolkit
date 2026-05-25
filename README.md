@@ -199,7 +199,7 @@ Installed automatically when these packages are present in
 |-------|--------|
 | `design-deck` | [`npm:pi-design-deck`](https://github.com/nicobailon/pi-design-deck) |
 
-**External skills** (27, installed from source repos):
+**External skills** (25, installed from source repos):
 
 Listed in `manifest.json` and installed automatically by `setup.mjs`.
 Not committed to this repo. Maintained by their original authors.
@@ -212,7 +212,6 @@ Not committed to this repo. Maintained by their original authors.
 | `cmux`, `cmux-and-worktrees`, `cmux-browser`, `cmux-debug-windows`, `cmux-markdown` | [manaflow-ai/cmux](https://github.com/manaflow-ai/cmux) |
 | `vue-best-practices` | [hyf0/vue-skills](https://github.com/hyf0/vue-skills) |
 | `nushell-pro` | [hustcer/nushell-pro](https://github.com/hustcer/nushell-pro) |
-| `systematic-debugging`, `writing-skills` | [obra/superpowers](https://github.com/obra/superpowers) |
 | `code-simplifier`, `iterate-pr` | [getsentry/skills](https://github.com/getsentry/skills) |
 | `playwright-cli` | [microsoft/playwright-cli](https://github.com/microsoft/playwright-cli) |
 | `firecrawl` | [firecrawl/cli](https://github.com/firecrawl/cli) |
