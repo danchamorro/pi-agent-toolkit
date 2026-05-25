@@ -179,7 +179,7 @@ full list with descriptions.
 |-------|-------------|
 | `1password-developer` | 1Password SSH agent, Environments, and op CLI workflows |
 | `brainstorm` | Interview-driven plan stress-testing |
-| `cli-detector` | Scan repos for service integrations and their CLIs |
+| `cli-detector` | Discover repo SaaS integrations and identify official provider CLIs for setup, debugging, and automation |
 | `code-review` | AI-powered code review using CodeRabbit CLI |
 | `code-structure-cleanup` | Behavior-preserving cleanup after working features have duplicated mechanics or messy structure |
 | `exa-search` | Semantic web search via Exa API |
