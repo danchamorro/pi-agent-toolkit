@@ -5,7 +5,7 @@ Extensions, skills, and configs for the
 backup so I can restore or sync my setup across machines, and a reference
 for anyone looking to customize their own Pi environment.
 
-Includes 25 extensions, 29 skills, 2 prompt templates, 1 theme,
+Includes 25 extensions, 26 skills, 2 prompt templates, 1 theme,
 7 installable Pi packages, MCP server configurations, and safety guardrails.
 
 ---
@@ -198,15 +198,15 @@ Installed automatically when these packages are present in
 |-------|--------|
 | `design-deck` | [`npm:pi-design-deck`](https://github.com/nicobailon/pi-design-deck) |
 
-**External skills** (17, installed from source repos):
+**External skills** (14, installed from source repos):
 
 Listed in `manifest.json` and installed automatically by `setup.mjs`.
 Not committed to this repo. Maintained by their original authors.
 
 | Skill | Source |
 |-------|--------|
-| `docx`, `pdf`, `pptx`, `xlsx`, `frontend-design`, `skill-creator`, `agent-browser` | [anthropics/skills](https://github.com/anthropics/skills) |
-| `vercel-react-best-practices`, `web-design-guidelines`, `find-skills` | [vercel-labs/skills](https://github.com/vercel-labs/skills) |
+| `docx`, `pdf`, `pptx`, `xlsx`, `frontend-design`, `skill-creator` | [anthropics/skills](https://github.com/anthropics/skills) |
+| `find-skills` | [vercel-labs/skills](https://github.com/vercel-labs/skills) |
 | `learn-codebase`, `self-improve` | [HazAT/pi-config](https://github.com/HazAT/pi-config) |
 | `vue-best-practices` | [hyf0/vue-skills](https://github.com/hyf0/vue-skills) |
 | `playwright-cli` | [microsoft/playwright-cli](https://github.com/microsoft/playwright-cli) |

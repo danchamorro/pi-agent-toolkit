@@ -2,11 +2,11 @@
   "externalSkills": [
     {
       "source": "anthropics/skills",
-      "skills": ["docx", "pdf", "pptx", "xlsx", "frontend-design", "skill-creator", "agent-browser"]
+      "skills": ["docx", "pdf", "pptx", "xlsx", "frontend-design", "skill-creator"]
     },
     {
       "source": "vercel-labs/skills",
-      "skills": ["find-skills", "vercel-react-best-practices", "web-design-guidelines"]
+      "skills": ["find-skills"]
     },
     { "source": "HazAT/pi-config", "skills": ["learn-codebase", "self-improve"] },
     { "source": "hyf0/vue-skills", "skills": ["vue-best-practices"] },
