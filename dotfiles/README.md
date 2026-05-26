@@ -1,8 +1,9 @@
 # pi-agent-toolkit dotfiles
 
-Installable Pi configuration: extensions, bundled skills, config files,
-and safety guardrails. `setup.mjs` installs the content in this directory
-into the appropriate Pi paths. External skills are tracked separately in
+Installable Pi and Claude Code configuration for my personal agent setup:
+extensions, personal skills, Pi-only skills, config files, and safety
+guardrails. `setup.mjs` installs the content in this directory into the
+appropriate agent paths. External skills are tracked separately in
 `manifest.json` and installed via `npx skills add`.
 
 ## Directory layout
@@ -10,20 +11,36 @@ into the appropriate Pi paths. External skills are tracked separately in
 ```
 dotfiles/
   extensions/ ............. 24 extensions (.ts files and subdirectories)
-  agent-skills/ ........... Pi-scoped skills     (-> ~/.pi/agent/skills/)
-  global-skills/ .......... Cross-agent skills   (-> ~/.agents/skills/)
+  agent-skills/ ........... Pi-only skills        (-> ~/.pi/agent/skills/)
+  personal-skills/ ........ Personal skills       (-> ~/.agents/skills/<category>/<skill> and ~/.claude/skills/<skill>)
   prompts/ ................ Prompt templates      (-> ~/.pi/agent/prompts/)
   agents/ ................. Custom subagents      (-> ~/.pi/agent/agents/)
   intercepted-commands/ ... Python/pip shims (uv.ts dependency)
   Config files ............ AGENTS.md, APPEND_SYSTEM.md, models.json, etc.
 ```
 
-`setup.mjs` also supports `dotfiles/agents/` and `dotfiles/themes/` if
-those directories are added later.
-
 Repo-only files such as `README.md`, `SETUP.md`, and `tsconfig.json` live
 in `dotfiles/` for documentation and tooling, but are not installed into
 Pi.
+
+## Skills
+
+Personal skills live at `dotfiles/personal-skills/<category>/<skill>/`.
+Run `npm run dev:sync` after adding or editing one. Pi discovers them from
+categorized links under `~/.agents/skills/<category>/<skill>`, while Claude
+Code discovers them from flat links under `~/.claude/skills/<skill>` because
+Claude Code does not currently discover nested skill directories.
+
+Pi-only skills live at `dotfiles/agent-skills/` and install to
+`~/.pi/agent/skills/`. Use this path only for skills that depend on Pi
+behavior and should not be shared with Claude Code.
+
+`setup.mjs sync` is intentionally not category-aware in v1 and no longer
+scans `~/.agents/skills/`. Create personal skills directly under
+`dotfiles/personal-skills/<category>/`, then run `npm run dev:sync`.
+
+Setup refuses to delete non-symlink files or directories in skill install
+roots. Third-party and unmanaged directories are reported and left in place.
 
 ## Custom subagents
 
