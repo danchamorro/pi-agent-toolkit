@@ -80,7 +80,6 @@ const heading = (msg) => console.log(`\n${BOLD}${msg}${RESET}`);
 const DIRECTORY_MAPS = [
   ["extensions", join(PI_AGENT_DIR, "extensions")],
   ["agent-skills", join(PI_AGENT_DIR, "skills")],
-  ["global-skills", AGENTS_SKILLS_DIR],
   ["prompts", join(PI_AGENT_DIR, "prompts")],
   ["agents", join(PI_AGENT_DIR, "agents")],
   ["themes", join(PI_AGENT_DIR, "themes")],
@@ -616,7 +615,6 @@ async function runSync(absorbAll) {
   const syncTargets = [
     [join(PI_AGENT_DIR, "extensions"), "extensions", "extensions"],
     [join(PI_AGENT_DIR, "skills"), "agent-skills", "agent-skills"],
-    [AGENTS_SKILLS_DIR, "global-skills", "global-skills"],
     [join(PI_AGENT_DIR, "prompts"), "prompts", "prompts"],
     [join(PI_AGENT_DIR, "agents"), "agents", "agents"],
     [join(PI_AGENT_DIR, "themes"), "themes", "themes"],
@@ -650,7 +648,7 @@ async function runSync(absorbAll) {
       }
 
       // For skills directories: only accept directories, skip external skills
-      if (label === "agent-skills" || label === "global-skills") {
+      if (label === "agent-skills") {
         if (!entryIsDir) continue;
         if (externalSkills.has(entry)) continue;
       }
