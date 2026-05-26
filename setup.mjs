@@ -49,7 +49,10 @@ const PI_AGENT_DIR = join(HOME, ".pi", "agent");
 const AGENTS_SKILLS_DIR = join(HOME, ".agents", "skills");
 const CLAUDE_SKILLS_DIR = join(HOME, ".claude", "skills");
 const PERSONAL_SKILLS_SOURCE_DIR = join(DOTFILES, "personal-skills");
-const PERSONAL_SKILLS_TARGET_DIRS = [AGENTS_SKILLS_DIR, CLAUDE_SKILLS_DIR];
+const PERSONAL_SKILLS_TARGETS = [
+  { root: AGENTS_SKILLS_DIR, layout: "categorized" },
+  { root: CLAUDE_SKILLS_DIR, layout: "flat" },
+];
 const PROTECTED_SKILL_ROOTS = new Set([
   AGENTS_SKILLS_DIR,
   CLAUDE_SKILLS_DIR,
@@ -413,7 +416,7 @@ function getPersonalSkills() {
   return skills;
 }
 
-function cleanupPersonalSkillTarget(targetRoot) {
+function cleanupPersonalSkillTarget(targetRoot, layout) {
   const skills = getPersonalSkills();
 
   for (const { skill } of skills) {
@@ -431,9 +434,10 @@ function cleanupPersonalSkillTarget(targetRoot) {
 
     for (const entry of readdirSync(categoryTarget)) {
       const p = join(categoryTarget, entry);
-      if (isSymlink(p) && isRepoOwnedSymlink(p) && !existsSync(p)) {
+      const shouldRemove = layout === "flat" || !existsSync(p);
+      if (isSymlink(p) && isRepoOwnedSymlink(p) && shouldRemove) {
         unlinkSync(p);
-        warn(`Removed dangling personal skill symlink: ${category}/${entry}`);
+        warn(`Removed personal skill symlink: ${category}/${entry}`);
       }
     }
 
@@ -455,13 +459,14 @@ function installPersonalSkills(useLink) {
   heading("personal-skills");
   let count = 0;
 
-  for (const targetRoot of PERSONAL_SKILLS_TARGET_DIRS) {
+  for (const { root: targetRoot, layout } of PERSONAL_SKILLS_TARGETS) {
     ensureDir(targetRoot);
 
-    cleanupPersonalSkillTarget(targetRoot);
+    cleanupPersonalSkillTarget(targetRoot, layout);
 
     for (const { category, skill, sourcePath } of skills) {
       const collisionPath = join(targetRoot, skill);
+      const targetPath = layout === "flat" ? collisionPath : join(targetRoot, category, skill);
       if (pathExists(collisionPath) && !isRepoOwnedSymlink(collisionPath)) {
         warn(
           `personal skill ${category}/${skill} collides with existing ${collisionPath}; skipping`
@@ -469,12 +474,13 @@ function installPersonalSkills(useLink) {
         continue;
       }
 
-      const categoryTarget = join(targetRoot, category);
-      const targetPath = join(categoryTarget, skill);
-      ensureDir(categoryTarget);
+      if (layout === "categorized") {
+        ensureDir(dirname(targetPath));
+      }
 
       if (!replaceWithSource(sourcePath, targetPath, useLink)) continue;
-      ok(`${category}/${skill} ${DIM}-> ${useLink ? "symlinked" : "copied"}${RESET}`);
+      const label = layout === "flat" ? skill : `${category}/${skill}`;
+      ok(`${label} ${DIM}-> ${useLink ? "symlinked" : "copied"}${RESET}`);
       count++;
     }
   }
@@ -767,8 +773,9 @@ ${BOLD}What it does:${RESET}
 
   Copy mode copies files from dotfiles/ into ~/.pi/agent/ and ~/.agents/skills/.
   Categorized personal skills from dotfiles/personal-skills/<category>/<skill>/
-  are installed into ~/.agents/skills/ and ~/.claude/skills/. They are not
-  installed into ~/.pi/agent/skills/.
+  are installed into ~/.agents/skills/<category>/<skill> for Pi and as flat
+  entries in ~/.claude/skills/<skill> for Claude Code. They are not installed
+  into ~/.pi/agent/skills/.
 
   Link mode symlinks files so edits in the repo are immediately visible to Pi.
   Good for development. Re-run to pick up new files or clean dangling symlinks.
