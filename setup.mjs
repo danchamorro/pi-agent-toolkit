@@ -21,6 +21,7 @@ import {
   readdirSync,
   readFileSync,
   readlinkSync,
+  realpathSync,
   rmSync,
   statSync,
   symlinkSync,
@@ -28,7 +29,7 @@ import {
 } from "node:fs";
 import { createInterface } from "node:readline";
 import { execSync } from "node:child_process";
-import { dirname, join, resolve } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
 
@@ -41,9 +42,19 @@ const REPO_ROOT = dirname(__filename);
 const DOTFILES = join(REPO_ROOT, "dotfiles");
 const MANIFEST_PATH = join(REPO_ROOT, "manifest.json");
 
-const HOME = homedir();
+const HOME = process.env.PI_AGENT_TOOLKIT_HOME
+  ? resolve(process.env.PI_AGENT_TOOLKIT_HOME)
+  : homedir();
 const PI_AGENT_DIR = join(HOME, ".pi", "agent");
 const AGENTS_SKILLS_DIR = join(HOME, ".agents", "skills");
+const CLAUDE_SKILLS_DIR = join(HOME, ".claude", "skills");
+const PERSONAL_SKILLS_SOURCE_DIR = join(DOTFILES, "personal-skills");
+const PERSONAL_SKILLS_TARGET_DIRS = [AGENTS_SKILLS_DIR, CLAUDE_SKILLS_DIR];
+const PROTECTED_SKILL_ROOTS = new Set([
+  AGENTS_SKILLS_DIR,
+  CLAUDE_SKILLS_DIR,
+  join(PI_AGENT_DIR, "skills"),
+]);
 
 // ANSI color helpers
 const GREEN = "\x1b[32m";
@@ -129,15 +140,42 @@ function isDirectory(p) {
   }
 }
 
+function isPathInside(parent, child) {
+  const rel = relative(parent, child);
+  return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
+}
+
+function isRepoOwnedSymlink(p) {
+  try {
+    const target = readlinkSync(p);
+    const absoluteTarget = isAbsolute(target) ? target : resolve(dirname(p), target);
+    const compareTarget = existsSync(p) ? realpathSync(p) : absoluteTarget;
+    return compareTarget === REPO_ROOT || compareTarget.startsWith(`${REPO_ROOT}${sep}`);
+  } catch {
+    return false;
+  }
+}
+
+function isProtectedSkillPath(p) {
+  for (const root of PROTECTED_SKILL_ROOTS) {
+    if (isPathInside(root, p)) return true;
+  }
+  return false;
+}
+
 function ensureDir(p) {
   mkdirSync(p, { recursive: true });
 }
 
-/** Remove a symlink or file/directory at a path */
+/** Remove a repo-managed path. Protected skill roots never delete unmanaged content. */
 function removePath(p) {
   try {
     const stats = lstatSync(p);
-    if (stats.isSymbolicLink() || stats.isFile()) {
+    if (stats.isSymbolicLink()) {
+      unlinkSync(p);
+    } else if (isProtectedSkillPath(p)) {
+      warn(`Preserved unmanaged skill entry: ${p}`);
+    } else if (stats.isFile()) {
       unlinkSync(p);
     } else if (stats.isDirectory()) {
       rmSync(p, { recursive: true, force: true });
@@ -145,6 +183,27 @@ function removePath(p) {
   } catch {
     // Does not exist, nothing to remove
   }
+}
+
+function replaceWithSource(sourcePath, targetPath, useLink) {
+  if (pathExists(targetPath)) {
+    const stats = lstatSync(targetPath);
+    if (stats.isSymbolicLink()) {
+      unlinkSync(targetPath);
+    } else if (isProtectedSkillPath(targetPath)) {
+      warn(`Preserved unmanaged skill entry: ${targetPath}`);
+      return false;
+    } else {
+      removePath(targetPath);
+    }
+  }
+
+  if (useLink) {
+    symlinkSync(sourcePath, targetPath);
+  } else {
+    cpSync(sourcePath, targetPath, { recursive: true });
+  }
+  return true;
 }
 
 /** Read and parse manifest.json */
@@ -331,6 +390,98 @@ function installPackages() {
   }
 }
 
+function getPersonalSkillCategories() {
+  if (!existsSync(PERSONAL_SKILLS_SOURCE_DIR)) return [];
+  return readdirSync(PERSONAL_SKILLS_SOURCE_DIR).filter((category) => {
+    if (SKIP_ENTRIES.has(category)) return false;
+    return isDirectory(join(PERSONAL_SKILLS_SOURCE_DIR, category));
+  });
+}
+
+function getPersonalSkills() {
+  const skills = [];
+  for (const category of getPersonalSkillCategories()) {
+    const categoryDir = join(PERSONAL_SKILLS_SOURCE_DIR, category);
+    for (const skill of readdirSync(categoryDir)) {
+      if (SKIP_ENTRIES.has(skill)) continue;
+      const skillDir = join(categoryDir, skill);
+      if (!isDirectory(skillDir)) continue;
+      if (!existsSync(join(skillDir, "SKILL.md"))) continue;
+      skills.push({ category, skill, sourcePath: skillDir });
+    }
+  }
+  return skills;
+}
+
+function cleanupPersonalSkillTarget(targetRoot) {
+  const skills = getPersonalSkills();
+
+  for (const { skill } of skills) {
+    const flatTarget = join(targetRoot, skill);
+    if (isSymlink(flatTarget) && !existsSync(flatTarget)) {
+      unlinkSync(flatTarget);
+      warn(`Removed dangling personal skill symlink: ${skill}`);
+    }
+  }
+
+  const categories = getPersonalSkillCategories();
+  for (const category of categories) {
+    const categoryTarget = join(targetRoot, category);
+    if (!existsSync(categoryTarget) || !isDirectory(categoryTarget)) continue;
+
+    for (const entry of readdirSync(categoryTarget)) {
+      const p = join(categoryTarget, entry);
+      if (isSymlink(p) && isRepoOwnedSymlink(p) && !existsSync(p)) {
+        unlinkSync(p);
+        warn(`Removed dangling personal skill symlink: ${category}/${entry}`);
+      }
+    }
+
+    try {
+      if (readdirSync(categoryTarget).length === 0) {
+        rmSync(categoryTarget, { recursive: false });
+        warn(`Removed empty personal skill category: ${category}`);
+      }
+    } catch {
+      // Directory disappeared or is not empty.
+    }
+  }
+}
+
+function installPersonalSkills(useLink) {
+  const skills = getPersonalSkills();
+  if (skills.length === 0) return 0;
+
+  heading("personal-skills");
+  let count = 0;
+
+  for (const targetRoot of PERSONAL_SKILLS_TARGET_DIRS) {
+    ensureDir(targetRoot);
+
+    cleanupPersonalSkillTarget(targetRoot);
+
+    for (const { category, skill, sourcePath } of skills) {
+      const collisionPath = join(targetRoot, skill);
+      if (pathExists(collisionPath) && !isRepoOwnedSymlink(collisionPath)) {
+        warn(
+          `personal skill ${category}/${skill} collides with existing ${collisionPath}; skipping`
+        );
+        continue;
+      }
+
+      const categoryTarget = join(targetRoot, category);
+      const targetPath = join(categoryTarget, skill);
+      ensureDir(categoryTarget);
+
+      if (!replaceWithSource(sourcePath, targetPath, useLink)) continue;
+      ok(`${category}/${skill} ${DIM}-> ${useLink ? "symlinked" : "copied"}${RESET}`);
+      count++;
+    }
+  }
+
+  return count;
+}
+
 async function runInstall(useLink, skipExternal, skipPackages) {
   const mode = useLink ? "link" : "copy";
   heading(`pi-agent-toolkit setup (${mode} mode)`);
@@ -358,27 +509,23 @@ async function runInstall(useLink, skipExternal, skipPackages) {
         if (contents.length === 0) continue;
       }
 
-      if (useLink) {
-        removePath(targetPath);
-        symlinkSync(sourcePath, targetPath);
-        ok(`${entry} ${DIM}-> symlinked${RESET}`);
-      } else {
-        removePath(targetPath);
-        cpSync(sourcePath, targetPath, { recursive: true });
-        ok(`${entry} ${DIM}-> copied${RESET}`);
+      if (replaceWithSource(sourcePath, targetPath, useLink)) {
+        ok(`${entry} ${DIM}-> ${useLink ? "symlinked" : "copied"}${RESET}`);
+        totalCount++;
       }
-      totalCount++;
     }
 
     // Clean dangling symlinks
     for (const entry of readdirSync(targetDir)) {
       const p = join(targetDir, entry);
-      if (isSymlink(p) && !existsSync(p)) {
+      if (isSymlink(p) && isRepoOwnedSymlink(p) && !existsSync(p)) {
         unlinkSync(p);
         warn(`Removed dangling symlink: ${entry}`);
       }
     }
   }
+
+  totalCount += installPersonalSkills(useLink);
 
   // Whole-directory mappings (symlink/copy the entire directory)
   for (const [subdir, targetPath] of WHOLE_DIR_MAPS) {
@@ -598,6 +745,13 @@ Selectively install extensions, skills, and configs for the Pi coding agent.
 
 ${BOLD}Usage:${RESET}
 
+  npm run setup                     Copy mode (for users / new machines)
+  npm run link                      Symlink mode (for development)
+  npm run dev:sync                  Link repo files, skip external skills and packages
+  npm run update:third-party        Reinstall external skills and Pi packages
+  npm run update:skills             Reinstall external skills only
+  npm run update:packages           Reinstall Pi packages only
+
   node setup.mjs                    Copy mode (for users / new machines)
   node setup.mjs --link             Symlink mode (for development)
   node setup.mjs sync               Absorb local Pi files into the repo
@@ -612,7 +766,9 @@ ${BOLD}Flags (copy and link modes):${RESET}
 ${BOLD}What it does:${RESET}
 
   Copy mode copies files from dotfiles/ into ~/.pi/agent/ and ~/.agents/skills/.
-  Good for users who want a working setup without maintaining a repo clone.
+  Categorized personal skills from dotfiles/personal-skills/<category>/<skill>/
+  are installed into ~/.agents/skills/ and ~/.claude/skills/. They are not
+  installed into ~/.pi/agent/skills/.
 
   Link mode symlinks files so edits in the repo are immediately visible to Pi.
   Good for development. Re-run to pick up new files or clean dangling symlinks.
@@ -620,6 +776,13 @@ ${BOLD}What it does:${RESET}
   Sync scans Pi directories for files not managed by the repo (not symlinks,
   not external skills). Offers to move them into dotfiles/ and replace with
   symlinks. Use after building an extension or skill locally in Pi.
+
+  Set PI_AGENT_TOOLKIT_HOME=/tmp/safe-home to rebase install targets under a
+  throwaway home during validation. This writes to $PI_AGENT_TOOLKIT_HOME/.pi,
+  $PI_AGENT_TOOLKIT_HOME/.agents, and $PI_AGENT_TOOLKIT_HOME/.claude.
+
+  Safety: setup refuses to delete non-symlink files or directories in skill
+  install roots. Unmanaged entries are reported and left in place.
 
 ${BOLD}External skills:${RESET}
 
