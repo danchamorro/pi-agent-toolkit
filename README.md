@@ -57,22 +57,39 @@ Day to day personal skill workflow:
 
 `dev:sync` uses link mode and skips external skills and Pi package refreshes.
 
-### Syncing local changes back
+### Bringing outside work into the repo
 
-Built an extension, Pi-only skill, prompt, agent, or theme directly in
-`~/.pi/agent/`? Pull it into the repo:
+Prefer repo-first development: create the file under `dotfiles/` or
+`packages/`, then run `npm run dev:sync` so the live Pi copy is a symlink.
+If you prototype directly in Pi-owned directories, absorb the unmanaged
+files back into the repo:
 
 ```bash
 node setup.mjs sync
 ```
 
-This finds unmanaged files in Pi-owned directories (not symlinks, not
-external skills), offers to move them into `dotfiles/`, and replaces the
-original with a symlink. Use `--all` to skip the interactive prompts.
+`sync` scans live Pi directories and maps accepted files back to repo-owned
+paths:
 
-`setup.mjs sync` is intentionally not category-aware in v1 and no longer
-scans `~/.agents/skills/`. Create personal skills directly under
-`dotfiles/personal-skills/<category>/`, then run `npm run dev:sync`.
+| Live path | Repo path after sync |
+|---|---|
+| `~/.pi/agent/extensions/` | `dotfiles/extensions/` |
+| `~/.pi/agent/skills/` | `dotfiles/agent-skills/` |
+| `~/.pi/agent/prompts/` | `dotfiles/prompts/` |
+| `~/.pi/agent/agents/` | `dotfiles/agents/` |
+| `~/.pi/agent/themes/` | `dotfiles/themes/` |
+
+It ignores existing symlinks and manifest-listed external skills, prompts
+for each unmanaged item, moves accepted files into `dotfiles/`, and replaces
+the live file with a symlink. Use `--all` to skip the interactive prompts.
+
+`sync` does not scan `~/.agents/skills/` or `~/.claude/skills/`. For
+cross-agent personal skills, manually move or copy the skill to
+`dotfiles/personal-skills/<category>/<skill>/`, then run
+`npm run dev:sync`.
+
+For third-party work installed with `npx skills add` or `pi install`, track
+it in `manifest.json` instead of committing the generated installed files.
 
 ### Full usage
 
@@ -146,7 +163,7 @@ pi install git:https://github.com/badlogic/pi-diff-review
 | `pi-intercom` | Direct 1:1 messaging between Pi sessions on the same machine, with an `intercom` tool plus `/intercom` and `Alt+M` UI entry points. | [nicobailon/pi-intercom](https://github.com/nicobailon/pi-intercom) |
 | `pi-diff-review` | Native diff review window for Pi. Adds a `/diff-review` command that opens changed files in a Monaco diff editor and turns review notes into a prompt back in Pi. | [badlogic/pi-diff-review](https://github.com/badlogic/pi-diff-review) |
 
-### Extensions (24)
+### Extensions (25)
 
 All extensions live in `dotfiles/extensions/`. See
 [dotfiles/extensions/README.md](dotfiles/extensions/README.md) for the
@@ -334,20 +351,39 @@ Configured in `mcp.json` (created from template during setup):
 
 ### Extensions, skills, prompts, agents, and themes
 
-1. Create the file in the appropriate repo path:
-   - Personal skills: `dotfiles/personal-skills/<category>/<skill>/`
-   - Pi-only skills: `dotfiles/agent-skills/`
-   - Extensions: `dotfiles/extensions/`
-   - Prompts: `dotfiles/prompts/`
-   - Subagents: `dotfiles/agents/`
-   - Themes: `dotfiles/themes/`
-2. Run `npm run dev:sync` during development, or `npm run setup` for copy mode.
-3. Reload the relevant agent if needed.
-4. Commit and push.
+Start in the repo whenever possible. Choose the owner path first, then link
+it into the live agent directories:
 
-Or build Pi-owned files locally in Pi, then absorb with `node setup.mjs sync`.
-Personal skills should be created directly in the repo because sync is not
-category-aware in v1.
+| Component | Repo-owned source | Installed or linked to | Notes |
+|---|---|---|---|
+| Extension | `dotfiles/extensions/*.ts` or `dotfiles/extensions/<name>/` | `~/.pi/agent/extensions/` | Add the required top-level JSDoc block and update `dotfiles/extensions/CHANGELOG.md`. |
+| Pi-only skill | `dotfiles/agent-skills/<skill>/` | `~/.pi/agent/skills/<skill>/` | Use for workflows that depend on Pi-only tools or UI. |
+| Personal skill | `dotfiles/personal-skills/<category>/<skill>/` | `~/.agents/skills/<category>/<skill>/` and `~/.claude/skills/<skill>/` | Use for skills shared by Pi and Claude Code. These are not installed into `~/.pi/agent/skills/`. |
+| Prompt template | `dotfiles/prompts/<prompt>.md` | `~/.pi/agent/prompts/` | Keep reusable prompts here instead of scattering local copies. |
+| Subagent | `dotfiles/agents/<agent>.md` | `~/.pi/agent/agents/` and `~/.claude/agents/` | Use for reusable custom agent definitions. |
+| Theme | `dotfiles/themes/<theme>.json` | `~/.pi/agent/themes/` | Available after sync, but not automatically activated. |
+
+After adding the file:
+
+1. Run `npm run dev:sync` during development, or `npm run setup` for copy mode.
+2. Reload Pi or Claude Code if the running agent does not pick up the new file.
+3. Run the narrow validation for the changed area.
+4. Commit and push the repo changes.
+
+If you already built the component outside the repo:
+
+- In `~/.pi/agent/extensions`, `skills`, `prompts`, `agents`, or `themes`, run
+  `node setup.mjs sync` and accept the items you want to absorb. The script
+  moves them into `dotfiles/` and symlinks the live files back to the repo.
+- In `~/.agents/skills` or `~/.claude/skills`, move the skill manually into
+  `dotfiles/personal-skills/<category>/<skill>/`, then run
+  `npm run dev:sync`. `setup.mjs sync` intentionally does not scan those
+  directories.
+- In a separate checkout or scratch directory, copy the source into the
+  matching repo-owned path above, then run `npm run dev:sync`.
+- If the work is an installable first-party Pi package, keep the source under
+  `packages/<package>/`, publish it through the package workflow, and track the
+  installed package name in `manifest.json`.
 
 ### External skills
 
