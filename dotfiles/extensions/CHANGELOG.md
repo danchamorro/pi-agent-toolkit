@@ -9,6 +9,9 @@ All notable changes to extensions in `~/.pi/agent/extensions/`.
 - Added `gh pr create --body-file` support so the approval gate reads,
   validates, and previews PR bodies supplied from files before allowing the
   command.
+- Resolved the current branch before gating `git push`, including `git -C`
+  invocations, so protected-branch checks still apply when the branch is not
+  named explicitly.
 
 ### question-mode.ts
 

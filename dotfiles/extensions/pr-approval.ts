@@ -66,6 +66,7 @@ interface PrMergeMetadata {
 interface PushMetadata {
   remote: string | null;
   branch: string | null;
+  gitCwd: string | null;
   isForce: boolean;
   isProtected: boolean;
 }
@@ -337,14 +338,16 @@ function parsePush(tokens: string[]): PushMetadata | null {
     "-c", "-C", "--exec-path", "--git-dir", "--work-tree", "--namespace",
   ]);
 
+  let gitCwd: string | null = null;
   let subIdx = gitIdx + 1;
   while (subIdx < tokens.length) {
     const token = tokens[subIdx] ?? "";
     if (!token.startsWith("-")) break;
     if (token === "--") return null;
+    if (token === "-C") { gitCwd = tokens[subIdx + 1] ?? null; subIdx += 2; continue; }
+    if (token.startsWith("-C") && token.length > 2) { gitCwd = token.slice(2); subIdx += 1; continue; }
     if (GIT_GLOBAL_OPTS_WITH_VALUE.has(token)) { subIdx += 2; continue; }
     if (token.startsWith("-c") && token.length > 2) { subIdx += 1; continue; }
-    if (token.startsWith("-C") && token.length > 2) { subIdx += 1; continue; }
     if (token.startsWith("--") && token.includes("=")) { subIdx += 1; continue; }
     subIdx += 1;
   }
@@ -378,7 +381,7 @@ function parsePush(tokens: string[]): PushMetadata | null {
 
   const isProtected = branch !== null && PROTECTED_BRANCHES.has(branch);
 
-  return { remote, branch, isForce, isProtected };
+  return { remote, branch, gitCwd, isForce, isProtected };
 }
 
 // ---------------------------------------------------------------------------
@@ -400,6 +403,34 @@ function parsePrOperation(command: string): PrOperation | null {
   }
 
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// Push branch loading
+// ---------------------------------------------------------------------------
+
+async function hydratePushCurrentBranch(
+  pi: ExtensionAPI,
+  op: PrOperation,
+  cwd: string,
+): Promise<void> {
+  if (op.kind !== "push") return;
+  const meta = op.metadata;
+  if (meta.branch) return;
+
+  const gitCwd = meta.gitCwd ? resolve(cwd, meta.gitCwd) : cwd;
+  const result = await pi.exec("git", ["branch", "--show-current"], {
+    cwd: gitCwd,
+    timeout: 5_000,
+  });
+
+  if (result.code !== 0 || result.killed) return;
+
+  const currentBranch = result.stdout.trim();
+  if (!currentBranch) return;
+
+  meta.branch = currentBranch;
+  meta.isProtected = PROTECTED_BRANCHES.has(currentBranch);
 }
 
 // ---------------------------------------------------------------------------
@@ -731,6 +762,9 @@ function appendPushReview(
 ): void {
   appendKeyValue(lines, theme, "Remote", meta.remote ?? "(default)", width);
   appendKeyValue(lines, theme, "Branch", meta.branch ?? "(current branch)", width);
+  if (meta.gitCwd) {
+    appendKeyValue(lines, theme, "Git cwd", meta.gitCwd, width);
+  }
   appendKeyValue(lines, theme, "Force", meta.isForce ? "yes" : "no", width);
   appendKeyValue(lines, theme, "Protected", meta.isProtected ? "yes" : "no", width);
 
@@ -831,6 +865,7 @@ function buildPushPrompt(meta: PushMetadata): string {
   const lines = ["Git Push:"];
   lines.push(`  Remote: ${meta.remote ?? "(default)"}`);
   lines.push(`  Branch: ${meta.branch ?? "(current branch)"}`);
+  if (meta.gitCwd) lines.push(`  Git cwd: ${meta.gitCwd}`);
   if (meta.isForce) lines.push("  ** FORCE PUSH **");
   if (meta.isProtected) lines.push(`  ** PROTECTED BRANCH: ${meta.branch} **`);
   lines.push("");
@@ -987,7 +1022,10 @@ export default function prApprovalExtension(pi: ExtensionAPI) {
     if (!command) return;
 
     const op = parsePrOperation(command);
-    if (!op || !shouldGate(op)) return;
+    if (!op) return;
+
+    await hydratePushCurrentBranch(pi, op, ctx.cwd);
+    if (!shouldGate(op)) return;
 
     await hydratePrCreateBodyFile(op, ctx.cwd);
     const validation = validateOperation(op);
@@ -1022,7 +1060,10 @@ export default function prApprovalExtension(pi: ExtensionAPI) {
     if (!command) return;
 
     const op = parsePrOperation(command);
-    if (!op || !shouldGate(op)) return;
+    if (!op) return;
+
+    await hydratePushCurrentBranch(pi, op, ctx.cwd);
+    if (!shouldGate(op)) return;
 
     await hydratePrCreateBodyFile(op, ctx.cwd);
     const validation = validateOperation(op);
