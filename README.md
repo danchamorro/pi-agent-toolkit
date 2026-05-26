@@ -6,7 +6,7 @@ skills, configs, safety guardrails, and installable packages. This is a
 public backup and reference for how I organize my own agent environment,
 not a universal starter kit intended to be cloned unchanged by everyone.
 
-Includes 25 extensions, 40 skills, 2 prompt templates, 1 theme,
+Includes 25 extensions, 43 skills, 2 prompt templates, 1 theme,
 7 installable Pi packages, MCP server configurations, and safety guardrails.
 
 ---
@@ -217,12 +217,13 @@ and install path:
 Setup refuses to delete non-symlink files or directories in skill install
 roots. Unmanaged and third-party directories are reported and left in place.
 
-**Personal skills** (13, committed to this repo):
+**Personal skills** (16, committed to this repo):
 
 | Category | Skill | Description |
 |----------|-------|-------------|
 | `security-environment` | `1password-developer` | 1Password SSH agent, Environments, and op CLI workflows |
 | `planning` | `brainstorm` | Interview-driven plan stress-testing |
+| `engineering` | `api-contract-validator` | Validate API clients and integrations against contracts, schemas, SDK types, and documented request/response behavior |
 | `developer-workflow` | `cli-detector` | Discover repo SaaS integrations and identify official provider CLIs for setup, debugging, and automation |
 | `engineering` | `code-structure-cleanup` | Behavior-preserving cleanup after working features have duplicated mechanics or messy structure |
 | `engineering` | `debug-mantra` | Four-step debugging discipline for reproducing, tracing, falsifying, and cross-checking bugs |
@@ -232,7 +233,9 @@ roots. Unmanaged and third-party directories are reported and left in place.
 | `engineering` | `post-mortem` | Produce engineering root-cause writeups after fixed and validated bugs |
 | `planning` | `plan-reviewer` | Review implementation plans for evidence, trackability, dependencies, risks, and validation before execution |
 | `engineering` | `scrutinize` | Outsider-perspective review of plans, PRs, diffs, and code changes |
+| `developer-workflow` | `sql-specialist` | Write, review, explain, and optimize SQL queries, schemas, DDL, ERDs, and execution plans |
 | `docs-communication` | `technical-docs` | Technical documentation standards |
+| `engineering` | `test-author` | Create or update targeted tests using project-native conventions and validation |
 | `developer-workflow` | `whats-new` | Git changelog generation between branches |
 
 **Pi-only skills** (1, committed to this repo):
@@ -272,7 +275,8 @@ Not committed to this repo. Maintained by their original authors.
 ### Subagents
 
 Custom subagents live in `dotfiles/agents/` and are installed to
-`~/.pi/agent/agents/` by `setup.mjs`.
+`~/.pi/agent/agents/` for Pi and `~/.claude/agents/` for Claude Code by
+`setup.mjs`.
 
 | Agent | Description |
 |-------|-------------|

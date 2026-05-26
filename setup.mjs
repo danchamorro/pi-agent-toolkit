@@ -48,6 +48,7 @@ const HOME = process.env.PI_AGENT_TOOLKIT_HOME
 const PI_AGENT_DIR = join(HOME, ".pi", "agent");
 const AGENTS_SKILLS_DIR = join(HOME, ".agents", "skills");
 const CLAUDE_SKILLS_DIR = join(HOME, ".claude", "skills");
+const CLAUDE_AGENTS_DIR = join(HOME, ".claude", "agents");
 const PERSONAL_SKILLS_SOURCE_DIR = join(DOTFILES, "personal-skills");
 const PERSONAL_SKILLS_TARGETS = [
   { root: AGENTS_SKILLS_DIR, layout: "categorized" },
@@ -82,6 +83,7 @@ const DIRECTORY_MAPS = [
   ["agent-skills", join(PI_AGENT_DIR, "skills")],
   ["prompts", join(PI_AGENT_DIR, "prompts")],
   ["agents", join(PI_AGENT_DIR, "agents")],
+  ["agents", CLAUDE_AGENTS_DIR],
   ["themes", join(PI_AGENT_DIR, "themes")],
 ];
 
@@ -498,7 +500,7 @@ async function runInstall(useLink, skipExternal, skipPackages) {
     const sourceDir = join(DOTFILES, subdir);
     if (!existsSync(sourceDir)) continue;
 
-    heading(subdir);
+    heading(targetDir === CLAUDE_AGENTS_DIR ? "claude-agents" : subdir);
     ensureDir(targetDir);
 
     const entries = readdirSync(sourceDir);
@@ -769,8 +771,8 @@ ${BOLD}Flags (copy and link modes):${RESET}
 
 ${BOLD}What it does:${RESET}
 
-  Copy mode copies files from dotfiles/ into ~/.pi/agent/ and ~/.agents/skills/.
-  Categorized personal skills from dotfiles/personal-skills/<category>/<skill>/
+  Copy mode copies files from dotfiles/ into ~/.pi/agent/, ~/.claude/agents/,
+  and ~/.agents/skills/. Categorized personal skills from dotfiles/personal-skills/<category>/<skill>/
   are installed into ~/.agents/skills/<category>/<skill> for Pi and as flat
   entries in ~/.claude/skills/<skill> for Claude Code. They are not installed
   into ~/.pi/agent/skills/.
