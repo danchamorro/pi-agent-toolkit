@@ -369,6 +369,7 @@ modified to suit my needs:
 - [Disler](https://github.com/disler)
 - [Jesse Vincent (obra)](https://github.com/obra)
 - [Nico Bailon](https://github.com/nicobailon)
+- [thananon/9arm-skills](https://github.com/thananon/9arm-skills)
 - [pawel-cell/micky-podcast-agentic-engineering](https://github.com/pawel-cell/micky-podcast-agentic-engineering)
 
 ## License
