@@ -11,6 +11,10 @@ These rules apply to all repositories unless a project-level AGENTS.md adds stri
 - **Never** use `--no-verify` when committing. All pre-commit hooks must pass.
 - After making code changes, stop at diff + validation results and ask for approval before any commit.
 - If the user asks to "proceed" or "continue," do not infer commit permission.
+- Stage explicit paths only. Do not use `git add -A` or `git add .`.
+- Before committing, run `git status` and verify only files changed in this session are staged.
+- Do not run `git reset --hard`, `git checkout .`, `git clean -fd`, or `git stash` unless the user explicitly asks and the risk to other work is clear.
+- Resolve merge or rebase conflicts only in files you modified. If conflicts affect unrelated files, stop and ask.
 
 ### Commit message style
 
@@ -30,7 +34,7 @@ When the user explicitly asks to commit, use Conventional Commits:
 - Separate subject/body with a blank line; wrap body at 72 chars
 - Focus on **why** (the diff already shows what changed)
 - No AI attribution and no emojis
-- **Always include a body** — single-line commits are not acceptable
+- **Always include a body**, single-line commits are not acceptable
 
 Example:
 
@@ -63,14 +67,14 @@ Motivation, context, or problem being solved. Link related issues if applicable.
 
 ## How tested
 
-What validation was done — tests added/updated, manual checks, commands run.
+What validation was done: tests added/updated, manual checks, commands run.
 
 ## Notes (optional)
 
 Breaking changes, follow-ups, deployment considerations, or anything reviewers should know.
 ```
 
-- Be reasonably detailed without being verbose — a reviewer should understand the change without reading every diff line
+- Be reasonably detailed without being verbose. A reviewer should understand the change without reading every diff line
 - No AI attribution and no emojis
 - Always use `--title` and `--body-file` with `gh pr create` when the body spans multiple lines. Prefer `--body-file` over inline `--body` for any non-trivial PR description to avoid shell escaping and command substitution bugs.
 
@@ -127,6 +131,11 @@ gh pr create --title "fix(cache): prevent stale Redis entries" \
 - Do **not** use emojis in code (strings, comments, log messages, docstrings).
 - To make text stand out, use colors (ANSI codes), bolding, or ASCII symbols instead of emojis.
 
+### Interaction style
+
+- When the user asks a question, answer it first before making edits or running implementation commands. Read-only evidence gathering is allowed when needed to answer accurately.
+- When responding to user feedback or analysis, explicitly state whether you agree or disagree before describing changes.
+
 ## Agent-Legible Code, Enforcement, and Reviewability
 
 AI agents work best when the codebase is explicit, searchable, modular, and mechanically enforced. Prioritize changes that make the system easier for both humans and agents to understand.
@@ -139,7 +148,7 @@ Agents must avoid introducing patterns that hide intent, control flow, data acce
 
 Do not introduce:
 
-- Dynamic imports unless there is already a clear project convention for them.
+- Inline imports, dynamic imports, or type-position import tricks unless there is already a clear project convention for them or a runtime boundary requires them.
 - Implicit global state.
 - Silent fallbacks that hide configuration, permission, database, API, or runtime failures.
 - Bare `except`, `catch`, or broad catch-all error handling.
@@ -148,6 +157,7 @@ Do not introduce:
 - Raw SQL scattered across the codebase when a query interface or repository layer exists.
 - Raw UI primitives when a shared component library exists.
 - New abstractions that obscure simple behavior.
+- Trivial one-use abstractions. Inline single-use helpers unless the helper improves naming, testability, reuse, or domain clarity.
 
 Prefer:
 
@@ -168,6 +178,10 @@ Do not rely on prompts or judgment alone. Follow the project's mechanical guardr
 
 Before considering a task complete, run the relevant project-native checks for the affected scope. This may include linting, formatting, type checking, tests, migrations, or build validation. Prefer the narrowest command that covers the files or package you changed, and discover the repo's standard commands before inventing your own.
 
+Prefer narrow validation commands that cover the changed scope. Avoid expensive full builds or full test suites unless they are needed for confidence, are the project standard for the touched area, or the user requests them.
+
+If you create or modify a test file, run that test directly when possible and iterate until it passes or report the blocker clearly.
+
 Agents must not bypass, weaken, delete, or silence enforcement rules just to make a change pass.
 
 Do not:
@@ -175,6 +189,7 @@ Do not:
 - Disable lint rules without a clear justification.
 - Add broad `ignore`, `noqa`, `type: ignore`, or equivalent comments unless there is no reasonable alternative.
 - Remove failing tests instead of fixing the underlying issue.
+- Fix type or build errors by deleting behavior, weakening contracts, or downgrading dependencies. Investigate the cause and prefer a correct dependency update, type-safe change, or explicit user-approved migration.
 - Relax type safety to make code compile.
 - Add catch-all error handling to hide failures.
 - Introduce duplicate helpers, duplicate query paths, or duplicate UI primitives.
@@ -214,6 +229,8 @@ Prefer:
 Avoid:
 
 - Large rewrites unless explicitly requested.
+- Removing functionality, public API surface, tests, safeguards, or code that appears intentional without asking first.
+- Breaking public behavior, public APIs, data formats, CLI flags, configuration keys, or persisted state without asking whether backward compatibility matters.
 - Drive-by refactors.
 - Formatting unrelated files.
 - Renaming unrelated symbols.
@@ -240,6 +257,7 @@ Certain changes require extra human attention. When making any of the following 
 - Billing logic.
 - Security-sensitive behavior.
 - Dependency additions or upgrades.
+- Lockfile changes.
 - Production configuration changes.
 - Error handling changes.
 - Retry, timeout, or background job behavior.
@@ -247,6 +265,8 @@ Certain changes require extra human attention. When making any of the following 
 - Changes that affect reliability, observability, or incident response.
 
 For these areas, do not assume that passing tests is enough. Explain the risk, the intended behavior, and what a human reviewer should verify.
+
+Treat dependency and lockfile changes as code changes that require review. Call them out clearly, explain why they changed, and avoid running dependency lifecycle scripts unless needed and approved.
 
 ### 5. Completion Checklist
 
@@ -295,6 +315,11 @@ When analyzing data flow, trace it all the way to the system boundary before dra
 - If the creator is an external system outside the codebase, say so explicitly rather than concluding the value "isn't needed" or "comes from the config."
 - When the upstream source is outside the codebase, state the boundary clearly: "This value originates from Zapier/HubSpot/external ETL, which is not visible in the code."
 
+### Context gathering before edits
+
+- Before wide-ranging changes, editing unfamiliar files, or audits, inspect the full relevant context. For source code, prefer jCodeMunch file outlines, context bundles, symbols, or full file reads as appropriate.
+- Do not rely only on search snippets for broad changes, audits, or unfamiliar files. Gather enough complete context before editing.
+
 ### Clean up after yourself
 
 Never leave debugging or testing artifacts in the codebase:
@@ -310,10 +335,11 @@ Before every commit, scan changes for artifacts. If `git diff` shows `console.lo
 
 - Do **not** read, search, or inspect files inside `node_modules/` by default.
 - For dependency internals, prefer `opensrc` source lookups over inspecting `node_modules/` when available.
+- For external API behavior or types, verify against official documentation first. Use `opensrc` for dependency internals, or inspect installed type definitions only when that installed package is the necessary source of truth and the inspection is narrowly scoped. Do not guess.
 - Treat `node_modules/` as off-limits unless the user explicitly asks to inspect an installed dependency/package or the installed package is the only source of truth for the behavior in question.
 - If inspection of `node_modules/` is genuinely necessary and the user did not explicitly ask for it, ask for permission first.
 - When inspection is allowed, keep it tightly scoped to the smallest possible set of named files and never run broad recursive searches over `node_modules/`.
-- **Exception — Pi packages:** Reading files under `@earendil-works/` is always allowed without permission. This namespace contains Pi and its related packages (docs, examples, extensions, themes, skills, SDK source).
+- **Exception: Pi packages.** Reading files under `@earendil-works/` is always allowed without permission. This namespace contains Pi and its related packages (docs, examples, extensions, themes, skills, SDK source).
 
 ### jCodeMunch MCP usage
 
@@ -329,6 +355,11 @@ Before every commit, scan changes for artifacts. If `git diff` shows `console.lo
 - When the user asks to create or update Pi skills, Pi features, Pi configuration, or reusable agent tooling, consider this repo a preferred destination when it is relevant.
 - Keep changes in this repo polished and shareable. Avoid adding secrets, private tokens, machine-specific credentials, or undocumented local-only assumptions.
 - If a requested change seems specific to one machine or not suitable for a public repo, call that out and ask before adding it here.
+
+### Temporary scripts and long-form CLI input
+
+- For non-trivial ad hoc scripts, write them to a temporary file, run them, and remove them afterward. Avoid embedding long multi-line scripts directly in shell commands.
+- For multi-line GitHub issue, PR, or comment bodies, write the body to a temp file and use `--body-file`.
 
 ### Default workflow
 

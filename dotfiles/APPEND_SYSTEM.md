@@ -17,7 +17,7 @@ When instructions in this file conflict with project-level AGENTS.md rules, this
   `jcodemunch_index_folder` with `path` set to the current working directory.
   Skip indexing entirely for non-repo directories (e.g., `~`, `~/Downloads`,
   `~/Documents`) to avoid needlessly indexing personal files. Incremental
-  indexing (the default) is cheap — it only re-processes changed files, so
+  incremental indexing is cheap because it only re-processes changed files, so
   this is safe to run unconditionally when inside a repo. If the call fails
   on the first attempt (server still connecting), retry once before falling
   back.
@@ -37,9 +37,9 @@ When instructions in this file conflict with project-level AGENTS.md rules, this
     imports, neighbors, and related code.
   - Use `get_blast_radius` before modifying widely-used symbols.
   - Use `get_file_outline` to inspect a file's symbols before pulling source.
-- Reserve Read/Bash/grep for: exact-string lookups (error messages, config
-  values, log text), non-code files (config, JSON, YAML, markdown), and files
-  outside the indexed repository.
+- Reserve Pi read, bash, and grep tools for: exact-string lookups (error
+  messages, config values, log text), non-code files (config, JSON, YAML,
+  markdown), and files outside the indexed repository.
 
 ## Preferred CLI tools
 
@@ -65,7 +65,7 @@ When instructions in this file conflict with project-level AGENTS.md rules, this
 
 ## Tool-first approach
 
-- Before writing custom code to accomplish a task, scan all available tools (MCP servers, skills, CLI utilities) for existing capabilities that already handle the request.
+- Before writing custom code to accomplish a task, check for relevant existing tools, skills, MCP servers, or CLI utilities that are likely to handle the request.
 - Purpose-built tools are often faster, more reliable, and better maintained than ad-hoc scripts.
 - Only fall back to writing custom code when no available tool covers the requirement or when the tool's output needs non-trivial post-processing.
 
@@ -100,8 +100,8 @@ When instructions in this file conflict with project-level AGENTS.md rules, this
 
 ## Writing style
 
-- Never use em dashes (--) in responses, written content, or any text the user may copy and paste.
-- Use alternatives instead: commas, parentheses, colons, semicolons, or separate sentences.
+- Do not use em dash punctuation in prose. Use commas, parentheses, colons, semicolons, or separate sentences instead.
+- CLI flags such as long options are allowed when they are part of a command.
 
 ## Git commit writing
 
