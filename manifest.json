@@ -8,13 +8,27 @@
       "source": "vercel-labs/skills",
       "skills": ["find-skills"]
     },
+    {
+      "source": "vercel-labs/agent-skills",
+      "skills": [
+        "vercel-composition-patterns",
+        "deploy-to-vercel",
+        "vercel-react-best-practices",
+        "vercel-react-native-skills",
+        "vercel-react-view-transitions",
+        "vercel-cli-with-tokens",
+        "vercel-optimize",
+        "web-design-guidelines"
+      ]
+    },
     { "source": "HazAT/pi-config", "skills": ["learn-codebase", "self-improve"] },
     { "source": "hyf0/vue-skills", "skills": ["vue-best-practices"] },
     { "source": "coderabbitai/skills", "skills": ["autofix", "code-review"] },
     { "source": "microsoft/playwright-cli", "skills": [] },
     { "source": "firecrawl/cli", "skills": ["firecrawl"] },
     { "source": "coleam00/excalidraw-diagram-skill", "skills": [] },
-    { "source": "browser-use/browser-harness", "skills": ["browser"] }
+    { "source": "browser-use/browser-harness", "skills": ["browser"] },
+    { "source": "vercel-labs/agent-browser", "skills": ["agent-browser"] }
   ],
   "packages": [
     "npm:@danchamorro/pi-agent-modes",
