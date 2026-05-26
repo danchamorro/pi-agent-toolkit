@@ -141,7 +141,7 @@ pi install npm:@danchamorro/pi-agent-modes
 pi install npm:@danchamorro/pi-prompt-enhancer
 pi install npm:pi-design-deck
 pi install npm:pi-annotate
-pi install npm:pi-subagents
+pi install git:github.com/HazAT/pi-interactive-subagents
 pi install npm:pi-intercom
 pi install git:https://github.com/badlogic/pi-diff-review
 ```
@@ -159,7 +159,7 @@ pi install git:https://github.com/badlogic/pi-diff-review
 |---|---|---|
 | `pi-design-deck` | Present multi-slide visual decision decks with high-fidelity previews. Bundles the `design-deck` skill used in this setup. | [nicobailon/pi-design-deck](https://github.com/nicobailon/pi-design-deck) |
 | `pi-annotate` | Visual browser annotation for AI-assisted UI debugging. Adds `/annotate` plus companion Chrome extension tooling. | [nicobailon/pi-annotate](https://github.com/nicobailon/pi-annotate) |
-| `pi-subagents` | Delegate work to subagents with single, chain, and parallel execution modes. Ships built-in agent definitions like `scout`, `planner`, `worker`, and `reviewer`. | [nicobailon/pi-subagents](https://github.com/nicobailon/pi-subagents) |
+| `pi-interactive-subagents` | Spawn async subagents in multiplexer panes while the main session keeps working. Adds the `subagent` family of tools plus `/plan`, `/iterate`, and `/subagent` workflows. | [HazAT/pi-interactive-subagents](https://github.com/HazAT/pi-interactive-subagents) |
 | `pi-intercom` | Direct 1:1 messaging between Pi sessions on the same machine, with an `intercom` tool plus `/intercom` and `Alt+M` UI entry points. | [nicobailon/pi-intercom](https://github.com/nicobailon/pi-intercom) |
 | `pi-diff-review` | Native diff review window for Pi. Adds a `/diff-review` command that opens changed files in a Monaco diff editor and turns review notes into a prompt back in Pi. | [badlogic/pi-diff-review](https://github.com/badlogic/pi-diff-review) |
 
@@ -307,7 +307,7 @@ Prompt templates live in `dotfiles/prompts/` and are installed to
 | Prompt | Description |
 |--------|-------------|
 | `implementation-plan` | Convert an existing plan into actionable, committable checklist phases and write the result to a new Markdown file. |
-| `orchestrate` | Orchestrate a task using `pi-subagents` and `intercom`, keeping planning and final synthesis in the current session while delegating focused work to subagents. |
+| `orchestrate` | Orchestrate a task using `pi-interactive-subagents`, keeping planning and final synthesis in the current session while delegating focused work to async subagents. |
 
 ### Themes (1)
 

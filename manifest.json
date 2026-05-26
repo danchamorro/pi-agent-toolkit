@@ -35,7 +35,7 @@
     "npm:@danchamorro/pi-prompt-enhancer",
     "npm:pi-design-deck",
     "npm:pi-annotate",
-    "npm:pi-subagents",
+    "git:github.com/HazAT/pi-interactive-subagents",
     "npm:pi-intercom",
     "git:https://github.com/badlogic/pi-diff-review"
   ]
