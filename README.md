@@ -1,9 +1,10 @@
 # pi-agent-toolkit
 
-Extensions, skills, and configs for the
-[Pi](https://github.com/earendil-works/pi) coding agent. My versioned
-backup so I can restore or sync my setup across machines, and a reference
-for anyone looking to customize their own Pi environment.
+My personal, versioned setup for the
+[Pi](https://github.com/earendil-works/pi) coding agent, with extensions,
+skills, configs, safety guardrails, and installable packages. This is a
+public backup and reference for how I organize my own agent environment,
+not a universal starter kit intended to be cloned unchanged by everyone.
 
 Includes 25 extensions, 27 skills, 2 prompt templates, 1 theme,
 7 installable Pi packages, MCP server configurations, and safety guardrails.
@@ -22,8 +23,9 @@ cd pi-agent-toolkit
 node setup.mjs
 ```
 
-This copies everything into the right Pi directories. Template configs
-(`auth.json`, `mcp.json`) are created only if they don't already exist.
+This copies everything into the right Pi and Claude Code directories.
+Template configs (`auth.json`, `mcp.json`) are created only if they don't
+already exist.
 
 For full functionality on a new machine, review the prerequisites in
 [`dotfiles/SETUP.md`](dotfiles/SETUP.md). Some helper tools, including
@@ -33,7 +35,7 @@ security, are documented there rather than installed by this repo.
 Skip external skills or packages if you don't want them:
 
 ```bash
-node setup.mjs --skip-external --skip-packages
+npm run setup -- --skip-external --skip-packages
 ```
 
 ### For development (link mode)
@@ -41,28 +43,47 @@ node setup.mjs --skip-external --skip-packages
 Symlink files so edits in the repo are immediately visible to Pi:
 
 ```bash
-node setup.mjs --link
+npm run link
 ```
 
 Re-run any time to pick up new files or clean dangling symlinks. Template
 configs with secrets are never symlinked.
 
+Day to day personal skill workflow:
+
+1. Create or edit a skill under `dotfiles/personal-skills/<category>/<skill>/`.
+2. Run `npm run dev:sync`.
+3. Reload Pi or Claude Code if the running agent does not pick up new skills automatically.
+
+`dev:sync` uses link mode and skips external skills and Pi package refreshes.
+
 ### Syncing local changes back
 
-Built an extension or skill directly in `~/.pi/agent/`? Pull it into the
-repo:
+Built an extension, Pi-only skill, prompt, agent, or theme directly in
+`~/.pi/agent/`? Pull it into the repo:
 
 ```bash
 node setup.mjs sync
 ```
 
-This finds unmanaged files (not symlinks, not external skills), offers to
-move them into `dotfiles/`, and replaces the original with a symlink.
-Use `--all` to skip the interactive prompts.
+This finds unmanaged files in Pi-owned directories (not symlinks, not
+external skills), offers to move them into `dotfiles/`, and replaces the
+original with a symlink. Use `--all` to skip the interactive prompts.
+
+`setup.mjs sync` is intentionally not category-aware in v1 and no longer
+scans `~/.agents/skills/`. Create personal skills directly under
+`dotfiles/personal-skills/<category>/`, then run `npm run dev:sync`.
 
 ### Full usage
 
 ```
+npm run setup                     Copy mode (for users / new machines)
+npm run link                      Symlink mode (for development)
+npm run dev:sync                  Link repo files, skip external skills and packages
+npm run update:third-party        Reinstall external skills and Pi packages
+npm run update:skills             Reinstall external skills only
+npm run update:packages           Reinstall Pi packages only
+
 node setup.mjs                    Copy mode (for users / new machines)
 node setup.mjs --link             Symlink mode (for development)
 node setup.mjs sync               Absorb local Pi files into the repo
@@ -173,20 +194,48 @@ full list with descriptions.
 
 ### Skills
 
-**Bundled skills** (10, committed to this repo):
+This repo distinguishes several skill types so each one has one clear owner
+and install path:
+
+- **Personal skills** are user-authored skills committed to this repo under
+  `dotfiles/personal-skills/<category>/<skill>/`. They install to
+  `~/.agents/skills/<category>/<skill>` for Pi and flat to
+  `~/.claude/skills/<skill>` for Claude Code, because Claude Code does not
+  discover nested skill directories. Repo-managed personal skills are not
+  linked into `~/.pi/agent/skills/`.
+- **Pi-only skills** live under `dotfiles/agent-skills/` and install to
+  `~/.pi/agent/skills/`. Use these for Pi-specific workflows that should not
+  be shared with Claude Code.
+- **Project-local skills** belong in a project's own agent configuration,
+  not in this personal setup repo.
+- **Third-party skills** are listed in `manifest.json` and installed by
+  `npx skills add`. They are not committed here and may still be placed by
+  third-party tooling under `~/.agents/skills/` or `~/.pi/agent/skills/`.
+- **Package-provided skills** ship with installed Pi packages from
+  `manifest.json`.
+
+Setup refuses to delete non-symlink files or directories in skill install
+roots. Unmanaged and third-party directories are reported and left in place.
+
+**Personal skills** (9, committed to this repo):
+
+| Category | Skill | Description |
+|----------|-------|-------------|
+| `security-environment` | `1password-developer` | 1Password SSH agent, Environments, and op CLI workflows |
+| `planning` | `brainstorm` | Interview-driven plan stress-testing |
+| `developer-workflow` | `cli-detector` | Discover repo SaaS integrations and identify official provider CLIs for setup, debugging, and automation |
+| `engineering` | `code-structure-cleanup` | Behavior-preserving cleanup after working features have duplicated mechanics or messy structure |
+| `developer-workflow` | `gh-issue-creator` | Create GitHub issues via `gh` CLI |
+| `docs-communication` | `google-chat-cards-v2` | Google Chat Cards v2 notifications |
+| `planning` | `plan-reviewer` | Review implementation plans for evidence, trackability, dependencies, risks, and validation before execution |
+| `docs-communication` | `technical-docs` | Technical documentation standards |
+| `developer-workflow` | `whats-new` | Git changelog generation between branches |
+
+**Pi-only skills** (1, committed to this repo):
 
 | Skill | Description |
 |-------|-------------|
-| `1password-developer` | 1Password SSH agent, Environments, and op CLI workflows |
-| `brainstorm` | Interview-driven plan stress-testing |
-| `cli-detector` | Discover repo SaaS integrations and identify official provider CLIs for setup, debugging, and automation |
-| `code-structure-cleanup` | Behavior-preserving cleanup after working features have duplicated mechanics or messy structure |
 | `exa-search` | Semantic web search via Exa API |
-| `gh-issue-creator` | Create GitHub issues via `gh` CLI |
-| `google-chat-cards-v2` | Google Chat Cards v2 notifications |
-| `plan-reviewer` | Review implementation plans for evidence, trackability, dependencies, risks, and validation before execution |
-| `technical-docs` | Technical documentation standards |
-| `whats-new` | Git changelog generation between branches |
 
 **Package-provided skills** (1, installed via Pi packages):
 
@@ -275,13 +324,20 @@ Configured in `mcp.json` (created from template during setup):
 
 ### Extensions, skills, prompts, agents, and themes
 
-1. Create the file in `dotfiles/extensions/`, `dotfiles/agent-skills/`,
-   `dotfiles/global-skills/`, `dotfiles/prompts/`, `dotfiles/agents/`,
-   or `dotfiles/themes/`.
-2. If using `--link` mode, it's already live. Otherwise re-run `setup.mjs`.
-3. Commit and push.
+1. Create the file in the appropriate repo path:
+   - Personal skills: `dotfiles/personal-skills/<category>/<skill>/`
+   - Pi-only skills: `dotfiles/agent-skills/`
+   - Extensions: `dotfiles/extensions/`
+   - Prompts: `dotfiles/prompts/`
+   - Subagents: `dotfiles/agents/`
+   - Themes: `dotfiles/themes/`
+2. Run `npm run dev:sync` during development, or `npm run setup` for copy mode.
+3. Reload the relevant agent if needed.
+4. Commit and push.
 
-Or build locally in Pi, then absorb with `node setup.mjs sync`.
+Or build Pi-owned files locally in Pi, then absorb with `node setup.mjs sync`.
+Personal skills should be created directly in the repo because sync is not
+category-aware in v1.
 
 ### External skills
 

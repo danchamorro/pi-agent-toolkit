@@ -778,9 +778,11 @@ ${BOLD}What it does:${RESET}
   Link mode symlinks files so edits in the repo are immediately visible to Pi.
   Good for development. Re-run to pick up new files or clean dangling symlinks.
 
-  Sync scans Pi directories for files not managed by the repo (not symlinks,
-  not external skills). Offers to move them into dotfiles/ and replace with
-  symlinks. Use after building an extension or skill locally in Pi.
+  Sync scans Pi-owned directories for files not managed by the repo (not
+  symlinks, not external skills). Offers to move them into dotfiles/ and
+  replace with symlinks. It does not scan ~/.agents/skills/ and is not
+  category-aware in v1. Create personal skills directly under
+  dotfiles/personal-skills/<category>/<skill>/, then run npm run dev:sync.
 
   Set PI_AGENT_TOOLKIT_HOME=/tmp/safe-home to rebase install targets under a
   throwaway home during validation. This writes to $PI_AGENT_TOOLKIT_HOME/.pi,
