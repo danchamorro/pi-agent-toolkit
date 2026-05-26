@@ -9,7 +9,8 @@
  * Shortcut: none.
  */
 
-import { basename } from "node:path";
+import { readFile, stat } from "node:fs/promises";
+import { basename, resolve } from "node:path";
 
 import type {
   ExtensionAPI,
@@ -30,6 +31,7 @@ const REASON_INTERACTIVE_REQUIRED =
 const REASON_PR_CREATE_DENIED = "gh pr create blocked: approval denied.";
 const REASON_PR_MERGE_DENIED = "gh pr merge blocked: approval denied.";
 const REASON_PUSH_DENIED = "git push blocked: approval denied.";
+const MAX_PR_BODY_FILE_BYTES = 256 * 1024;
 
 const PROTECTED_BRANCHES = new Set([
   "main",
@@ -49,6 +51,9 @@ interface PrCreateMetadata {
   isDraft: boolean;
   reviewers: string[];
   body: string | null;
+  bodyFile: string | null;
+  bodySource: "inline" | "file" | null;
+  bodyFileError: string | null;
 }
 
 interface PrMergeMetadata {
@@ -232,6 +237,10 @@ function consumeOptionValue(
     return { value: token.slice(longFlag.length + 1), skip: 1 };
   }
 
+  if (shortFlag.length === 2 && token.startsWith(shortFlag) && token.length > shortFlag.length) {
+    return { value: token.slice(shortFlag.length), skip: 1 };
+  }
+
   return { value: null, skip: 0 };
 }
 
@@ -246,6 +255,9 @@ function parsePrCreate(tokens: string[]): PrCreateMetadata | null {
   let head: string | null = null;
   let isDraft = false;
   let body: string | null = null;
+  let bodyFile: string | null = null;
+  let bodySource: "inline" | "file" | null = null;
+  let bodyFileError: string | null = null;
   const reviewers: string[] = [];
 
   for (let i = 0; i < args.length; i += 1) {
@@ -261,7 +273,24 @@ function parsePrCreate(tokens: string[]): PrCreateMetadata | null {
     if (headOpt.skip) { head = headOpt.value; i += headOpt.skip - 1; continue; }
 
     const bodyOpt = consumeOptionValue(args, i, "-b", "--body");
-    if (bodyOpt.skip) { body = bodyOpt.value; i += bodyOpt.skip - 1; continue; }
+    if (bodyOpt.skip) {
+      body = bodyOpt.value;
+      bodyFile = null;
+      bodySource = "inline";
+      bodyFileError = null;
+      i += bodyOpt.skip - 1;
+      continue;
+    }
+
+    const bodyFileOpt = consumeOptionValue(args, i, "-F", "--body-file");
+    if (bodyFileOpt.skip) {
+      body = null;
+      bodyFile = bodyFileOpt.value;
+      bodySource = "file";
+      bodyFileError = null;
+      i += bodyFileOpt.skip - 1;
+      continue;
+    }
 
     const revOpt = consumeOptionValue(args, i, "-r", "--reviewer");
     if (revOpt.skip) { if (revOpt.value) reviewers.push(revOpt.value); i += revOpt.skip - 1; continue; }
@@ -269,7 +298,7 @@ function parsePrCreate(tokens: string[]): PrCreateMetadata | null {
     if (token === "-d" || token === "--draft") { isDraft = true; continue; }
   }
 
-  return { title, base, head, isDraft, reviewers, body };
+  return { title, base, head, isDraft, reviewers, body, bodyFile, bodySource, bodyFileError };
 }
 
 function parsePrMerge(tokens: string[]): PrMergeMetadata | null {
@@ -374,6 +403,48 @@ function parsePrOperation(command: string): PrOperation | null {
 }
 
 // ---------------------------------------------------------------------------
+// Body-file loading
+// ---------------------------------------------------------------------------
+
+async function hydratePrCreateBodyFile(op: PrOperation, cwd: string): Promise<void> {
+  if (op.kind !== "pr-create") return;
+
+  const meta = op.metadata;
+  if (meta.bodySource !== "file") return;
+
+  if (!meta.bodyFile) {
+    meta.bodyFileError = "PR body file path is missing. Provide a file path after --body-file.";
+    return;
+  }
+
+  if (meta.bodyFile === "-") {
+    meta.bodyFileError = "PR body file '-' reads from stdin and cannot be validated. Use a real file path.";
+    return;
+  }
+
+  const filePath = resolve(cwd, meta.bodyFile);
+
+  try {
+    const fileInfo = await stat(filePath);
+    if (!fileInfo.isFile()) {
+      meta.bodyFileError = `PR body file is not a regular file: ${meta.bodyFile}`;
+      return;
+    }
+
+    if (fileInfo.size > MAX_PR_BODY_FILE_BYTES) {
+      meta.bodyFileError = `PR body file is too large (${fileInfo.size} bytes; limit ${MAX_PR_BODY_FILE_BYTES} bytes): ${meta.bodyFile}`;
+      return;
+    }
+
+    meta.body = await readFile(filePath, "utf8");
+    meta.bodyFileError = null;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    meta.bodyFileError = `Unable to read PR body file ${meta.bodyFile}: ${message}`;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Validation
 // ---------------------------------------------------------------------------
 
@@ -402,11 +473,17 @@ function validatePrCreate(meta: PrCreateMetadata): ValidationResult {
     });
   }
 
-  if (!meta.body || meta.body.trim().length === 0) {
+  if (meta.bodyFileError) {
     issues.push({
       level: "error",
-      message:
-        "PR body is missing. Add --body explaining what changed and why.",
+      message: meta.bodyFileError,
+    });
+  } else if (!meta.body || meta.body.trim().length === 0) {
+    issues.push({
+      level: "error",
+      message: meta.bodySource === "file"
+        ? `PR body file is empty: ${meta.bodyFile ?? "(missing file path)"}. Add content explaining what changed and why.`
+        : "PR body is missing. Add --body or --body-file explaining what changed and why.",
     });
   } else if (meta.body.trim().length < 20) {
     issues.push({
@@ -594,6 +671,9 @@ function appendPrCreateReview(
   appendKeyValue(lines, theme, "Draft", meta.isDraft ? "yes" : "no", width);
   appendKeyValue(lines, theme, "Reviewers", reviewers, width);
   appendKeyValue(lines, theme, "Body", bodySummary, width);
+  if (meta.bodyFile) {
+    appendKeyValue(lines, theme, "Body file", meta.bodyFile, width);
+  }
 
   appendSectionHeader(lines, theme, "Checklist");
   lines.push("  " + statusMark(theme, Boolean(meta.title?.trim()), "Title present"));
@@ -723,6 +803,9 @@ function buildPrCreatePrompt(meta: PrCreateMetadata): string {
   lines.push(`  Draft: ${meta.isDraft ? "yes" : "no"}`);
   if (meta.reviewers.length > 0) {
     lines.push(`  Reviewers: ${meta.reviewers.join(", ")}`);
+  }
+  if (meta.bodyFile) {
+    lines.push(`  Body file: ${meta.bodyFile}`);
   }
   if (meta.body) {
     const preview = meta.body.length > 80 ? meta.body.slice(0, 80) + "..." : meta.body;
@@ -906,6 +989,7 @@ export default function prApprovalExtension(pi: ExtensionAPI) {
     const op = parsePrOperation(command);
     if (!op || !shouldGate(op)) return;
 
+    await hydratePrCreateBodyFile(op, ctx.cwd);
     const validation = validateOperation(op);
 
     if (validation.hasErrors) {
@@ -940,6 +1024,7 @@ export default function prApprovalExtension(pi: ExtensionAPI) {
     const op = parsePrOperation(command);
     if (!op || !shouldGate(op)) return;
 
+    await hydratePrCreateBodyFile(op, ctx.cwd);
     const validation = validateOperation(op);
 
     if (!ctx.hasUI) {

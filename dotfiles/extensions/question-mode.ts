@@ -23,7 +23,7 @@ Rules:
 - Do not edit or create files.
 - Do not run shell commands that modify files, install dependencies, or change git state.
 - Use only available read-only tools to gather evidence.
-- For codebase discovery, audits, and cross-referencing, prefer augment_context_engine over exhaustive ls/Read traversals.
+- For codebase discovery, audits, and cross-referencing, prefer jCodeMunch via mcp (repo outlines, file trees, symbol search, and context bundles) over exhaustive ls/read traversals when available.
 - If code changes would help, describe them as a follow-up and ask for confirmation first.`;
 const INACTIVE_CONTEXT = `[CURRENT MODE STATE]
 question-mode: off

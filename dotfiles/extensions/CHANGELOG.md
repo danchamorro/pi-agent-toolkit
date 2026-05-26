@@ -2,6 +2,19 @@
 
 All notable changes to extensions in `~/.pi/agent/extensions/`.
 
+## 2026-05-26
+
+### pr-approval.ts
+
+- Added `gh pr create --body-file` support so the approval gate reads,
+  validates, and previews PR bodies supplied from files before allowing the
+  command.
+
+### question-mode.ts
+
+- Updated read-only discovery guidance to prefer jCodeMunch MCP repo outlines,
+  file trees, symbol search, and context bundles over exhaustive file traversal.
+
 ## 2026-05-24
 
 ### damage-control/
