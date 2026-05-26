@@ -280,6 +280,18 @@ If a legitimate command is blocked:
 3. Each skill directory must contain a `SKILL.md` file.
 4. Restart Pi after adding new skills.
 
+### Subagent overrides not appearing
+
+This setup uses `pi-interactive-subagents`. Agent discovery priority is
+project `.pi/agents/`, then global `~/.pi/agent/agents/`, then bundled
+package agents. Put project-specific overrides in `.pi/agents/`; keep
+shared global overrides in this repo under `dotfiles/agents/` and run
+`npm run dev:sync` or `npm run setup`.
+
+Do not edit installed package source files. To override a bundled agent,
+copy the full Markdown agent file into the higher-priority location and
+change the frontmatter there.
+
 ### npm install fails in damage-control
 
 The `damage-control/` extension has its own `package.json`. `setup.mjs`
