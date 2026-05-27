@@ -10,7 +10,7 @@ appropriate agent paths. External skills are tracked separately in
 
 ```
 dotfiles/
-  extensions/ ............. 24 extensions (.ts files and subdirectories)
+  extensions/ ............. 26 extensions (.ts files and subdirectories)
   agent-skills/ ........... Pi-only skills        (-> ~/.pi/agent/skills/)
   personal-skills/ ........ Personal skills       (-> ~/.agents/skills/<category>/<skill> and ~/.claude/skills/<skill>)
   prompts/ ................ Prompt templates      (-> ~/.pi/agent/prompts/)
@@ -62,47 +62,8 @@ roots. Third-party and unmanaged directories are reported and left in place.
 
 ## Extensions
 
-### Internalized from mitsuhiko/agent-stuff
-
-Forked from commit `3bf6bd3` of [mitsuhiko/agent-stuff](https://github.com/mitsuhiko/agent-stuff).
-All 9 extensions are self-contained in this repo (no upstream package reference).
-
-| Extension | Origin | Notes |
-|-----------|--------|-------|
-| `btw.ts` | Forked | Fixed `getApiKey` -> `getApiKeyAndHeaders`. Added scroll support. |
-| `control.ts` | Forked | Fixed `getApiKey` calls in summarization and RPC handler. |
-| `loop.ts` | Forked | Fixed `getApiKey` calls in summary model and breakout condition. |
-| `context.ts` | Ported | Context management from upstream. |
-| `files.ts` | Ported | File operation tools from upstream. |
-| `review.ts` | Ported | Code review extension from upstream. |
-| `session-breakdown.ts` | Ported | Session cost/usage breakdown from upstream. |
-| `todos.ts` | Ported | File-based todo management from upstream. |
-| `uv.ts` | Ported | Python/uv integration. Depends on `intercepted-commands/`. |
-
-### Original extensions
-
-| Extension | Purpose |
-|-----------|---------|
-| `term-notify.ts` | Desktop notification on agent completion (cmux + OSC 777 fallback) |
-| `commit-approval.ts` | Interactive commit approval workflow |
-| `pr-approval.ts` | Interactive PR approval workflow |
-| `dirty-repo-guard.ts` | Warns when working in a repo with uncommitted changes |
-| `require-session-name-on-exit.ts` | Prompts for a session name before guarded quit commands and safe-exit shortcuts |
-| `exa-enforce.ts` | Enforces Exa usage for web search |
-| `exa-search-tool.ts` | Registers Exa as a search tool |
-| `qna-interactive.ts` | Interactive Q&A mode |
-| `question-mode.ts` | Question-only mode (no file changes) |
-| `clean-sessions.ts` | Prunes old, low-value session files |
-| `find-session.ts` | Search past Pi sessions with LLM ranking and one-step resume |
-| `coach.ts` | Recommends underused Pi workflows based on session habits |
-| `tilldone.ts` | Task list management with progress tracking |
-| `tools.ts` | Custom tool registrations |
-
-### Directory-based extensions
-
-| Extension | Purpose |
-|-----------|---------|
-| `damage-control/` | Safety guardrail engine. Loads `damage-control-rules.yaml` and enforces bash command patterns, path access rules, and delete protections. Has its own `package.json` (deps installed automatically). |
+See the [root README Extensions section](../README.md#extensions-26) for the
+full list with descriptions.
 
 ## Safety guardrails (Damage Control)
 
@@ -134,6 +95,7 @@ is never committed:
 | [Postgres MCP](https://github.com/crystaldba/postgres-mcp) | Read-only PostgreSQL access. Runs in Docker with `--access-mode=restricted`. Uses `"lifecycle": "lazy"`. | `docker run crystaldba/postgres-mcp` |
 | [MariaDB MCP](https://github.com/MariaDB/mcp) | Read-only MariaDB or MySQL access. Runs via `uvx` with a local connection and optional `MCP_READ_ONLY=true`. | `uvx --from iflow-mcp_mariadb-mariadb-server mariadb-server` |
 | [chrome-devtools](https://github.com/nicobailon/chrome-devtools-mcp) | Browser automation via Chrome DevTools Protocol. | `npx chrome-devtools-mcp@latest` |
+| [Tirith](https://tirith.sh/) | Local security checks for commands, URLs, pasted content, files, directories, and MCP configs. | `tirith mcp-server` |
 
 [pi-mcp-adapter](https://github.com/nicobailon/pi-mcp-adapter) is not an
 MCP server. It is a Pi extension that improves how MCP tool responses are

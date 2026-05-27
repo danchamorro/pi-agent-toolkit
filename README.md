@@ -6,8 +6,8 @@ skills, configs, safety guardrails, and installable packages. This is a
 public backup and reference for how I organize my own agent environment,
 not a universal starter kit intended to be cloned unchanged by everyone.
 
-Includes 25 extensions, 43 skills, 2 prompt templates, 1 theme,
-7 installable Pi packages, MCP server configurations, and safety guardrails.
+Includes 26 extensions, 43 skills, 1 prompt template, 1 theme,
+5 installable Pi packages, MCP server configurations, and safety guardrails.
 
 ---
 
@@ -158,11 +158,9 @@ pi install git:https://github.com/badlogic/pi-diff-review
 | `pi-annotate` | Visual browser annotation for AI-assisted UI debugging. Adds `/annotate` plus companion Chrome extension tooling. | [nicobailon/pi-annotate](https://github.com/nicobailon/pi-annotate) |
 | `pi-diff-review` | Native diff review window for Pi. Adds a `/diff-review` command that opens changed files in a Monaco diff editor and turns review notes into a prompt back in Pi. | [badlogic/pi-diff-review](https://github.com/badlogic/pi-diff-review) |
 
-### Extensions (25)
+### Extensions (26)
 
-All extensions live in `dotfiles/extensions/`. See
-[dotfiles/extensions/README.md](dotfiles/extensions/README.md) for the
-full list with descriptions.
+All extensions live in `dotfiles/extensions/`.
 
 **Safety and workflow:**
 
@@ -203,6 +201,12 @@ full list with descriptions.
 | `clean-sessions.ts` | Prunes old, low-value session files |
 | `inventory.ts` | Reopens Pi's startup-style resource inventory as a tabbed TUI overlay with scope grouping and descriptions |
 | `uv.ts` | Intercepts pip/python calls and redirects to uv |
+
+**Terminal integration:**
+
+| Extension | What it does |
+|-----------|-------------|
+| `warp-split-fork.ts` | Forks the current Pi session into Warp via `/warp-tab-fork` (new tab) or `/warp-pane-fork` (new pane, macOS experimental) |
 
 ### Skills
 
@@ -310,12 +314,12 @@ default; pick one via `/settings` or set `"theme"` in your local
 |------|---------|
 | `AGENTS.md` | Global agent rules: git safety, commit style, code style, path discipline |
 | `APPEND_SYSTEM.md` | System prompt: reasoning quality, jCodeMunch policies, documentation lookup, writing style |
-| `settings.json` | Pi settings: default provider/model, enabled models, compaction. Mutated by Pi at runtime; gitignored. |
+| `settings.json` | Pi settings: default provider/model, enabled models, compaction. Live-only at `~/.pi/agent/`; mutated by Pi at runtime and gitignored (not shipped in this repo). |
 | `models.json` | Custom provider definitions (e.g., local models via Ollama) |
 | `agent-modes.json` | Per-mode model/thinking overrides for debug, review, etc. |
 | `damage-control-rules.yaml` | Safety rules: bash patterns, path access, delete protection |
-| `auth.json` | Provider API keys (created from template, never committed) |
-| `mcp.json` | MCP server configuration (created from template, never committed) |
+| `auth.json.template` | Template for `auth.json` (provider API keys). Setup copies to live `~/.pi/agent/auth.json` on first run; never committed. |
+| `mcp.json.template` | Template for `mcp.json` (MCP server configuration). Setup copies to live `~/.pi/agent/mcp.json` on first run; never committed. |
 
 ### MCP servers
 
@@ -355,7 +359,7 @@ After adding the file:
 
 If you already built the component outside the repo:
 
-- In `~/.pi/agent/extensions`, `skills`, `prompts`, `agents`, or `themes`, run
+- In `~/.pi/agent/extensions`, `skills`, `prompts`, or `themes`, run
   `node setup.mjs sync` and accept the items you want to absorb. The script
   moves them into `dotfiles/` and symlinks the live files back to the repo.
 - In `~/.agents/skills` or `~/.claude/skills`, move the skill manually into
