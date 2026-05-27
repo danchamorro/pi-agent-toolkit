@@ -4,6 +4,16 @@ All notable changes to extensions in `~/.pi/agent/extensions/`.
 
 ## 2026-05-26
 
+### warp-split-fork.ts
+
+- Added `/warp-tab-fork [optional prompt]` to fork the current Pi session into a
+  new named Warp tab using a generated tab config and Warp's URL handler.
+- Added experimental `/warp-pane-fork [optional prompt]` to fork into a new pane
+  in the current Warp tab via macOS UI automation, with clipboard restoration.
+- Forwarded safe parent Pi startup flags, including model, thinking, tool,
+  resource, agent-mode, MCP config, and session-control flags, into spawned
+  Warp forks while excluding one-shot session targeting flags and API keys.
+
 ### pr-approval.ts
 
 - Added `gh pr create --body-file` support so the approval gate reads,
