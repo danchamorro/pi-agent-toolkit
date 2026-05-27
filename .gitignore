@@ -5,6 +5,9 @@ node_modules/
 dist/
 *.tgz
 
+# Local scratch scripts
+scripts/
+
 # OS artifacts
 .DS_Store
 

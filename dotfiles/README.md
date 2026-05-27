@@ -14,7 +14,6 @@ dotfiles/
   agent-skills/ ........... Pi-only skills        (-> ~/.pi/agent/skills/)
   personal-skills/ ........ Personal skills       (-> ~/.agents/skills/<category>/<skill> and ~/.claude/skills/<skill>)
   prompts/ ................ Prompt templates      (-> ~/.pi/agent/prompts/)
-  agents/ ................. Subagent overrides    (-> ~/.pi/agent/agents/)
   intercepted-commands/ ... Python/pip shims (uv.ts dependency)
   Config files ............ AGENTS.md, APPEND_SYSTEM.md, models.json, etc.
 ```
@@ -42,36 +41,11 @@ scans `~/.agents/skills/`. Create personal skills directly under
 Setup refuses to delete non-symlink files or directories in skill install
 roots. Third-party and unmanaged directories are reported and left in place.
 
-## Subagent overrides
-
-This setup uses `pi-interactive-subagents` for visible, interruptible,
-async subagent panes. Completed subagents report back to the parent session
-automatically, and `caller_ping` handles child-to-parent help requests.
-Intercom is no longer part of the default subagent workflow. Agent files in
-`dotfiles/agents/` install to `~/.pi/agent/agents/` and override bundled
-package agents without editing installed package source. Project
-`.pi/agents/` files have higher priority than these global overrides;
-bundled package agents are the fallback.
-
-Default Pi-backed agents use Codex. The bundled `claude-code` agent remains
-available for explicit Claude Code workflows only.
-
-| Agent | Source | Model / thinking | Purpose |
-|-------|--------|------------------|---------|
-| `scout` | global override | `openai-codex/gpt-5.5` / `off` | Fast read-only codebase reconnaissance. |
-| `planner` | global override | `openai-codex/gpt-5.5` / `high` | Interactive requirements, approach, plan, and todo creation. |
-| `worker` | global override | `openai-codex/gpt-5.5` / `minimal` | Focused implementation and validation. |
-| `reviewer` | global override | `openai-codex/gpt-5.5` / `high` | Code review for quality, security, and correctness. |
-| `visual-tester` | global override | `openai-codex/gpt-5.5` / `minimal` | Browser visual QA and structured reports. |
-| `db-researcher` | global custom | `openai-codex/gpt-5.5` / `high` | Read-only MCP database investigation. |
-| `claude-code` | bundled package | Claude CLI `sonnet` | Reserved for explicit Claude Code delegation workflows. |
-
 ## Prompt templates
 
 | Prompt | Purpose |
 |--------|---------|
 | `implementation-plan.md` | Convert an existing plan into actionable, committable checklist phases and write the result to a new Markdown file. |
-| `orchestrate.md` | Orchestrate a task with `pi-interactive-subagents`, keeping planning and final synthesis in the current session while delegating focused work to async subagents. |
 
 ## Config files
 

@@ -81,7 +81,6 @@ const DIRECTORY_MAPS = [
   ["extensions", join(PI_AGENT_DIR, "extensions")],
   ["agent-skills", join(PI_AGENT_DIR, "skills")],
   ["prompts", join(PI_AGENT_DIR, "prompts")],
-  ["agents", join(PI_AGENT_DIR, "agents")],
   ["themes", join(PI_AGENT_DIR, "themes")],
 ];
 
@@ -616,7 +615,6 @@ async function runSync(absorbAll) {
     [join(PI_AGENT_DIR, "extensions"), "extensions", "extensions"],
     [join(PI_AGENT_DIR, "skills"), "agent-skills", "agent-skills"],
     [join(PI_AGENT_DIR, "prompts"), "prompts", "prompts"],
-    [join(PI_AGENT_DIR, "agents"), "agents", "agents"],
     [join(PI_AGENT_DIR, "themes"), "themes", "themes"],
   ];
 
@@ -770,7 +768,6 @@ ${BOLD}Flags (copy and link modes):${RESET}
 ${BOLD}What it does:${RESET}
 
   Copy mode copies files from dotfiles/ into ~/.pi/agent/ and ~/.agents/skills/.
-  Subagent overrides from dotfiles/agents/ install only to ~/.pi/agent/agents/.
   Categorized personal skills from dotfiles/personal-skills/<category>/<skill>/
   are installed into ~/.agents/skills/<category>/<skill> for Pi and as flat
   entries in ~/.claude/skills/<skill> for Claude Code. They are not installed

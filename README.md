@@ -76,7 +76,6 @@ paths:
 | `~/.pi/agent/extensions/` | `dotfiles/extensions/` |
 | `~/.pi/agent/skills/` | `dotfiles/agent-skills/` |
 | `~/.pi/agent/prompts/` | `dotfiles/prompts/` |
-| `~/.pi/agent/agents/` | `dotfiles/agents/` |
 | `~/.pi/agent/themes/` | `dotfiles/themes/` |
 
 It ignores existing symlinks and manifest-listed external skills, prompts
@@ -134,14 +133,13 @@ npm run update:packages   # Pi packages from manifest.json
 
 ### Packages (installable via pi)
 
-This setup installs six Pi packages via `manifest.json`:
+This setup installs five Pi packages via `manifest.json`:
 
 ```bash
 pi install npm:@danchamorro/pi-agent-modes
 pi install npm:@danchamorro/pi-prompt-enhancer
 pi install npm:pi-design-deck
 pi install npm:pi-annotate
-pi install git:github.com/HazAT/pi-interactive-subagents
 pi install git:https://github.com/badlogic/pi-diff-review
 ```
 
@@ -158,7 +156,6 @@ pi install git:https://github.com/badlogic/pi-diff-review
 |---|---|---|
 | `pi-design-deck` | Present multi-slide visual decision decks with high-fidelity previews. Bundles the `design-deck` skill used in this setup. | [nicobailon/pi-design-deck](https://github.com/nicobailon/pi-design-deck) |
 | `pi-annotate` | Visual browser annotation for AI-assisted UI debugging. Adds `/annotate` plus companion Chrome extension tooling. | [nicobailon/pi-annotate](https://github.com/nicobailon/pi-annotate) |
-| `pi-interactive-subagents` | Spawn async subagents in multiplexer panes while the main session keeps working. Adds the `subagent` family of tools plus `/plan`, `/iterate`, `/subagent`, built-in completion return, and `caller_ping` for child-to-parent help requests. | [HazAT/pi-interactive-subagents](https://github.com/HazAT/pi-interactive-subagents) |
 | `pi-diff-review` | Native diff review window for Pi. Adds a `/diff-review` command that opens changed files in a Monaco diff editor and turns review notes into a prompt back in Pi. | [badlogic/pi-diff-review](https://github.com/badlogic/pi-diff-review) |
 
 ### Extensions (25)
@@ -287,40 +284,7 @@ Not committed to this repo. Maintained by their original authors.
 | `browser` | [browser-use/browser-harness](https://github.com/browser-use/browser-harness) |
 | `agent-browser` | [vercel-labs/agent-browser](https://github.com/vercel-labs/agent-browser) |
 
-### Subagents
-
-This setup uses `pi-interactive-subagents` for visible, interruptible,
-async subagent panes. Completed subagents report back to the parent session
-automatically, and `caller_ping` handles child-to-parent help requests.
-Intercom is no longer part of the default subagent workflow. The package
-ships bundled agent definitions and this repo overrides selected bundled
-agents by installing full Markdown files from `dotfiles/agents/` into
-`~/.pi/agent/agents/`. Do not edit installed package source files for local
-preferences.
-
-Agent discovery priority is:
-
-1. Project-local `.pi/agents/`
-2. Global `~/.pi/agent/agents/`
-3. Bundled package agents
-
-That means a project can override this global toolkit by adding a matching
-agent file under its own `.pi/agents/` directory.
-
-Default Pi-backed agents use Codex. Keep the bundled `claude-code` agent
-available only for explicit Claude Code workflows.
-
-| Agent | Source | Model / thinking | Description |
-|-------|--------|------------------|-------------|
-| `scout` | global override | `openai-codex/gpt-5.5` / `off` | Fast read-only codebase reconnaissance. |
-| `planner` | global override | `openai-codex/gpt-5.5` / `high` | Interactive planning agent for requirements, approach, plan, and todos. |
-| `worker` | global override | `openai-codex/gpt-5.5` / `minimal` | Focused implementation agent for scoped todos and validation. |
-| `reviewer` | global override | `openai-codex/gpt-5.5` / `high` | Code review agent for quality, security, and correctness. |
-| `visual-tester` | global override | `openai-codex/gpt-5.5` / `minimal` | Visual QA agent for browser UI testing and reports. |
-| `db-researcher` | global custom | `openai-codex/gpt-5.5` / `high` | Read-only database investigation agent for MCP-connected databases. |
-| `claude-code` | bundled package | Claude CLI `sonnet` | Reserved for explicit Claude Code delegation workflows. |
-
-### Prompt templates (2)
+### Prompt templates (1)
 
 Prompt templates live in `dotfiles/prompts/` and are installed to
 `~/.pi/agent/prompts/` by `setup.mjs`.
@@ -328,7 +292,6 @@ Prompt templates live in `dotfiles/prompts/` and are installed to
 | Prompt | Description |
 |--------|-------------|
 | `implementation-plan` | Convert an existing plan into actionable, committable checklist phases and write the result to a new Markdown file. |
-| `orchestrate` | Orchestrate a task using `pi-interactive-subagents`, keeping planning and final synthesis in the current session while delegating focused work to async subagents. |
 
 ### Themes (1)
 
@@ -370,7 +333,7 @@ Configured in `mcp.json` (created from template during setup):
 
 ## How to add new components
 
-### Extensions, skills, prompts, agents, and themes
+### Extensions, skills, prompts, and themes
 
 Start in the repo whenever possible. Choose the owner path first, then link
 it into the live agent directories:
@@ -381,7 +344,6 @@ it into the live agent directories:
 | Pi-only skill | `dotfiles/agent-skills/<skill>/` | `~/.pi/agent/skills/<skill>/` | Use for workflows that depend on Pi-only tools or UI. |
 | Personal skill | `dotfiles/personal-skills/<category>/<skill>/` | `~/.agents/skills/<category>/<skill>/` and `~/.claude/skills/<skill>/` | Use for skills shared by Pi and Claude Code. These are not installed into `~/.pi/agent/skills/`. |
 | Prompt template | `dotfiles/prompts/<prompt>.md` | `~/.pi/agent/prompts/` | Keep reusable prompts here instead of scattering local copies. |
-| Subagent | `dotfiles/agents/<agent>.md` | `~/.pi/agent/agents/` | Use for reusable custom agents and full-file overrides of bundled `pi-interactive-subagents` agents. Prefer project `.pi/agents/` for project-specific overrides. |
 | Theme | `dotfiles/themes/<theme>.json` | `~/.pi/agent/themes/` | Available after sync, but not automatically activated. |
 
 After adding the file:
