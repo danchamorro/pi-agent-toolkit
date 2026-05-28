@@ -10,6 +10,10 @@
  * - /subagent stop <id> - stop a running sub-agent.
  * - /subagent reply <id> <feedback> - answer a sub-agent feedback request.
  *
+ * Tools:
+ * - start_subagent - let the main agent launch a role-specific background sub-agent.
+ *   The tool waits until the sub-agent finishes or needs feedback.
+ *
  * Shortcut: none.
  *
  * Adds a small Claude Code-style sub-agent MVP. Sub-agents run as in-process
@@ -40,7 +44,7 @@ import {
 	type Model,
 	type ThinkingLevel as AiThinkingLevel,
 } from "@earendil-works/pi-ai";
-import { truncateToWidth, visibleWidth, type Component } from "@earendil-works/pi-tui";
+import { Text, truncateToWidth, visibleWidth, type Component } from "@earendil-works/pi-tui";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -62,6 +66,21 @@ type FeedbackRequestDetails = {
 	requestId: string;
 	subagentId: string;
 	status: "answered" | "cancelled";
+};
+
+type StartSubagentDetails = {
+	subagentId?: string;
+	name?: string;
+	role?: string;
+	task?: string;
+	status: "started" | "waiting_for_feedback" | "completed" | "failed" | "stopped" | "error";
+	subagentStatus?: SubagentStatus;
+	command?: string;
+	availableRoles?: string[];
+	activity?: string;
+	elapsed?: string;
+	result?: string;
+	error?: string;
 };
 
 type RoleModelSpec = {
@@ -86,6 +105,8 @@ type ParsedStartArgs = {
 	name: string;
 	task: string;
 	role?: SubagentRole;
+	notifyOnStart?: boolean;
+	notifyOnCompletion?: boolean;
 };
 
 type SubagentRecord = {
@@ -105,6 +126,8 @@ type SubagentRecord = {
 	pendingFeedback?: FeedbackRequest;
 	feedbackSerial: number;
 	toolCalls: Map<string, { name: string; startedAt: number; status: "running" | "done" | "failed" }>;
+	completion?: Promise<void>;
+	notifyOnCompletion: boolean;
 };
 
 const SUBAGENT_MESSAGE_TYPE = "subagent-status";
@@ -136,6 +159,22 @@ const AskMainSessionParams = Type.Object({
 	context: Type.Optional(
 		Type.String({
 			description: "Brief context explaining why the sub-agent is blocked.",
+		}),
+	),
+});
+
+const StartSubagentParams = Type.Object({
+	role: Type.Optional(
+		Type.String({
+			description: "Optional bundled role to use: planner, reviewer, scout, or worker.",
+		}),
+	),
+	task: Type.String({
+		description: "The concrete task the sub-agent should work on.",
+	}),
+	name: Type.Optional(
+		Type.String({
+			description: "Optional display name. Defaults to the role name or a task-derived name.",
 		}),
 	),
 });
@@ -454,6 +493,10 @@ function hasStatus(record: SubagentRecord, status: SubagentStatus): boolean {
 
 function isActiveStatus(status: SubagentStatus): boolean {
 	return status === "starting" || status === "running" || status === "waiting for feedback";
+}
+
+function isWorkingStatus(status: SubagentStatus): boolean {
+	return status === "starting" || status === "running";
 }
 
 function isVisibleInWidget(record: SubagentRecord, now: number): boolean {
@@ -883,7 +926,7 @@ export default function (pi: ExtensionAPI) {
 		return [...new Set([...baseTools, "ask_main_session"])];
 	}
 
-	function resolveSubagentModel(ctx: ExtensionCommandContext, role?: SubagentRole): Model<any> {
+	function resolveSubagentModel(ctx: ExtensionContext, role?: SubagentRole): Model<any> {
 		if (!role?.model) {
 			if (!ctx.model) {
 				throw new Error("No active model selected.");
@@ -898,7 +941,40 @@ export default function (pi: ExtensionAPI) {
 		return model;
 	}
 
-	async function runSubagent(record: SubagentRecord, ctx: ExtensionCommandContext): Promise<void> {
+	function createSubagentRecord(parsed: ParsedStartArgs, ctx: ExtensionContext): SubagentRecord {
+		const record: SubagentRecord = {
+			id: `sa-${nextSubagentNumber++}`,
+			name: parsed.name,
+			task: parsed.task,
+			role: parsed.role,
+			status: "starting",
+			startedAt: Date.now(),
+			activity: "Queued.",
+			feedbackSerial: 0,
+			toolCalls: new Map(),
+			notifyOnCompletion: parsed.notifyOnCompletion ?? true,
+		};
+		records.set(record.id, record);
+		updateStatusWidget(ctx);
+
+		if (parsed.notifyOnStart ?? true) {
+			postStatusMessage(
+				[
+					`Started sub-agent ${record.name} (${record.id}).`,
+					record.role ? `Role: ${record.role.name}` : "",
+					`Task: ${record.task}`,
+				]
+					.filter(Boolean)
+					.join("\n\n"),
+			);
+		}
+		const completion = runSubagent(record, ctx);
+		record.completion = completion;
+		void completion;
+		return record;
+	}
+
+	async function runSubagent(record: SubagentRecord, ctx: ExtensionContext): Promise<void> {
 		try {
 			const model = resolveSubagentModel(ctx, record.role);
 			const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
@@ -950,7 +1026,9 @@ export default function (pi: ExtensionAPI) {
 			record.status = "completed";
 			record.finishedAt = Date.now();
 			markActivity(record, "Completed.");
-			postStatusMessage(`Sub-agent ${record.name} (${record.id}) completed.\n\n${record.result}`);
+			if (record.notifyOnCompletion) {
+				postStatusMessage(`Sub-agent ${record.name} (${record.id}) completed.\n\n${record.result}`);
+			}
 		} catch (error) {
 			if (record.status === "stopped") {
 				return;
@@ -959,7 +1037,9 @@ export default function (pi: ExtensionAPI) {
 			record.status = "failed";
 			record.finishedAt = Date.now();
 			markActivity(record, "Failed.");
-			postStatusMessage(`Sub-agent ${record.name} (${record.id}) failed.\n\n${record.error}`);
+			if (record.notifyOnCompletion) {
+				postStatusMessage(`Sub-agent ${record.name} (${record.id}) failed.\n\n${record.error}`);
+			}
 		} finally {
 			record.pendingFeedback?.cancel("The sub-agent is no longer running.");
 			updateRecordContextUsage(record);
@@ -978,30 +1058,152 @@ export default function (pi: ExtensionAPI) {
 			return;
 		}
 
-		const record: SubagentRecord = {
-			id: `sa-${nextSubagentNumber++}`,
-			name: parsed.name,
-			task: parsed.task,
-			role: parsed.role,
-			status: "starting",
-			startedAt: Date.now(),
-			activity: "Queued.",
-			feedbackSerial: 0,
-			toolCalls: new Map(),
-		};
-		records.set(record.id, record);
-		updateStatusWidget();
+		createSubagentRecord(parsed, ctx);
+	}
 
-		postStatusMessage(
-			[
-				`Started sub-agent ${record.name} (${record.id}).`,
-				record.role ? `Role: ${record.role.name}` : "",
-				`Task: ${record.task}`,
-			]
-				.filter(Boolean)
-				.join("\n\n"),
-		);
-		void runSubagent(record, ctx);
+	function statusForTool(record: SubagentRecord): StartSubagentDetails["status"] {
+		if (record.status === "waiting for feedback") {
+			return "waiting_for_feedback";
+		}
+		if (record.status === "starting" || record.status === "running") {
+			return "started";
+		}
+		return record.status;
+	}
+
+	function detailsForRecord(record: SubagentRecord): StartSubagentDetails {
+		return {
+			status: statusForTool(record),
+			subagentStatus: record.status,
+			subagentId: record.id,
+			name: record.name,
+			role: record.role?.name,
+			task: record.task,
+			command: `/subagent view ${record.id}`,
+			activity: record.activity,
+			elapsed: elapsedFor(record),
+			result: record.result,
+			error: record.error,
+		};
+	}
+
+	function formatStartSubagentCall(args: { role?: string; task?: string; name?: string }): string {
+		const role = args.role?.trim() || "default";
+		const name = args.name?.trim();
+		const task = args.task?.trim() || "(no task)";
+		return `start_subagent ${role}${name ? ` ${name}` : ""}: ${singleLine(task, 120)}`;
+	}
+
+	function formatStartSubagentSummary(details: StartSubagentDetails): string {
+		if (details.status === "error") {
+			return `start_subagent error: ${details.error ?? "unknown error"}`;
+		}
+
+		const id = details.subagentId ?? "?";
+		const name = details.name ?? "sub-agent";
+		const status = details.subagentStatus ?? details.status;
+		const task = details.task ? ` | ${singleLine(details.task, 100)}` : "";
+		return `${name} (${id}) ${status}${details.elapsed ? ` in ${details.elapsed}` : ""}${task}`;
+	}
+
+	function formatStartSubagentExpanded(details: StartSubagentDetails, contentText: string): string {
+		const lines = [
+			formatStartSubagentSummary(details),
+			details.command ? `Inspect: ${details.command}` : "",
+			details.activity ? `Latest: ${details.activity}` : "",
+		].filter(Boolean);
+
+		if (contentText.trim()) {
+			lines.push("", contentText.trim());
+		}
+
+		return lines.join("\n");
+	}
+
+	function waitForSubagentHandoff(record: SubagentRecord, signal: AbortSignal | undefined): Promise<void> {
+		if (!isWorkingStatus(record.status)) {
+			return Promise.resolve();
+		}
+
+		return new Promise((resolve, reject) => {
+			let settled = false;
+			let interval: ReturnType<typeof setInterval> | undefined;
+
+			const cleanup = () => {
+				if (interval) {
+					clearInterval(interval);
+				}
+				signal?.removeEventListener("abort", abortHandler);
+			};
+
+			const finish = () => {
+				if (settled) {
+					return;
+				}
+				settled = true;
+				cleanup();
+				resolve();
+			};
+
+			const fail = (error: Error) => {
+				if (settled) {
+					return;
+				}
+				settled = true;
+				cleanup();
+				reject(error);
+			};
+
+			const check = () => {
+				if (!isWorkingStatus(record.status)) {
+					finish();
+				}
+			};
+
+			const abortHandler = () => {
+				fail(new Error(`Stopped waiting for sub-agent ${record.id}; it is still ${record.status}.`));
+			};
+
+			if (signal?.aborted) {
+				abortHandler();
+				return;
+			}
+
+			signal?.addEventListener("abort", abortHandler, { once: true });
+			interval = setInterval(check, 250);
+			record.completion?.finally(check);
+			check();
+		});
+	}
+
+	async function startSubagentFromTool(
+		params: { role?: string; task: string; name?: string },
+		ctx: ExtensionContext,
+		signal: AbortSignal | undefined,
+	): Promise<StartSubagentDetails> {
+		const task = params.task.trim();
+		if (!task) {
+			return {
+				status: "error",
+				error: "task is required.",
+				availableRoles: roles.map((role) => role.name),
+			};
+		}
+
+		const roleName = params.role?.trim();
+		const role = roleName ? rolesByName.get(roleName.toLowerCase()) : undefined;
+		if (roleName && !role) {
+			return {
+				status: "error",
+				error: `Unknown sub-agent role "${roleName}".`,
+				availableRoles: roles.map((candidate) => candidate.name),
+			};
+		}
+
+		const displayName = params.name?.trim() || role?.name || deriveName(task);
+		const record = createSubagentRecord({ name: displayName, task, role, notifyOnStart: false, notifyOnCompletion: false }, ctx);
+		await waitForSubagentHandoff(record, signal);
+		return detailsForRecord(record);
 	}
 
 	async function stopSubagent(id: string, ctx: ExtensionCommandContext): Promise<void> {
@@ -1151,6 +1353,75 @@ export default function (pi: ExtensionAPI) {
 				default:
 					showStatusView("", ctx);
 			}
+		},
+	});
+
+	pi.registerTool({
+		name: "start_subagent",
+		label: "Start Subagent",
+		description:
+			"Start an in-process background Pi sub-agent for delegated work. " +
+			"Use this when a planner, reviewer, scout, or worker can make progress independently. " +
+			"The tool waits until the sub-agent finishes or asks for feedback, so the main session should use the sub-agent result instead of duplicating the work.",
+		promptSnippet:
+			"Delegate work to a sub-agent and wait for its result. Roles: planner, scout, reviewer, worker.",
+		promptGuidelines: [
+			"Use start_subagent when a clearly bounded task should be delegated.",
+			"Choose role=scout for read-only codebase mapping, role=planner for plans and todos, role=reviewer for review, and role=worker for implementation.",
+			"Wait for this tool's result and synthesize it for the user instead of duplicating the sub-agent's investigation in the main session.",
+			"Do not expose implementation parameters or tool details to the user; users can start explicit background jobs with `/subagent start <role> <task>`.",
+			"Give the sub-agent a concrete task with enough context to finish without guessing.",
+			"Use /subagent view <id> to inspect status, and answer feedback requests with /subagent reply <id> <feedback>.",
+		],
+		parameters: StartSubagentParams,
+		renderCall(args, theme) {
+			return new Text(theme.fg("accent", formatStartSubagentCall(args)), 0, 0);
+		},
+		renderResult(result, { expanded }, theme) {
+			const details = result.details as StartSubagentDetails | undefined;
+			const firstContent = result.content[0];
+			const contentText = firstContent?.type === "text" ? firstContent.text : "";
+
+			if (!details) {
+				return new Text(contentText || "(no output)", 0, 0);
+			}
+
+			if (expanded) {
+				return new Text(formatStartSubagentExpanded(details, contentText), 0, 0);
+			}
+
+			const color =
+				details.status === "completed"
+					? "success"
+					: details.status === "failed" || details.status === "error"
+						? "error"
+						: details.status === "waiting_for_feedback"
+							? "warning"
+							: "accent";
+			const hint = details.command ? ` | expand or run ${details.command}` : "";
+			return new Text(`${theme.fg(color, formatStartSubagentSummary(details))}${theme.fg("dim", hint)}`, 0, 0);
+		},
+		async execute(_toolCallId, params, signal, _onUpdate, ctx) {
+			if (signal?.aborted) {
+				throw new Error("Sub-agent start was cancelled.");
+			}
+
+			const details = await startSubagentFromTool(params, ctx, signal);
+			let text = `Sub-agent ${details.name} (${details.subagentId}) is ${details.subagentStatus}. Inspect it with ${details.command}.`;
+			if (details.status === "completed" && details.result) {
+				text = `Sub-agent ${details.name} (${details.subagentId}) completed.\n\n${details.result}`;
+			} else if (details.status === "waiting_for_feedback") {
+				text = `Sub-agent ${details.name} (${details.subagentId}) needs feedback. Inspect it with ${details.command} and reply with /subagent reply ${details.subagentId} <feedback>.`;
+			} else if (details.status === "failed") {
+				text = `Sub-agent ${details.name} (${details.subagentId}) failed.\n\n${details.error ?? details.activity ?? "Unknown error"}`;
+			} else if (details.status === "error") {
+				text = `Error: ${details.error}`;
+			}
+
+			return {
+				content: [{ type: "text", text }],
+				details,
+			};
 		},
 	});
 

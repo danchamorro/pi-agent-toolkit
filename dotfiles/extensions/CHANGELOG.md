@@ -18,6 +18,15 @@ All notable changes to extensions in `~/.pi/agent/extensions/`.
   floating overlay.
 - Added bundled `planner`, `reviewer`, `scout`, and `worker` role prompts plus
   `/subagent agents` and `/subagent start <role> <task>` support.
+- Added a `start_subagent` tool so the main agent can launch a bundled role
+  sub-agent without requiring the user to type a slash command.
+- Changed `start_subagent` to always wait until the delegated sub-agent finishes
+  or asks for feedback, reducing duplicate work in the main session.
+- Suppressed full completion posts for tool-launched sub-agents when the tool
+  is already returning the delegated result to the main agent.
+- Added compact call/result rendering for `start_subagent` so raw sub-agent
+  output is hidden until the user expands the tool result or runs
+  `/subagent view <id>`.
 
 ## 2026-05-26
 
