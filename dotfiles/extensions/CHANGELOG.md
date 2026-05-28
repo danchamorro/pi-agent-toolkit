@@ -2,6 +2,21 @@
 
 All notable changes to extensions in `~/.pi/agent/extensions/`.
 
+## 2026-05-28
+
+### subagents.ts
+
+- Added `/subagent start`, `/subagent list`, `/subagent view`,
+  `/subagent stop`, and `/subagent reply` for a simple in-process background
+  sub-agent MVP.
+- Added a compact below-editor status widget for sub-agent status, latest
+  activity, elapsed runtime, context usage, results, errors, and pending
+  feedback requests.
+- Added an `ask_main_session` sub-agent tool so blocked background work can
+  pause and request explicit feedback from the main session.
+- Made `/subagent view [id]` report status details instead of opening a
+  floating overlay.
+
 ## 2026-05-26
 
 ### warp-split-fork.ts

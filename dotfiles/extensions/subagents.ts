@@ -1,0 +1,968 @@
+/**
+ * Subagents Extension
+ *
+ * Commands:
+ * - /subagent start <task> - start a background sub-agent.
+ * - /subagent list - show known sub-agents.
+ * - /subagent view [id] - show sub-agent status or details.
+ * - /subagent stop <id> - stop a running sub-agent.
+ * - /subagent reply <id> <feedback> - answer a sub-agent feedback request.
+ *
+ * Shortcut: none.
+ *
+ * Adds a small Claude Code-style sub-agent MVP. Sub-agents run as in-process
+ * Pi sessions, track status and activity in memory, can ask the main session
+ * for feedback through an explicit tool, and expose a compact live status
+ * widget near the editor while background work is active.
+ */
+
+import {
+	buildSessionContext,
+	createAgentSession,
+	createExtensionRuntime,
+	SessionManager,
+	type AgentSession,
+	type AgentSessionEvent,
+	type ContextUsage,
+	type ExtensionAPI,
+	type ExtensionCommandContext,
+	type ExtensionContext,
+	type ResourceLoader,
+	type ToolDefinition,
+} from "@earendil-works/pi-coding-agent";
+import { type AssistantMessage, type Message, type ThinkingLevel as AiThinkingLevel } from "@earendil-works/pi-ai";
+import { truncateToWidth, visibleWidth, type Component } from "@earendil-works/pi-tui";
+import { Type } from "typebox";
+
+type SessionThinkingLevel = "off" | AiThinkingLevel;
+type SubagentStatus = "starting" | "running" | "waiting for feedback" | "completed" | "failed" | "stopped";
+
+type FeedbackRequest = {
+	id: string;
+	question: string;
+	context?: string;
+	requestedAt: number;
+	resolve: (feedback: string) => void;
+	cancel: (reason: string) => void;
+};
+
+type FeedbackRequestDetails = {
+	requestId: string;
+	subagentId: string;
+	status: "answered" | "cancelled";
+};
+
+type SubagentRecord = {
+	id: string;
+	name: string;
+	task: string;
+	status: SubagentStatus;
+	startedAt: number;
+	finishedAt?: number;
+	activity: string;
+	result?: string;
+	error?: string;
+	session?: AgentSession;
+	unsubscribe?: () => void;
+	contextUsage?: ContextUsage;
+	pendingFeedback?: FeedbackRequest;
+	feedbackSerial: number;
+	toolCalls: Map<string, { name: string; startedAt: number; status: "running" | "done" | "failed" }>;
+};
+
+const SUBAGENT_MESSAGE_TYPE = "subagent-status";
+const FEEDBACK_MESSAGE_TYPE = "subagent-feedback-request";
+const DEFAULT_TOOLS = ["read", "bash", "edit", "write"];
+const SUBAGENT_TOOL_NAMES = new Set(["read", "bash", "edit", "write", "grep", "find", "ls"]);
+const MAX_ACTIVITY_LENGTH = 220;
+const RECENT_FINISHED_WIDGET_MS = 60_000;
+const WIDGET_INTERVAL_KEY = Symbol.for("pi-agent-toolkit/subagents-widget-interval");
+
+{
+	const previousInterval = (globalThis as Record<symbol, ReturnType<typeof setInterval> | null | undefined>)[
+		WIDGET_INTERVAL_KEY
+	];
+	if (previousInterval) {
+		clearInterval(previousInterval);
+		(globalThis as Record<symbol, ReturnType<typeof setInterval> | null | undefined>)[WIDGET_INTERVAL_KEY] = null;
+	}
+}
+
+const AskMainSessionParams = Type.Object({
+	question: Type.String({
+		description: "The specific question or decision needed from the main session.",
+	}),
+	context: Type.Optional(
+		Type.String({
+			description: "Brief context explaining why the sub-agent is blocked.",
+		}),
+	),
+});
+
+function stripDynamicSystemPromptFooter(systemPrompt: string): string {
+	return systemPrompt
+		.replace(/\nCurrent date and time:[^\n]*(?:\nCurrent working directory:[^\n]*)?$/u, "")
+		.replace(/\nCurrent working directory:[^\n]*$/u, "")
+		.trim();
+}
+
+function singleLine(value: string, maxLength = MAX_ACTIVITY_LENGTH): string {
+	const line = value.replace(/\s+/g, " ").trim();
+	return line.length > maxLength ? `${line.slice(0, maxLength - 3)}...` : line;
+}
+
+function splitCommand(input: string): { command: string; rest: string } {
+	const trimmed = input.trim();
+	if (!trimmed) {
+		return { command: "view", rest: "" };
+	}
+
+	const firstSpace = trimmed.search(/\s/u);
+	if (firstSpace === -1) {
+		return { command: trimmed.toLowerCase(), rest: "" };
+	}
+
+	return {
+		command: trimmed.slice(0, firstSpace).toLowerCase(),
+		rest: trimmed.slice(firstSpace + 1).trim(),
+	};
+}
+
+function parseStartArgs(input: string): { name: string; task: string } | null {
+	const taskInput = input.trim();
+	if (!taskInput) {
+		return null;
+	}
+
+	const colonIndex = taskInput.indexOf(":");
+	if (colonIndex > 0 && colonIndex <= 48) {
+		const name = taskInput.slice(0, colonIndex).trim();
+		const task = taskInput.slice(colonIndex + 1).trim();
+		if (name && task) {
+			return { name, task };
+		}
+	}
+
+	return {
+		name: deriveName(taskInput),
+		task: taskInput,
+	};
+}
+
+function deriveName(task: string): string {
+	const words = task
+		.replace(/[^a-zA-Z0-9 _.-]+/g, " ")
+		.split(/\s+/u)
+		.filter(Boolean)
+		.slice(0, 5);
+	return words.length > 0 ? words.join(" ") : "sub-agent";
+}
+
+function formatDuration(ms: number): string {
+	const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+	const seconds = totalSeconds % 60;
+	const totalMinutes = Math.floor(totalSeconds / 60);
+	const minutes = totalMinutes % 60;
+	const hours = Math.floor(totalMinutes / 60);
+
+	if (hours > 0) {
+		return `${hours}h ${minutes}m`;
+	}
+	if (minutes > 0) {
+		return `${minutes}m ${seconds}s`;
+	}
+	return `${seconds}s`;
+}
+
+function elapsedFor(record: SubagentRecord): string {
+	return formatDuration((record.finishedAt ?? Date.now()) - record.startedAt);
+}
+
+function formatContextUsage(record: SubagentRecord): string {
+	const usage = record.session?.getContextUsage() ?? record.contextUsage;
+	if (!usage) {
+		return "context unknown";
+	}
+	if (usage.tokens === null || usage.percent === null) {
+		return `context ?/${usage.contextWindow}`;
+	}
+	return `context ${Math.round(usage.tokens)}/${usage.contextWindow} (${usage.percent.toFixed(1)}%)`;
+}
+
+function extractText(parts: AssistantMessage["content"]): string {
+	return parts
+		.filter((part) => part.type === "text")
+		.map((part) => part.text)
+		.join("\n")
+		.trim();
+}
+
+function extractEventAssistantText(message: unknown): string {
+	if (!message || typeof message !== "object") {
+		return "";
+	}
+
+	const maybeMessage = message as { role?: unknown; content?: unknown };
+	if (maybeMessage.role !== "assistant" || !Array.isArray(maybeMessage.content)) {
+		return "";
+	}
+
+	return maybeMessage.content
+		.filter((part): part is { type: "text"; text: string } => part?.type === "text")
+		.map((part) => part.text)
+		.join("\n")
+		.trim();
+}
+
+function getLastAssistantMessage(session: AgentSession): AssistantMessage | null {
+	for (let i = session.state.messages.length - 1; i >= 0; i--) {
+		const message = session.state.messages[i];
+		if (message.role === "assistant") {
+			return message as AssistantMessage;
+		}
+	}
+
+	return null;
+}
+
+function createSubagentResourceLoader(ctx: ExtensionContext, record: SubagentRecord): ResourceLoader {
+	const extensionsResult = { extensions: [], errors: [], runtime: createExtensionRuntime() };
+	const mainSystemPrompt = stripDynamicSystemPromptFooter(ctx.getSystemPrompt());
+	const subagentPrompt = [
+		"You are a focused Pi sub-agent running in the background for the main session.",
+		`Sub-agent id: ${record.id}`,
+		`Sub-agent name: ${record.name}`,
+		`Assigned task: ${record.task}`,
+		"Work independently, keep the scope narrow, and produce a concise final result.",
+		"When blocked, missing a decision, or needing user input, call ask_main_session with a specific question and wait for the reply.",
+		"Do not assume feedback that was not provided.",
+	].join("\n");
+
+	return {
+		getExtensions: () => extensionsResult,
+		getSkills: () => ({ skills: [], diagnostics: [] }),
+		getPrompts: () => ({ prompts: [], diagnostics: [] }),
+		getThemes: () => ({ themes: [], diagnostics: [] }),
+		getAgentsFiles: () => ({ agentsFiles: [] }),
+		getSystemPrompt: () => [mainSystemPrompt, subagentPrompt].filter(Boolean).join("\n\n"),
+		getAppendSystemPrompt: () => [],
+		extendResources: () => {},
+		reload: async () => {},
+	};
+}
+
+function seedMainContext(record: SubagentRecord, session: AgentSession, ctx: ExtensionContext): void {
+	try {
+		const context = buildSessionContext(ctx.sessionManager.getEntries(), ctx.sessionManager.getLeafId());
+		const messages = context.messages as Message[];
+		if (messages.length > 0) {
+			session.agent.state.messages = messages as typeof session.state.messages;
+			record.activity = `Seeded with ${messages.length} main-context messages.`;
+		}
+	} catch (error) {
+		record.activity = `Could not seed main context: ${error instanceof Error ? error.message : String(error)}`;
+	}
+}
+
+function updateRecordContextUsage(record: SubagentRecord): void {
+	record.contextUsage = record.session?.getContextUsage();
+}
+
+function markActivity(record: SubagentRecord, activity: string): void {
+	record.activity = singleLine(activity);
+	updateRecordContextUsage(record);
+}
+
+function hasStatus(record: SubagentRecord, status: SubagentStatus): boolean {
+	return record.status === status;
+}
+
+function isActiveStatus(status: SubagentStatus): boolean {
+	return status === "starting" || status === "running" || status === "waiting for feedback";
+}
+
+function isVisibleInWidget(record: SubagentRecord, now: number): boolean {
+	if (isActiveStatus(record.status)) {
+		return true;
+	}
+	return record.finishedAt !== undefined && now - record.finishedAt <= RECENT_FINISHED_WIDGET_MS;
+}
+
+function padToWidth(line: string, width: number): string {
+	return line + " ".repeat(Math.max(0, width - visibleWidth(line)));
+}
+
+function widgetTopLine(title: string, info: string, width: number, theme: ExtensionContext["ui"]["theme"]): string {
+	if (width <= 0) {
+		return "";
+	}
+	if (width === 1) {
+		return theme.fg("accent", "+");
+	}
+
+	const innerWidth = width - 2;
+	const label = ` ${title}${info ? ` ${info}` : ""} `;
+	const clippedLabel = truncateToWidth(label, innerWidth);
+	const fill = "-".repeat(Math.max(0, innerWidth - visibleWidth(clippedLabel)));
+	return `${theme.fg("accent", "+")}${theme.fg("accent", clippedLabel)}${theme.fg("accent", fill)}${theme.fg("accent", "+")}`;
+}
+
+function widgetBottomLine(width: number, theme: ExtensionContext["ui"]["theme"]): string {
+	if (width <= 0) {
+		return "";
+	}
+	if (width === 1) {
+		return theme.fg("accent", "+");
+	}
+	return theme.fg("accent", `+${"-".repeat(width - 2)}+`);
+}
+
+function widgetContentLine(left: string, right: string, width: number, theme: ExtensionContext["ui"]["theme"]): string {
+	if (width <= 0) {
+		return "";
+	}
+	if (width === 1) {
+		return theme.fg("accent", "|");
+	}
+
+	const contentWidth = Math.max(0, width - 2);
+	const rightWidth = visibleWidth(right);
+	if (rightWidth >= contentWidth) {
+		const clippedRight = truncateToWidth(right, contentWidth);
+		return `${theme.fg("accent", "|")}${padToWidth(clippedRight, contentWidth)}${theme.fg("accent", "|")}`;
+	}
+
+	const clippedLeft = truncateToWidth(left, contentWidth - rightWidth);
+	const padding = " ".repeat(Math.max(0, contentWidth - visibleWidth(clippedLeft) - rightWidth));
+	return `${theme.fg("accent", "|")}${clippedLeft}${padding}${right}${theme.fg("accent", "|")}`;
+}
+
+function compactContextUsage(record: SubagentRecord): string {
+	const usage = record.session?.getContextUsage() ?? record.contextUsage;
+	if (!usage || usage.percent === null) {
+		return "ctx ?";
+	}
+	return `ctx ${usage.percent.toFixed(1)}%`;
+}
+
+function latestRunningTool(record: SubagentRecord): string | undefined {
+	const running = [...record.toolCalls.values()].filter((tool) => tool.status === "running");
+	return running.at(-1)?.name;
+}
+
+function statusText(record: SubagentRecord, theme: ExtensionContext["ui"]["theme"]): string {
+	switch (record.status) {
+		case "starting":
+			return theme.fg("accent", "starting");
+		case "running": {
+			const tool = latestRunningTool(record);
+			return tool ? theme.fg("accent", `running ${tool}`) : theme.fg("accent", "running");
+		}
+		case "waiting for feedback":
+			return theme.fg("warning", `waiting /subagent reply ${record.id}`);
+		case "completed":
+			return theme.fg("success", "complete");
+		case "failed":
+			return theme.fg("error", "failed");
+		case "stopped":
+			return theme.fg("warning", "stopped");
+	}
+}
+
+function renderSubagentWidgetLines(records: SubagentRecord[], width: number, theme: ExtensionContext["ui"]["theme"]): string[] {
+	const now = Date.now();
+	const visibleRecords = records.filter((record) => isVisibleInWidget(record, now));
+	const activeCount = visibleRecords.filter((record) => isActiveStatus(record.status)).length;
+	if (visibleRecords.length === 0) {
+		return [];
+	}
+
+	const info = activeCount === visibleRecords.length ? `${activeCount} active` : `${activeCount} active, ${visibleRecords.length - activeCount} recent`;
+	const lines = [widgetTopLine("Subagents", info, width, theme)];
+	const displayRecords = visibleRecords.slice(0, 3);
+
+	for (const record of displayRecords) {
+		const left = ` ${elapsedFor(record).padStart(5)}  ${record.id}  ${record.name} `;
+		const right = `${statusText(record, theme)} ${theme.fg("dim", compactContextUsage(record))} `;
+		lines.push(widgetContentLine(left, right, width, theme));
+
+		if (record.pendingFeedback) {
+			const feedback = `   needs feedback: ${record.pendingFeedback.question} `;
+			lines.push(widgetContentLine(theme.fg("warning", truncateToWidth(feedback, Math.max(0, width - 2))), "", width, theme));
+		} else if (record.status === "running" || record.status === "starting") {
+			const activity = `   ${record.activity} `;
+			lines.push(widgetContentLine(theme.fg("dim", activity), "", width, theme));
+		}
+	}
+
+	if (visibleRecords.length > displayRecords.length) {
+		lines.push(widgetContentLine(theme.fg("dim", ` ${visibleRecords.length - displayRecords.length} more sub-agent(s) `), "", width, theme));
+	}
+
+	lines.push(widgetBottomLine(width, theme));
+	return lines;
+}
+
+class SubagentStatusWidget implements Component {
+	constructor(
+		private readonly getRecords: () => SubagentRecord[],
+		private readonly theme: ExtensionContext["ui"]["theme"],
+	) {}
+
+	invalidate(): void {}
+
+	render(width: number): string[] {
+		return renderSubagentWidgetLines(this.getRecords(), width, this.theme);
+	}
+}
+
+export default function (pi: ExtensionAPI) {
+	const records = new Map<string, SubagentRecord>();
+	let nextSubagentNumber = 1;
+	let latestCtx: ExtensionContext | undefined;
+	let widgetInterval: ReturnType<typeof setInterval> | null = null;
+
+	function sortedRecords(): SubagentRecord[] {
+		return [...records.values()].sort((a, b) => a.startedAt - b.startedAt);
+	}
+
+	function setWidgetInterval(interval: ReturnType<typeof setInterval> | null): void {
+		widgetInterval = interval;
+		(globalThis as Record<symbol, ReturnType<typeof setInterval> | null | undefined>)[WIDGET_INTERVAL_KEY] = interval;
+	}
+
+	function clearWidgetInterval(): void {
+		if (widgetInterval) {
+			clearInterval(widgetInterval);
+			setWidgetInterval(null);
+		}
+	}
+
+	function activeRecords(): SubagentRecord[] {
+		return sortedRecords().filter((record) => isActiveStatus(record.status));
+	}
+
+	function visibleWidgetRecords(): SubagentRecord[] {
+		const now = Date.now();
+		return sortedRecords().filter((record) => isVisibleInWidget(record, now));
+	}
+
+	function updateStatusWidget(ctx = latestCtx): void {
+		if (!ctx?.hasUI) {
+			return;
+		}
+
+		const visibleRecords = visibleWidgetRecords();
+		const active = visibleRecords.filter((record) => isActiveStatus(record.status));
+		const waiting = active.filter((record) => record.status === "waiting for feedback");
+
+		if (visibleRecords.length === 0) {
+			ctx.ui.setWidget("subagents", undefined);
+			ctx.ui.setStatus("subagents", undefined);
+			clearWidgetInterval();
+			return;
+		}
+
+		const statusLabel = waiting.length > 0 ? `SA:${active.length} wait` : `SA:${active.length}`;
+		ctx.ui.setStatus(
+			"subagents",
+			waiting.length > 0 ? ctx.ui.theme.fg("warning", statusLabel) : ctx.ui.theme.fg("accent", statusLabel),
+		);
+		ctx.ui.setWidget("subagents", (_tui, theme) => new SubagentStatusWidget(sortedRecords, theme), {
+			placement: "belowEditor",
+		});
+
+		if (!widgetInterval) {
+			setWidgetInterval(
+				setInterval(() => {
+					updateStatusWidget();
+				}, 1000),
+			);
+		}
+	}
+
+	function findRecord(query: string): { record?: SubagentRecord; error?: string } {
+		const id = query.trim();
+		if (!id) {
+			return { error: "Sub-agent id is required." };
+		}
+
+		const exact = records.get(id);
+		if (exact) {
+			return { record: exact };
+		}
+
+		const matches = [...records.values()].filter((record) => record.id.startsWith(id));
+		if (matches.length === 1) {
+			return { record: matches[0] };
+		}
+		if (matches.length > 1) {
+			return { error: `Sub-agent id "${id}" is ambiguous.` };
+		}
+		return { error: `Sub-agent "${id}" was not found.` };
+	}
+
+	function formatList(): string {
+		const items = sortedRecords();
+		if (items.length === 0) {
+			return "No sub-agents yet. Start one with `/subagent start <task>`.";
+		}
+
+		return items
+			.map((record) => {
+				const bits = [
+					`${record.id} ${record.name}`,
+					`status: ${record.status}`,
+					`elapsed: ${elapsedFor(record)}`,
+					formatContextUsage(record),
+					`latest: ${record.activity}`,
+				];
+				return `- ${bits.join(" | ")}`;
+			})
+			.join("\n");
+	}
+
+	function postStatusMessage(content: string): void {
+		pi.sendMessage(
+			{
+				customType: SUBAGENT_MESSAGE_TYPE,
+				content,
+				display: true,
+			},
+			{ triggerTurn: false },
+		);
+	}
+
+	function postFeedbackRequest(record: SubagentRecord, request: FeedbackRequest): void {
+		const parts = [
+			`Sub-agent ${record.name} (${record.id}) needs feedback.`,
+			`Question: ${request.question}`,
+		];
+		if (request.context) {
+			parts.push(`Context: ${request.context}`);
+		}
+		parts.push(`Reply with: /subagent reply ${record.id} <feedback>`);
+
+		pi.sendMessage(
+			{
+				customType: FEEDBACK_MESSAGE_TYPE,
+				content: parts.join("\n\n"),
+				display: true,
+				details: {
+					subagentId: record.id,
+					requestId: request.id,
+					question: request.question,
+				},
+			},
+			{ triggerTurn: false },
+		);
+	}
+
+	function createAskMainSessionTool(record: SubagentRecord): ToolDefinition<typeof AskMainSessionParams, FeedbackRequestDetails> {
+		return {
+			name: "ask_main_session",
+			label: "Ask Main Session",
+			description:
+				"Ask the main Pi session for feedback when the sub-agent is blocked or needs user input. The tool waits until the main session replies.",
+			promptSnippet:
+				"Ask the main Pi session for feedback when blocked or when user input is required. Use this instead of guessing.",
+			promptGuidelines: [
+				"Call ask_main_session when a decision, credential, missing requirement, or user preference blocks progress.",
+				"Ask one concrete question at a time and include only the context needed for the parent to answer.",
+				"Wait for the returned feedback before continuing.",
+			],
+			parameters: AskMainSessionParams,
+			execute(_toolCallId, params, signal) {
+				const question = params.question.trim();
+				const context = params.context?.trim();
+				const requestId = `${record.id}-feedback-${++record.feedbackSerial}`;
+
+				return new Promise((resolve) => {
+					let settled = false;
+					const settle = (status: FeedbackRequestDetails["status"], text: string) => {
+						if (settled) {
+							return;
+						}
+						settled = true;
+						signal?.removeEventListener("abort", abortHandler);
+						if (record.pendingFeedback?.id === requestId) {
+							record.pendingFeedback = undefined;
+						}
+						if (record.status !== "stopped" && record.status !== "failed") {
+							record.status = status === "answered" ? "running" : record.status;
+						}
+						markActivity(record, status === "answered" ? "Received feedback from main session." : text);
+						updateStatusWidget();
+						resolve({
+							content: [{ type: "text", text }],
+							details: {
+								requestId,
+								subagentId: record.id,
+								status,
+							},
+						});
+					};
+
+					const abortHandler = () => {
+						settle("cancelled", "The feedback request was cancelled because the sub-agent stopped.");
+					};
+
+					record.status = "waiting for feedback";
+					markActivity(record, `Waiting for feedback: ${question}`);
+					record.pendingFeedback = {
+						id: requestId,
+						question,
+						context,
+						requestedAt: Date.now(),
+						resolve: (feedback: string) => settle("answered", feedback),
+						cancel: (reason: string) => settle("cancelled", reason),
+					};
+
+					if (signal?.aborted) {
+						abortHandler();
+						return;
+					}
+
+					signal?.addEventListener("abort", abortHandler, { once: true });
+					postFeedbackRequest(record, record.pendingFeedback);
+					updateStatusWidget();
+				});
+			},
+		};
+	}
+
+	function updateFromEvent(record: SubagentRecord, event: AgentSessionEvent): void {
+		switch (event.type) {
+			case "message_start":
+			case "message_update": {
+				const streamed = extractEventAssistantText(event.message);
+				if (streamed) {
+					markActivity(record, streamed);
+				}
+				break;
+			}
+			case "message_end": {
+				const text = extractEventAssistantText(event.message);
+				if (text) {
+					markActivity(record, text);
+				}
+				break;
+			}
+			case "tool_execution_start": {
+				record.toolCalls.set(event.toolCallId, {
+					name: event.toolName,
+					startedAt: Date.now(),
+					status: "running",
+				});
+				markActivity(record, `Running tool: ${event.toolName}`);
+				break;
+			}
+			case "tool_execution_update": {
+				markActivity(record, `Tool update: ${event.toolName}`);
+				break;
+			}
+			case "tool_execution_end": {
+				const tool = record.toolCalls.get(event.toolCallId);
+				if (tool) {
+					tool.status = event.isError ? "failed" : "done";
+				}
+				markActivity(record, `${event.toolName} ${event.isError ? "failed" : "finished"}`);
+				break;
+			}
+			case "turn_end": {
+				markActivity(record, "Turn finished.");
+				break;
+			}
+			case "compaction_end": {
+				markActivity(record, event.aborted ? "Compaction aborted." : "Compaction finished.");
+				break;
+			}
+			default:
+				updateRecordContextUsage(record);
+		}
+
+		updateStatusWidget();
+	}
+
+	function getSubagentTools(): string[] {
+		const activeTools = pi.getActiveTools().filter((name) => SUBAGENT_TOOL_NAMES.has(name));
+		const baseTools = activeTools.length > 0 ? activeTools : DEFAULT_TOOLS;
+		return [...new Set([...baseTools, "ask_main_session"])];
+	}
+
+	async function runSubagent(record: SubagentRecord, ctx: ExtensionCommandContext): Promise<void> {
+		try {
+			if (!ctx.model) {
+				throw new Error("No active model selected.");
+			}
+
+			const auth = await ctx.modelRegistry.getApiKeyAndHeaders(ctx.model);
+			if (!auth.ok) {
+				throw new Error(auth.error || `No credentials available for ${ctx.model.provider}/${ctx.model.id}.`);
+			}
+
+			markActivity(record, "Creating background Pi session.");
+			const { session } = await createAgentSession({
+				cwd: ctx.cwd,
+				sessionManager: SessionManager.inMemory(ctx.cwd),
+				model: ctx.model,
+				modelRegistry: ctx.modelRegistry as AgentSession["modelRegistry"],
+				thinkingLevel: pi.getThinkingLevel() as SessionThinkingLevel,
+				tools: getSubagentTools(),
+				customTools: [createAskMainSessionTool(record) as unknown as ToolDefinition],
+				resourceLoader: createSubagentResourceLoader(ctx, record),
+			});
+
+			record.session = session;
+			record.unsubscribe = session.subscribe((event) => updateFromEvent(record, event));
+			seedMainContext(record, session, ctx);
+
+			record.status = "running";
+			markActivity(record, "Started background task.");
+			updateStatusWidget();
+
+			await session.prompt(record.task, { source: "extension" });
+
+			if (hasStatus(record, "stopped")) {
+				return;
+			}
+
+			const response = getLastAssistantMessage(session);
+			if (!response) {
+				throw new Error("Sub-agent finished without an assistant response.");
+			}
+			if (response.stopReason === "aborted") {
+				record.status = "stopped";
+				record.finishedAt = Date.now();
+				markActivity(record, "Stopped.");
+				return;
+			}
+			if (response.stopReason === "error") {
+				throw new Error(response.errorMessage || "Sub-agent request failed.");
+			}
+
+			record.result = extractText(response.content) || "(No text response)";
+			record.status = "completed";
+			record.finishedAt = Date.now();
+			markActivity(record, "Completed.");
+			postStatusMessage(`Sub-agent ${record.name} (${record.id}) completed.\n\n${record.result}`);
+		} catch (error) {
+			if (record.status === "stopped") {
+				return;
+			}
+			record.error = error instanceof Error ? error.message : String(error);
+			record.status = "failed";
+			record.finishedAt = Date.now();
+			markActivity(record, "Failed.");
+			postStatusMessage(`Sub-agent ${record.name} (${record.id}) failed.\n\n${record.error}`);
+		} finally {
+			record.pendingFeedback?.cancel("The sub-agent is no longer running.");
+			updateRecordContextUsage(record);
+			record.unsubscribe?.();
+			record.unsubscribe = undefined;
+			record.session?.dispose();
+			record.session = undefined;
+			updateStatusWidget();
+		}
+	}
+
+	async function startSubagent(args: string, ctx: ExtensionCommandContext): Promise<void> {
+		const parsed = parseStartArgs(args);
+		if (!parsed) {
+			ctx.ui.notify("Usage: /subagent start <task>", "warning");
+			return;
+		}
+
+		const record: SubagentRecord = {
+			id: `sa-${nextSubagentNumber++}`,
+			name: parsed.name,
+			task: parsed.task,
+			status: "starting",
+			startedAt: Date.now(),
+			activity: "Queued.",
+			feedbackSerial: 0,
+			toolCalls: new Map(),
+		};
+		records.set(record.id, record);
+		updateStatusWidget();
+
+		postStatusMessage(`Started sub-agent ${record.name} (${record.id}).\n\nTask: ${record.task}`);
+		void runSubagent(record, ctx);
+	}
+
+	async function stopSubagent(id: string, ctx: ExtensionCommandContext): Promise<void> {
+		const found = findRecord(id);
+		if (!found.record) {
+			ctx.ui.notify(found.error ?? "Sub-agent not found.", "warning");
+			return;
+		}
+
+		const record = found.record;
+		if (record.status === "completed" || record.status === "failed" || record.status === "stopped") {
+			ctx.ui.notify(`Sub-agent ${record.id} is already ${record.status}.`, "info");
+			return;
+		}
+
+		record.status = "stopped";
+		record.finishedAt = Date.now();
+		record.pendingFeedback?.cancel("The main session stopped this sub-agent.");
+		markActivity(record, "Stopped by main session.");
+		updateStatusWidget();
+
+		try {
+			await record.session?.abort();
+		} catch (error) {
+			record.error = error instanceof Error ? error.message : String(error);
+		} finally {
+			record.unsubscribe?.();
+			record.unsubscribe = undefined;
+			record.session?.dispose();
+			record.session = undefined;
+		}
+
+		postStatusMessage(`Stopped sub-agent ${record.name} (${record.id}).`);
+	}
+
+	function replyToSubagent(args: string, ctx: ExtensionCommandContext): void {
+		const { command: id, rest: feedback } = splitCommand(args);
+		if (!id || !feedback) {
+			ctx.ui.notify("Usage: /subagent reply <id> <feedback>", "warning");
+			return;
+		}
+
+		const found = findRecord(id);
+		if (!found.record) {
+			ctx.ui.notify(found.error ?? "Sub-agent not found.", "warning");
+			return;
+		}
+
+		const record = found.record;
+		if (!record.pendingFeedback) {
+			ctx.ui.notify(`Sub-agent ${record.id} is not waiting for feedback.`, "warning");
+			return;
+		}
+
+		record.pendingFeedback.resolve(feedback.trim());
+		postStatusMessage(`Sent feedback to sub-agent ${record.name} (${record.id}).`);
+	}
+
+	function formatRecordDetails(record: SubagentRecord): string {
+		const lines = [
+			`Sub-agent ${record.id}: ${record.name}`,
+			`Status: ${record.status}`,
+			`Elapsed: ${elapsedFor(record)}`,
+			`Context: ${formatContextUsage(record)}`,
+			`Task: ${record.task}`,
+			`Latest: ${record.activity}`,
+		];
+
+		if (record.pendingFeedback) {
+			lines.push(`Waiting for feedback: ${record.pendingFeedback.question}`);
+			lines.push(`Reply: /subagent reply ${record.id} <feedback>`);
+		}
+		if (record.result) {
+			lines.push(`Result: ${record.result}`);
+		}
+		if (record.error) {
+			lines.push(`Error: ${record.error}`);
+		}
+
+		return lines.join("\n");
+	}
+
+	function showStatusView(args: string, ctx: ExtensionCommandContext): void {
+		updateStatusWidget(ctx);
+		const id = args.trim();
+		if (!id) {
+			const active = activeRecords();
+			const prefix =
+				active.length > 0
+					? "Sub-agent status is visible below the editor while background work is active."
+					: "No sub-agents are currently active.";
+			postStatusMessage(`${prefix}\n\n${formatList()}`);
+			return;
+		}
+
+		const found = findRecord(id);
+		if (!found.record) {
+			ctx.ui.notify(found.error ?? "Sub-agent not found.", "warning");
+			return;
+		}
+
+		postStatusMessage(formatRecordDetails(found.record));
+	}
+
+	pi.registerCommand("subagent", {
+		description:
+			"Manage simple background sub-agents. Use `/subagent start <task>`, `/subagent list`, `/subagent view [id]`, `/subagent stop <id>`, or `/subagent reply <id> <feedback>`.",
+		handler: async (args, ctx) => {
+			latestCtx = ctx;
+			const { command, rest } = splitCommand(args);
+			switch (command) {
+				case "start":
+					await startSubagent(rest, ctx);
+					return;
+				case "list":
+					updateStatusWidget(ctx);
+					postStatusMessage(formatList());
+					return;
+				case "view":
+					showStatusView(rest, ctx);
+					return;
+				case "stop":
+					await stopSubagent(rest, ctx);
+					return;
+				case "reply":
+					replyToSubagent(rest, ctx);
+					return;
+				case "help":
+					postStatusMessage(
+							[
+								"Sub-agent commands:",
+								"- /subagent start <task>",
+								"- /subagent start <name>: <task>",
+								"- /subagent list",
+								"- /subagent view [id]",
+								"- /subagent stop <id>",
+								"- /subagent reply <id> <feedback>",
+							].join("\n"),
+					);
+					return;
+				default:
+					showStatusView("", ctx);
+			}
+		},
+	});
+
+	pi.on("session_start", async (_event, ctx) => {
+		latestCtx = ctx;
+		updateStatusWidget(ctx);
+	});
+
+	pi.on("session_shutdown", async (_event, ctx) => {
+		latestCtx = ctx;
+		if (ctx.hasUI) {
+			ctx.ui.setWidget("subagents", undefined);
+			ctx.ui.setStatus("subagents", undefined);
+		}
+		clearWidgetInterval();
+		for (const record of records.values()) {
+			if (record.status === "completed" || record.status === "failed" || record.status === "stopped") {
+				continue;
+			}
+			record.status = "stopped";
+			record.finishedAt = Date.now();
+			record.pendingFeedback?.cancel("The Pi session shut down before feedback arrived.");
+			markActivity(record, "Stopped because the main session shut down.");
+			try {
+				await record.session?.abort();
+			} catch (error) {
+				record.error = error instanceof Error ? error.message : String(error);
+			}
+			record.unsubscribe?.();
+			record.session?.dispose();
+			record.session = undefined;
+			record.unsubscribe = undefined;
+		}
+	});
+}
