@@ -3,6 +3,8 @@
  *
  * Commands:
  * - /subagent start <task> - start a background sub-agent.
+ * - /subagent start <role> <task> - start a role-specific background sub-agent.
+ * - /subagent agents - list the bundled sub-agent roles.
  * - /subagent list - show known sub-agents.
  * - /subagent view [id] - show sub-agent status or details.
  * - /subagent stop <id> - stop a running sub-agent.
@@ -12,14 +14,16 @@
  *
  * Adds a small Claude Code-style sub-agent MVP. Sub-agents run as in-process
  * Pi sessions, track status and activity in memory, can ask the main session
- * for feedback through an explicit tool, and expose a compact live status
- * widget near the editor while background work is active.
+ * for feedback through an explicit tool, can use bundled planner/reviewer/
+ * scout/worker role prompts, and expose a compact live status widget near the
+ * editor while background work is active.
  */
 
 import {
 	buildSessionContext,
 	createAgentSession,
 	createExtensionRuntime,
+	parseFrontmatter,
 	SessionManager,
 	type AgentSession,
 	type AgentSessionEvent,
@@ -30,8 +34,16 @@ import {
 	type ResourceLoader,
 	type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
-import { type AssistantMessage, type Message, type ThinkingLevel as AiThinkingLevel } from "@earendil-works/pi-ai";
+import {
+	type AssistantMessage,
+	type Message,
+	type Model,
+	type ThinkingLevel as AiThinkingLevel,
+} from "@earendil-works/pi-ai";
 import { truncateToWidth, visibleWidth, type Component } from "@earendil-works/pi-tui";
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { Type } from "typebox";
 
 type SessionThinkingLevel = "off" | AiThinkingLevel;
@@ -52,10 +64,35 @@ type FeedbackRequestDetails = {
 	status: "answered" | "cancelled";
 };
 
+type RoleModelSpec = {
+	provider: string;
+	modelId: string;
+	label: string;
+};
+
+type SubagentRole = {
+	name: string;
+	description: string;
+	tools: string[];
+	model?: RoleModelSpec;
+	thinking?: SessionThinkingLevel;
+	systemPrompt: string;
+	filePath: string;
+	autoExit?: boolean;
+	output?: string;
+};
+
+type ParsedStartArgs = {
+	name: string;
+	task: string;
+	role?: SubagentRole;
+};
+
 type SubagentRecord = {
 	id: string;
 	name: string;
 	task: string;
+	role?: SubagentRole;
 	status: SubagentStatus;
 	startedAt: number;
 	finishedAt?: number;
@@ -74,9 +111,13 @@ const SUBAGENT_MESSAGE_TYPE = "subagent-status";
 const FEEDBACK_MESSAGE_TYPE = "subagent-feedback-request";
 const DEFAULT_TOOLS = ["read", "bash", "edit", "write"];
 const SUBAGENT_TOOL_NAMES = new Set(["read", "bash", "edit", "write", "grep", "find", "ls"]);
+const THINKING_LEVELS = new Set<SessionThinkingLevel>(["off", "minimal", "low", "medium", "high", "xhigh"]);
 const MAX_ACTIVITY_LENGTH = 220;
 const RECENT_FINISHED_WIDGET_MS = 60_000;
 const WIDGET_INTERVAL_KEY = Symbol.for("pi-agent-toolkit/subagents-widget-interval");
+const SUBAGENTS_ASSET_DIR = join(dirname(fileURLToPath(import.meta.url)), "subagents");
+const ROLE_AGENT_DIR = join(SUBAGENTS_ASSET_DIR, "agents");
+const ROLE_AGENT_FILES = ["planner.md", "reviewer.md", "scout.md", "worker.md"] as const;
 
 {
 	const previousInterval = (globalThis as Record<symbol, ReturnType<typeof setInterval> | null | undefined>)[
@@ -128,7 +169,116 @@ function splitCommand(input: string): { command: string; rest: string } {
 	};
 }
 
-function parseStartArgs(input: string): { name: string; task: string } | null {
+function parseModelSpec(value: unknown, source: string): RoleModelSpec | undefined {
+	if (value === undefined) {
+		return undefined;
+	}
+	if (typeof value !== "string" || !value.trim()) {
+		throw new Error(`Role file ${source} has an invalid model value.`);
+	}
+
+	const label = value.trim();
+	const slashIndex = label.indexOf("/");
+	if (slashIndex <= 0 || slashIndex === label.length - 1) {
+		throw new Error(`Role file ${source} model must use provider/model format.`);
+	}
+
+	return {
+		provider: label.slice(0, slashIndex),
+		modelId: label.slice(slashIndex + 1),
+		label,
+	};
+}
+
+function parseThinkingLevel(value: unknown, source: string): SessionThinkingLevel | undefined {
+	if (value === undefined) {
+		return undefined;
+	}
+	if (typeof value !== "string" || !THINKING_LEVELS.has(value as SessionThinkingLevel)) {
+		throw new Error(`Role file ${source} has an invalid thinking level.`);
+	}
+	return value as SessionThinkingLevel;
+}
+
+function parseRoleTools(value: unknown, source: string): string[] {
+	if (value === undefined) {
+		return DEFAULT_TOOLS;
+	}
+
+	const rawTools =
+		typeof value === "string"
+			? value.split(",")
+			: Array.isArray(value)
+				? value.map((item) => {
+						if (typeof item !== "string") {
+							throw new Error(`Role file ${source} has a non-string tool value.`);
+						}
+						return item;
+					})
+				: undefined;
+
+	if (!rawTools) {
+		throw new Error(`Role file ${source} has an invalid tools value.`);
+	}
+
+	const tools = rawTools.map((tool) => tool.trim()).filter(Boolean);
+	for (const tool of tools) {
+		if (!SUBAGENT_TOOL_NAMES.has(tool)) {
+			throw new Error(`Role file ${source} references unsupported tool "${tool}".`);
+		}
+	}
+
+	return [...new Set(tools)];
+}
+
+function parseOptionalBoolean(value: unknown, field: string, source: string): boolean | undefined {
+	if (value === undefined) {
+		return undefined;
+	}
+	if (typeof value !== "boolean") {
+		throw new Error(`Role file ${source} has an invalid ${field} value.`);
+	}
+	return value;
+}
+
+function parseOptionalString(value: unknown, field: string, source: string): string | undefined {
+	if (value === undefined) {
+		return undefined;
+	}
+	if (typeof value !== "string") {
+		throw new Error(`Role file ${source} has an invalid ${field} value.`);
+	}
+	return value.trim() || undefined;
+}
+
+function loadSubagentRoles(): SubagentRole[] {
+	return ROLE_AGENT_FILES.map((fileName) => {
+		const filePath = join(ROLE_AGENT_DIR, fileName);
+		if (!existsSync(filePath)) {
+			throw new Error(`Missing sub-agent role file: ${filePath}`);
+		}
+
+		const { frontmatter, body } = parseFrontmatter<Record<string, unknown>>(readFileSync(filePath, "utf8"));
+		const name = parseOptionalString(frontmatter.name, "name", fileName);
+		if (!name) {
+			throw new Error(`Role file ${fileName} must declare a name.`);
+		}
+
+		return {
+			name,
+			description: parseOptionalString(frontmatter.description, "description", fileName) ?? "",
+			tools: parseRoleTools(frontmatter.tools, fileName),
+			model: parseModelSpec(frontmatter.model, fileName),
+			thinking: parseThinkingLevel(frontmatter.thinking, fileName),
+			systemPrompt: body.trim(),
+			filePath,
+			autoExit: parseOptionalBoolean(frontmatter["auto-exit"], "auto-exit", fileName),
+			output: parseOptionalString(frontmatter.output, "output", fileName),
+		};
+	});
+}
+
+function parseStartArgs(input: string, rolesByName: Map<string, SubagentRole>): ParsedStartArgs | null {
 	const taskInput = input.trim();
 	if (!taskInput) {
 		return null;
@@ -139,8 +289,22 @@ function parseStartArgs(input: string): { name: string; task: string } | null {
 		const name = taskInput.slice(0, colonIndex).trim();
 		const task = taskInput.slice(colonIndex + 1).trim();
 		if (name && task) {
-			return { name, task };
+			const role = rolesByName.get(name.toLowerCase());
+			return role ? { name: role.name, task, role } : { name, task };
 		}
+	}
+
+	const { command: firstWord, rest } = splitCommand(taskInput);
+	const role = rolesByName.get(firstWord.toLowerCase());
+	if (role) {
+		if (!rest) {
+			return null;
+		}
+		return {
+			name: role.name,
+			task: rest,
+			role,
+		};
 	}
 
 	return {
@@ -237,6 +401,17 @@ function createSubagentResourceLoader(ctx: ExtensionContext, record: SubagentRec
 		"When blocked, missing a decision, or needing user input, call ask_main_session with a specific question and wait for the reply.",
 		"Do not assume feedback that was not provided.",
 	].join("\n");
+	const rolePrompt = record.role
+		? [
+				`Selected role: ${record.role.name}`,
+				record.role.description ? `Role description: ${record.role.description}` : "",
+				record.role.output ? `Expected output artifact: ${record.role.output}` : "",
+				record.role.autoExit ? "When the assigned work is complete, return the final result and stop." : "",
+				record.role.systemPrompt,
+			]
+				.filter(Boolean)
+				.join("\n\n")
+		: "";
 
 	return {
 		getExtensions: () => extensionsResult,
@@ -244,7 +419,7 @@ function createSubagentResourceLoader(ctx: ExtensionContext, record: SubagentRec
 		getPrompts: () => ({ prompts: [], diagnostics: [] }),
 		getThemes: () => ({ themes: [], diagnostics: [] }),
 		getAgentsFiles: () => ({ agentsFiles: [] }),
-		getSystemPrompt: () => [mainSystemPrompt, subagentPrompt].filter(Boolean).join("\n\n"),
+		getSystemPrompt: () => [mainSystemPrompt, subagentPrompt, rolePrompt].filter(Boolean).join("\n\n"),
 		getAppendSystemPrompt: () => [],
 		extendResources: () => {},
 		reload: async () => {},
@@ -417,6 +592,8 @@ class SubagentStatusWidget implements Component {
 }
 
 export default function (pi: ExtensionAPI) {
+	const roles = loadSubagentRoles();
+	const rolesByName = new Map(roles.map((role) => [role.name.toLowerCase(), role]));
 	const records = new Map<string, SubagentRecord>();
 	let nextSubagentNumber = 1;
 	let latestCtx: ExtensionContext | undefined;
@@ -505,19 +682,31 @@ export default function (pi: ExtensionAPI) {
 	function formatList(): string {
 		const items = sortedRecords();
 		if (items.length === 0) {
-			return "No sub-agents yet. Start one with `/subagent start <task>`.";
+			return "No sub-agents yet. Start one with `/subagent start <task>` or `/subagent start <role> <task>`.";
 		}
 
 		return items
 			.map((record) => {
 				const bits = [
 					`${record.id} ${record.name}`,
+					record.role ? `role: ${record.role.name}` : undefined,
 					`status: ${record.status}`,
 					`elapsed: ${elapsedFor(record)}`,
 					formatContextUsage(record),
 					`latest: ${record.activity}`,
-				];
+				].filter(Boolean);
 				return `- ${bits.join(" | ")}`;
+			})
+			.join("\n");
+	}
+
+	function formatRoleList(): string {
+		return roles
+			.map((role) => {
+				const tools = [...new Set([...role.tools, "ask_main_session"])].join(", ");
+				const model = role.model?.label ?? "current model";
+				const thinking = role.thinking ?? "current thinking";
+				return `- ${role.name}: ${role.description || "No description"} | tools: ${tools} | model: ${model} | thinking: ${thinking}`;
 			})
 			.join("\n");
 	}
@@ -684,31 +873,47 @@ export default function (pi: ExtensionAPI) {
 		updateStatusWidget();
 	}
 
-	function getSubagentTools(): string[] {
+	function getSubagentTools(record: SubagentRecord): string[] {
+		if (record.role) {
+			return [...new Set([...record.role.tools, "ask_main_session"])];
+		}
+
 		const activeTools = pi.getActiveTools().filter((name) => SUBAGENT_TOOL_NAMES.has(name));
 		const baseTools = activeTools.length > 0 ? activeTools : DEFAULT_TOOLS;
 		return [...new Set([...baseTools, "ask_main_session"])];
 	}
 
-	async function runSubagent(record: SubagentRecord, ctx: ExtensionCommandContext): Promise<void> {
-		try {
+	function resolveSubagentModel(ctx: ExtensionCommandContext, role?: SubagentRole): Model<any> {
+		if (!role?.model) {
 			if (!ctx.model) {
 				throw new Error("No active model selected.");
 			}
+			return ctx.model;
+		}
 
-			const auth = await ctx.modelRegistry.getApiKeyAndHeaders(ctx.model);
+		const model = ctx.modelRegistry.find(role.model.provider, role.model.modelId);
+		if (!model) {
+			throw new Error(`Role "${role.name}" requires model ${role.model.label}, but it is not configured.`);
+		}
+		return model;
+	}
+
+	async function runSubagent(record: SubagentRecord, ctx: ExtensionCommandContext): Promise<void> {
+		try {
+			const model = resolveSubagentModel(ctx, record.role);
+			const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
 			if (!auth.ok) {
-				throw new Error(auth.error || `No credentials available for ${ctx.model.provider}/${ctx.model.id}.`);
+				throw new Error(auth.error || `No credentials available for ${model.provider}/${model.id}.`);
 			}
 
-			markActivity(record, "Creating background Pi session.");
+			markActivity(record, record.role ? `Creating ${record.role.name} background Pi session.` : "Creating background Pi session.");
 			const { session } = await createAgentSession({
 				cwd: ctx.cwd,
 				sessionManager: SessionManager.inMemory(ctx.cwd),
-				model: ctx.model,
+				model,
 				modelRegistry: ctx.modelRegistry as AgentSession["modelRegistry"],
-				thinkingLevel: pi.getThinkingLevel() as SessionThinkingLevel,
-				tools: getSubagentTools(),
+				thinkingLevel: record.role?.thinking ?? (pi.getThinkingLevel() as SessionThinkingLevel),
+				tools: getSubagentTools(record),
 				customTools: [createAskMainSessionTool(record) as unknown as ToolDefinition],
 				resourceLoader: createSubagentResourceLoader(ctx, record),
 			});
@@ -767,9 +972,9 @@ export default function (pi: ExtensionAPI) {
 	}
 
 	async function startSubagent(args: string, ctx: ExtensionCommandContext): Promise<void> {
-		const parsed = parseStartArgs(args);
+		const parsed = parseStartArgs(args, rolesByName);
 		if (!parsed) {
-			ctx.ui.notify("Usage: /subagent start <task>", "warning");
+			ctx.ui.notify("Usage: /subagent start <task> or /subagent start <role> <task>", "warning");
 			return;
 		}
 
@@ -777,6 +982,7 @@ export default function (pi: ExtensionAPI) {
 			id: `sa-${nextSubagentNumber++}`,
 			name: parsed.name,
 			task: parsed.task,
+			role: parsed.role,
 			status: "starting",
 			startedAt: Date.now(),
 			activity: "Queued.",
@@ -786,7 +992,15 @@ export default function (pi: ExtensionAPI) {
 		records.set(record.id, record);
 		updateStatusWidget();
 
-		postStatusMessage(`Started sub-agent ${record.name} (${record.id}).\n\nTask: ${record.task}`);
+		postStatusMessage(
+			[
+				`Started sub-agent ${record.name} (${record.id}).`,
+				record.role ? `Role: ${record.role.name}` : "",
+				`Task: ${record.task}`,
+			]
+				.filter(Boolean)
+				.join("\n\n"),
+		);
 		void runSubagent(record, ctx);
 	}
 
@@ -849,12 +1063,13 @@ export default function (pi: ExtensionAPI) {
 	function formatRecordDetails(record: SubagentRecord): string {
 		const lines = [
 			`Sub-agent ${record.id}: ${record.name}`,
+			record.role ? `Role: ${record.role.name}` : undefined,
 			`Status: ${record.status}`,
 			`Elapsed: ${elapsedFor(record)}`,
 			`Context: ${formatContextUsage(record)}`,
 			`Task: ${record.task}`,
 			`Latest: ${record.activity}`,
-		];
+		].filter(Boolean) as string[];
 
 		if (record.pendingFeedback) {
 			lines.push(`Waiting for feedback: ${record.pendingFeedback.question}`);
@@ -894,7 +1109,7 @@ export default function (pi: ExtensionAPI) {
 
 	pi.registerCommand("subagent", {
 		description:
-			"Manage simple background sub-agents. Use `/subagent start <task>`, `/subagent list`, `/subagent view [id]`, `/subagent stop <id>`, or `/subagent reply <id> <feedback>`.",
+			"Manage simple background sub-agents. Use `/subagent start <task>`, `/subagent start <role> <task>`, `/subagent agents`, `/subagent list`, `/subagent view [id]`, `/subagent stop <id>`, or `/subagent reply <id> <feedback>`.",
 		handler: async (args, ctx) => {
 			latestCtx = ctx;
 			const { command, rest } = splitCommand(args);
@@ -905,6 +1120,9 @@ export default function (pi: ExtensionAPI) {
 				case "list":
 					updateStatusWidget(ctx);
 					postStatusMessage(formatList());
+					return;
+				case "agents":
+					postStatusMessage(`Available sub-agent roles:\n\n${formatRoleList()}`);
 					return;
 				case "view":
 					showStatusView(rest, ctx);
@@ -917,15 +1135,17 @@ export default function (pi: ExtensionAPI) {
 					return;
 				case "help":
 					postStatusMessage(
-							[
-								"Sub-agent commands:",
-								"- /subagent start <task>",
-								"- /subagent start <name>: <task>",
-								"- /subagent list",
-								"- /subagent view [id]",
-								"- /subagent stop <id>",
-								"- /subagent reply <id> <feedback>",
-							].join("\n"),
+						[
+							"Sub-agent commands:",
+							"- /subagent start <task>",
+							"- /subagent start <name>: <task>",
+							"- /subagent start <role> <task>",
+							"- /subagent agents",
+							"- /subagent list",
+							"- /subagent view [id]",
+							"- /subagent stop <id>",
+							"- /subagent reply <id> <feedback>",
+						].join("\n"),
 					);
 					return;
 				default:

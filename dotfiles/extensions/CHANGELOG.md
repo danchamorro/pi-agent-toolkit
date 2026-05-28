@@ -16,6 +16,8 @@ All notable changes to extensions in `~/.pi/agent/extensions/`.
   pause and request explicit feedback from the main session.
 - Made `/subagent view [id]` report status details instead of opening a
   floating overlay.
+- Added bundled `planner`, `reviewer`, `scout`, and `worker` role prompts plus
+  `/subagent agents` and `/subagent start <role> <task>` support.
 
 ## 2026-05-26
 
