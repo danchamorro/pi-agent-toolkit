@@ -1,5 +1,17 @@
 # @danchamorro/pi-subagents Changelog
 
+## Unreleased
+
+### Fixed
+
+- Tool-launched sub-agents now report completion or failure back into the main
+  session as one hidden follow-up bundle, so the main agent can relay results
+  without competing with raw per-agent summaries or silently requiring manual
+  `/subagent view` inspection.
+- `start_subagent` now terminates the launch turn after the background records
+  start, keeping the main session idle and interruptible while sub-agents run
+  instead of letting the main agent continue its own duplicate investigation.
+
 ## 0.2.0 - 2026-05-29
 
 ### Added

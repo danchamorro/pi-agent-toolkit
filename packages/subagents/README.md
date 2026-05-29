@@ -58,8 +58,11 @@ burning the main session's remaining context.
 - **Scoped working directories.** Sub-agents stay anchored to their launch cwd.
   If a relative path is missing there, the child is instructed to ask for
   direction instead of wandering across unrelated folders.
-- **Compact result access.** Sub-agent output stays out of the main transcript
-  by default and can be inspected later with `/subagent view <id>`.
+- **Completion handoff.** Sub-agents launched by the main agent report
+  completion or failure back into the main session as one hidden follow-up
+  bundle, so the main agent can produce a single synthesis instead of competing
+  per-agent summaries. Users can still inspect full output later with
+  `/subagent view <id>`.
 
 ## Quick Start
 
@@ -313,10 +316,14 @@ the other repo" without typing slash commands.
 | `ask_main_session` | Child-only tool that lets a sub-agent ask the main session for a decision, missing path, credential, or preference. |
 
 `start_subagent` is intentionally nonblocking. Natural-language delegation
-should feel like starting any other background job: the main session reports
-which sub-agent started, stays interruptible, and can still stop or reply to the
-child later. The status widget stays visible while the child runs, and the full
-result is available through `/subagent view <id>` after completion.
+should feel like starting any other background job: the tool result shows which
+sub-agent started, then terminates the launch turn so the main session becomes
+idle and the user can stop or reply to the child while it runs. When one or more
+tool-started children from the same launch group complete or fail, the package
+posts one hidden follow-up report back into the main session and triggers the
+main agent to synthesize it for the user. The status widget stays visible while
+the child runs, and the full result remains available through
+`/subagent view <id>` after completion.
 
 ## How It Works
 

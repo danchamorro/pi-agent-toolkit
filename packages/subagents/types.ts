@@ -101,6 +101,8 @@ export type ParsedStartArgs = {
   cwd?: string;
   notifyOnStart?: boolean;
   notifyOnCompletion?: boolean;
+  reportCompletionToMain?: boolean;
+  completionGroupId?: string;
 };
 
 export type SubagentRecord = {
@@ -126,4 +128,6 @@ export type SubagentRecord = {
   >;
   completion?: Promise<void>;
   notifyOnCompletion: boolean;
+  reportCompletionToMain: boolean;
+  completionGroupId?: string;
 };
