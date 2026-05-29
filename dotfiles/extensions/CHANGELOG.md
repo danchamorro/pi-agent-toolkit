@@ -4,7 +4,7 @@ All notable changes to extensions in `~/.pi/agent/extensions/`.
 
 ## 2026-05-28
 
-### subagents.ts
+### subagents
 
 - Added `/subagent start`, `/subagent list`, `/subagent view`,
   `/subagent stop`, and `/subagent reply` for a simple in-process background
@@ -35,6 +35,8 @@ All notable changes to extensions in `~/.pi/agent/extensions/`.
 - Added cwd-aware sub-agent launches so `start_subagent` can target an explicit
   working directory, child sessions stay scoped to that cwd, and status views
   surface where each sub-agent is running.
+- Removed the old dotfiles-managed subagents implementation from
+  `dotfiles/extensions/`.
 
 ## 2026-05-26
 
