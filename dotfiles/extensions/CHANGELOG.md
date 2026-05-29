@@ -27,6 +27,11 @@ All notable changes to extensions in `~/.pi/agent/extensions/`.
 - Added compact call/result rendering for `start_subagent` so raw sub-agent
   output is hidden until the user expands the tool result or runs
   `/subagent view <id>`.
+- Changed sub-agent launches to use fresh child conversation context by default
+  instead of seeding the child session with the main session transcript.
+- Added `stop_subagent` and `reply_subagent` tools so the main agent can stop a
+  sub-agent or answer its feedback request without asking the user to type the
+  `/subagent stop` or `/subagent reply` slash commands.
 
 ## 2026-05-26
 

@@ -13,18 +13,20 @@
  * Tools:
  * - start_subagent - let the main agent launch a role-specific background sub-agent.
  *   The tool waits until the sub-agent finishes or needs feedback.
+ * - stop_subagent - let the main agent stop a running or waiting sub-agent.
+ * - reply_subagent - let the main agent answer a sub-agent feedback request.
  *
  * Shortcut: none.
  *
- * Adds a small Claude Code-style sub-agent MVP. Sub-agents run as in-process
- * Pi sessions, track status and activity in memory, can ask the main session
- * for feedback through an explicit tool, can use bundled planner/reviewer/
- * scout/worker role prompts, and expose a compact live status widget near the
- * editor while background work is active.
+ * Adds a small Claude Code-style sub-agent MVP. Sub-agents run as fresh
+ * in-process Pi sessions without inheriting the main conversation transcript,
+ * track status and activity in memory, can ask the main session for feedback
+ * through an explicit tool, can use bundled planner/reviewer/scout/worker role
+ * prompts, and expose a compact live status widget near the editor while
+ * background work is active.
  */
 
 import {
-	buildSessionContext,
 	createAgentSession,
 	createExtensionRuntime,
 	parseFrontmatter,
@@ -40,7 +42,6 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import {
 	type AssistantMessage,
-	type Message,
 	type Model,
 	type ThinkingLevel as AiThinkingLevel,
 } from "@earendil-works/pi-ai";
@@ -80,6 +81,18 @@ type StartSubagentDetails = {
 	activity?: string;
 	elapsed?: string;
 	result?: string;
+	error?: string;
+};
+
+type SubagentControlDetails = {
+	action: "stop" | "reply";
+	status: "stopped" | "replied" | "noop" | "error";
+	subagentId?: string;
+	name?: string;
+	subagentStatus?: SubagentStatus;
+	activity?: string;
+	elapsed?: string;
+	message?: string;
 	error?: string;
 };
 
@@ -177,6 +190,32 @@ const StartSubagentParams = Type.Object({
 			description: "Optional display name. Defaults to the role name or a task-derived name.",
 		}),
 	),
+});
+
+const StopSubagentParams = Type.Object({
+	id: Type.Optional(
+		Type.String({
+			description:
+				"Sub-agent id or id prefix to stop. Omit only when exactly one sub-agent is active or waiting for feedback.",
+		}),
+	),
+	reason: Type.Optional(
+		Type.String({
+			description: "Optional reason to record when stopping the sub-agent.",
+		}),
+	),
+});
+
+const ReplySubagentParams = Type.Object({
+	id: Type.Optional(
+		Type.String({
+			description:
+				"Sub-agent id or id prefix to reply to. Omit only when exactly one sub-agent is waiting for feedback.",
+		}),
+	),
+	feedback: Type.String({
+		description: "Feedback or instruction to send to the waiting sub-agent.",
+	}),
 });
 
 function stripDynamicSystemPromptFooter(systemPrompt: string): string {
@@ -436,6 +475,7 @@ function createSubagentResourceLoader(ctx: ExtensionContext, record: SubagentRec
 		`Sub-agent id: ${record.id}`,
 		`Sub-agent name: ${record.name}`,
 		`Assigned task: ${record.task}`,
+		"You do not have the main session's conversation history. Treat the assigned task, role instructions, accessible workspace files, and explicit feedback as your source of truth.",
 		"Work independently, keep the scope narrow, and produce a concise final result.",
 		"When blocked, missing a decision, or needing user input, call ask_main_session with a specific question and wait for the reply.",
 		"Do not assume feedback that was not provided.",
@@ -465,19 +505,6 @@ function createSubagentResourceLoader(ctx: ExtensionContext, record: SubagentRec
 	};
 }
 
-function seedMainContext(record: SubagentRecord, session: AgentSession, ctx: ExtensionContext): void {
-	try {
-		const context = buildSessionContext(ctx.sessionManager.getEntries(), ctx.sessionManager.getLeafId());
-		const messages = context.messages as Message[];
-		if (messages.length > 0) {
-			session.agent.state.messages = messages as typeof session.state.messages;
-			record.activity = `Seeded with ${messages.length} main-context messages.`;
-		}
-	} catch (error) {
-		record.activity = `Could not seed main context: ${error instanceof Error ? error.message : String(error)}`;
-	}
-}
-
 function updateRecordContextUsage(record: SubagentRecord): void {
 	record.contextUsage = record.session?.getContextUsage();
 }
@@ -497,6 +524,10 @@ function isActiveStatus(status: SubagentStatus): boolean {
 
 function isWorkingStatus(status: SubagentStatus): boolean {
 	return status === "starting" || status === "running";
+}
+
+function isFinishedStatus(status: SubagentStatus): boolean {
+	return status === "completed" || status === "failed" || status === "stopped";
 }
 
 function isVisibleInWidget(record: SubagentRecord, now: number): boolean {
@@ -662,6 +693,10 @@ export default function (pi: ExtensionAPI) {
 		return sortedRecords().filter((record) => isActiveStatus(record.status));
 	}
 
+	function waitingFeedbackRecords(): SubagentRecord[] {
+		return activeRecords().filter((record) => record.pendingFeedback);
+	}
+
 	function visibleWidgetRecords(): SubagentRecord[] {
 		const now = Date.now();
 		return sortedRecords().filter((record) => isVisibleInWidget(record, now));
@@ -720,6 +755,29 @@ export default function (pi: ExtensionAPI) {
 			return { error: `Sub-agent id "${id}" is ambiguous.` };
 		}
 		return { error: `Sub-agent "${id}" was not found.` };
+	}
+
+	function formatRecordChoices(recordsToFormat: SubagentRecord[]): string {
+		return recordsToFormat.map((record) => `${record.id} ${record.name} (${record.status})`).join(", ");
+	}
+
+	function resolveSingleRecord(
+		id: string | undefined,
+		candidates: SubagentRecord[],
+		emptyMessage: string,
+		multipleMessage: string,
+	): { record?: SubagentRecord; error?: string } {
+		const trimmedId = id?.trim();
+		if (trimmedId) {
+			return findRecord(trimmedId);
+		}
+		if (candidates.length === 0) {
+			return { error: emptyMessage };
+		}
+		if (candidates.length > 1) {
+			return { error: `${multipleMessage}: ${formatRecordChoices(candidates)}.` };
+		}
+		return { record: candidates[0] };
 	}
 
 	function formatList(): string {
@@ -996,10 +1054,9 @@ export default function (pi: ExtensionAPI) {
 
 			record.session = session;
 			record.unsubscribe = session.subscribe((event) => updateFromEvent(record, event));
-			seedMainContext(record, session, ctx);
 
 			record.status = "running";
-			markActivity(record, "Started background task.");
+			markActivity(record, "Started fresh background task.");
 			updateStatusWidget();
 
 			await session.prompt(record.task, { source: "extension" });
@@ -1120,6 +1177,47 @@ export default function (pi: ExtensionAPI) {
 		return lines.join("\n");
 	}
 
+	function formatControlSummary(details: SubagentControlDetails): string {
+		if (details.status === "error") {
+			return `${details.action}_subagent error: ${details.error ?? "unknown error"}`;
+		}
+		if (details.status === "noop") {
+			return details.message ?? `${details.action}_subagent no-op`;
+		}
+
+		const id = details.subagentId ?? "?";
+		const name = details.name ?? "sub-agent";
+		const status = details.subagentStatus ? ` | ${details.subagentStatus}` : "";
+		return `${details.action}_subagent ${name} (${id}) ${details.status}${status}`;
+	}
+
+	function formatControlExpanded(details: SubagentControlDetails, contentText: string): string {
+		const lines = [
+			formatControlSummary(details),
+			details.message,
+			details.activity ? `Latest: ${details.activity}` : "",
+			details.elapsed ? `Elapsed: ${details.elapsed}` : "",
+		].filter(Boolean);
+
+		if (contentText.trim() && contentText.trim() !== details.message?.trim()) {
+			lines.push("", contentText.trim());
+		}
+
+		return lines.join("\n");
+	}
+
+	function formatStopSubagentCall(args: { id?: string; reason?: string }): string {
+		const id = args.id?.trim() || "active";
+		const reason = args.reason?.trim();
+		return `stop_subagent ${id}${reason ? `: ${singleLine(reason, 100)}` : ""}`;
+	}
+
+	function formatReplySubagentCall(args: { id?: string; feedback?: string }): string {
+		const id = args.id?.trim() || "waiting";
+		const feedback = args.feedback?.trim() || "(no feedback)";
+		return `reply_subagent ${id}: ${singleLine(feedback, 120)}`;
+	}
+
 	function waitForSubagentHandoff(record: SubagentRecord, signal: AbortSignal | undefined): Promise<void> {
 		if (!isWorkingStatus(record.status)) {
 			return Promise.resolve();
@@ -1206,23 +1304,37 @@ export default function (pi: ExtensionAPI) {
 		return detailsForRecord(record);
 	}
 
-	async function stopSubagent(id: string, ctx: ExtensionCommandContext): Promise<void> {
-		const found = findRecord(id);
-		if (!found.record) {
-			ctx.ui.notify(found.error ?? "Sub-agent not found.", "warning");
-			return;
+	function detailsForControl(
+		action: SubagentControlDetails["action"],
+		status: SubagentControlDetails["status"],
+		record: SubagentRecord | undefined,
+		message: string | undefined,
+		error?: string,
+	): SubagentControlDetails {
+		return {
+			action,
+			status,
+			subagentId: record?.id,
+			name: record?.name,
+			subagentStatus: record?.status,
+			activity: record?.activity,
+			elapsed: record ? elapsedFor(record) : undefined,
+			message,
+			error,
+		};
+	}
+
+	async function stopSubagentRecord(record: SubagentRecord, reason?: string): Promise<SubagentControlDetails> {
+		if (isFinishedStatus(record.status)) {
+			const message = `Sub-agent ${record.name} (${record.id}) is already ${record.status}.`;
+			return detailsForControl("stop", "noop", record, message);
 		}
 
-		const record = found.record;
-		if (record.status === "completed" || record.status === "failed" || record.status === "stopped") {
-			ctx.ui.notify(`Sub-agent ${record.id} is already ${record.status}.`, "info");
-			return;
-		}
-
+		const stopReason = reason?.trim() || "Stopped by main session.";
 		record.status = "stopped";
 		record.finishedAt = Date.now();
-		record.pendingFeedback?.cancel("The main session stopped this sub-agent.");
-		markActivity(record, "Stopped by main session.");
+		record.pendingFeedback?.cancel(stopReason);
+		markActivity(record, stopReason);
 		updateStatusWidget();
 
 		try {
@@ -1236,7 +1348,50 @@ export default function (pi: ExtensionAPI) {
 			record.session = undefined;
 		}
 
-		postStatusMessage(`Stopped sub-agent ${record.name} (${record.id}).`);
+		return detailsForControl("stop", "stopped", record, `Stopped sub-agent ${record.name} (${record.id}).`);
+	}
+
+	function replySubagentRecord(record: SubagentRecord, feedback: string): SubagentControlDetails {
+		const trimmedFeedback = feedback.trim();
+		if (!trimmedFeedback) {
+			return detailsForControl("reply", "error", record, undefined, "feedback is required.");
+		}
+		if (!record.pendingFeedback) {
+			return detailsForControl(
+				"reply",
+				"error",
+				record,
+				undefined,
+				`Sub-agent ${record.id} is not waiting for feedback.`,
+			);
+		}
+
+		record.pendingFeedback.resolve(trimmedFeedback);
+		return detailsForControl("reply", "replied", record, `Sent feedback to sub-agent ${record.name} (${record.id}).`);
+	}
+
+	async function stopSubagent(id: string, ctx: ExtensionCommandContext): Promise<void> {
+		const found = resolveSingleRecord(
+			id,
+			activeRecords(),
+			"No active sub-agents to stop.",
+			"Multiple active sub-agents; provide an id",
+		);
+		if (!found.record) {
+			ctx.ui.notify(found.error ?? "Sub-agent not found.", "warning");
+			return;
+		}
+
+		const details = await stopSubagentRecord(found.record);
+		if (details.status === "noop") {
+			ctx.ui.notify(details.message ?? "Sub-agent is already finished.", "info");
+			return;
+		}
+		if (details.status === "error") {
+			ctx.ui.notify(details.error ?? "Could not stop sub-agent.", "warning");
+			return;
+		}
+		postStatusMessage(details.message ?? `Stopped sub-agent ${found.record.name} (${found.record.id}).`);
 	}
 
 	function replyToSubagent(args: string, ctx: ExtensionCommandContext): void {
@@ -1252,14 +1407,41 @@ export default function (pi: ExtensionAPI) {
 			return;
 		}
 
-		const record = found.record;
-		if (!record.pendingFeedback) {
-			ctx.ui.notify(`Sub-agent ${record.id} is not waiting for feedback.`, "warning");
+		const details = replySubagentRecord(found.record, feedback);
+		if (details.status === "error") {
+			ctx.ui.notify(details.error ?? "Could not reply to sub-agent.", "warning");
 			return;
 		}
 
-		record.pendingFeedback.resolve(feedback.trim());
-		postStatusMessage(`Sent feedback to sub-agent ${record.name} (${record.id}).`);
+		postStatusMessage(details.message ?? `Sent feedback to sub-agent ${found.record.name} (${found.record.id}).`);
+	}
+
+	async function stopSubagentFromTool(params: { id?: string; reason?: string }): Promise<SubagentControlDetails> {
+		const found = resolveSingleRecord(
+			params.id,
+			activeRecords(),
+			"No active sub-agents to stop.",
+			"Multiple active sub-agents; provide an id",
+		);
+		if (!found.record) {
+			return detailsForControl("stop", "error", undefined, undefined, found.error ?? "Sub-agent not found.");
+		}
+
+		return stopSubagentRecord(found.record, params.reason);
+	}
+
+	function replySubagentFromTool(params: { id?: string; feedback: string }): SubagentControlDetails {
+		const found = resolveSingleRecord(
+			params.id,
+			waitingFeedbackRecords(),
+			"No sub-agent is waiting for feedback.",
+			"Multiple sub-agents are waiting for feedback; provide an id",
+		);
+		if (!found.record) {
+			return detailsForControl("reply", "error", undefined, undefined, found.error ?? "Sub-agent not found.");
+		}
+
+		return replySubagentRecord(found.record, params.feedback);
 	}
 
 	function formatRecordDetails(record: SubagentRecord): string {
@@ -1370,8 +1552,10 @@ export default function (pi: ExtensionAPI) {
 			"Choose role=scout for read-only codebase mapping, role=planner for plans and todos, role=reviewer for review, and role=worker for implementation.",
 			"Wait for this tool's result and synthesize it for the user instead of duplicating the sub-agent's investigation in the main session.",
 			"Do not expose implementation parameters or tool details to the user; users can start explicit background jobs with `/subagent start <role> <task>`.",
-			"Give the sub-agent a concrete task with enough context to finish without guessing.",
-			"Use /subagent view <id> to inspect status, and answer feedback requests with /subagent reply <id> <feedback>.",
+			"Sub-agents start with fresh conversation context, so give the sub-agent a concrete, self-contained task with enough context to finish without guessing.",
+			"If the user wants to stop, cancel, or kill a sub-agent, use stop_subagent instead of asking them to type a slash command.",
+			"If the user answers a sub-agent feedback request, use reply_subagent instead of asking them to type a slash command.",
+			"Users can still manually inspect and control sub-agents with `/subagent view <id>`, `/subagent stop <id>`, and `/subagent reply <id> <feedback>`.",
 		],
 		parameters: StartSubagentParams,
 		renderCall(args, theme) {
@@ -1411,13 +1595,95 @@ export default function (pi: ExtensionAPI) {
 			if (details.status === "completed" && details.result) {
 				text = `Sub-agent ${details.name} (${details.subagentId}) completed.\n\n${details.result}`;
 			} else if (details.status === "waiting_for_feedback") {
-				text = `Sub-agent ${details.name} (${details.subagentId}) needs feedback. Inspect it with ${details.command} and reply with /subagent reply ${details.subagentId} <feedback>.`;
+				text = `Sub-agent ${details.name} (${details.subagentId}) needs feedback. Use reply_subagent to answer it or stop_subagent to stop it. The user can also manually inspect it with ${details.command}.`;
 			} else if (details.status === "failed") {
 				text = `Sub-agent ${details.name} (${details.subagentId}) failed.\n\n${details.error ?? details.activity ?? "Unknown error"}`;
 			} else if (details.status === "error") {
 				text = `Error: ${details.error}`;
 			}
 
+			return {
+				content: [{ type: "text", text }],
+				details,
+			};
+		},
+	});
+
+	pi.registerTool({
+		name: "stop_subagent",
+		label: "Stop Subagent",
+		description:
+			"Stop a running or waiting sub-agent on behalf of the user. " +
+			"Use this when the user says to stop, cancel, kill, abort, or dismiss a sub-agent.",
+		promptSnippet: "Stop or cancel an active sub-agent.",
+		promptGuidelines: [
+			"Use stop_subagent when the user asks to stop, cancel, kill, abort, dismiss, or end a sub-agent.",
+			"If exactly one sub-agent is active or waiting for feedback, omit id when the user says 'it' or 'the subagent'.",
+			"If multiple sub-agents are active, use the id from the feedback message, widget, or prior tool result.",
+			"Do not ask the user to type `/subagent stop <id>` unless tool use is unavailable; the manual command remains available for users who prefer it.",
+		],
+		parameters: StopSubagentParams,
+		renderCall(args, theme) {
+			return new Text(theme.fg("warning", formatStopSubagentCall(args)), 0, 0);
+		},
+		renderResult(result, { expanded }, theme) {
+			const details = result.details as SubagentControlDetails | undefined;
+			const firstContent = result.content[0];
+			const contentText = firstContent?.type === "text" ? firstContent.text : "";
+			if (!details) {
+				return new Text(contentText || "(no output)", 0, 0);
+			}
+			if (expanded) {
+				return new Text(formatControlExpanded(details, contentText), 0, 0);
+			}
+			const color =
+				details.status === "stopped" ? "success" : details.status === "noop" ? "warning" : "error";
+			return new Text(theme.fg(color, formatControlSummary(details)), 0, 0);
+		},
+		async execute(_toolCallId, params) {
+			const details = await stopSubagentFromTool(params);
+			const text = details.message ?? (details.error ? `Error: ${details.error}` : formatControlSummary(details));
+			return {
+				content: [{ type: "text", text }],
+				details,
+			};
+		},
+	});
+
+	pi.registerTool({
+		name: "reply_subagent",
+		label: "Reply Subagent",
+		description:
+			"Answer a sub-agent feedback request on behalf of the user. " +
+			"Use this when the user gives an instruction or answer for a waiting sub-agent.",
+		promptSnippet: "Reply to a waiting sub-agent feedback request.",
+		promptGuidelines: [
+			"Use reply_subagent when the user answers a sub-agent feedback request or tells you what to tell the sub-agent.",
+			"If exactly one sub-agent is waiting for feedback, omit id when the user's intent is clear.",
+			"If multiple sub-agents are waiting, use the id from the feedback message or widget.",
+			"Send the user's actual instruction as feedback; do not summarize away important constraints.",
+			"Do not ask the user to type `/subagent reply <id> <feedback>` unless tool use is unavailable; the manual command remains available for users who prefer it.",
+		],
+		parameters: ReplySubagentParams,
+		renderCall(args, theme) {
+			return new Text(theme.fg("accent", formatReplySubagentCall(args)), 0, 0);
+		},
+		renderResult(result, { expanded }, theme) {
+			const details = result.details as SubagentControlDetails | undefined;
+			const firstContent = result.content[0];
+			const contentText = firstContent?.type === "text" ? firstContent.text : "";
+			if (!details) {
+				return new Text(contentText || "(no output)", 0, 0);
+			}
+			if (expanded) {
+				return new Text(formatControlExpanded(details, contentText), 0, 0);
+			}
+			const color = details.status === "replied" ? "success" : "error";
+			return new Text(theme.fg(color, formatControlSummary(details)), 0, 0);
+		},
+		async execute(_toolCallId, params) {
+			const details = replySubagentFromTool(params);
+			const text = details.message ?? (details.error ? `Error: ${details.error}` : formatControlSummary(details));
 			return {
 				content: [{ type: "text", text }],
 				details,
