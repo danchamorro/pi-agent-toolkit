@@ -1,6 +1,9 @@
 name: Publish subagents package
 
 on:
+  push:
+    tags:
+      - "subagents-v*"
   workflow_dispatch:
 
 permissions:
