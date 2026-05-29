@@ -7,7 +7,7 @@ public backup and reference for how I organize my own agent environment,
 not a universal starter kit intended to be cloned unchanged by everyone.
 
 Includes 26 extensions, 43 skills, 1 prompt template, 1 theme,
-5 installable Pi packages, MCP server configurations, and safety guardrails.
+6 installable Pi packages, MCP server configurations, and safety guardrails.
 
 ---
 
@@ -133,9 +133,10 @@ npm run update:packages   # Pi packages from manifest.json
 
 ### Packages (installable via pi)
 
-This setup installs five Pi packages via `manifest.json`:
+This setup installs six Pi packages via `manifest.json`:
 
 ```bash
+pi install npm:@danchamorro/pi-subagents
 pi install npm:@danchamorro/pi-agent-modes
 pi install npm:@danchamorro/pi-prompt-enhancer
 pi install npm:pi-design-deck
@@ -147,6 +148,7 @@ pi install git:https://github.com/badlogic/pi-diff-review
 
 | Package | Description | npm |
 |---|---|---|
+| [subagents](packages/subagents) | Run in-process background sub-agents with bundled planner, reviewer, scout, and worker roles plus main-session feedback handoff | [![npm](https://img.shields.io/npm/v/@danchamorro/pi-subagents)](https://www.npmjs.com/package/@danchamorro/pi-subagents) |
 | [agent-modes](packages/agent-modes) | Switch between code, architect, debug, ask, and review modes with enforced tool restrictions, bash allowlists, and per-mode model assignment | [![npm](https://img.shields.io/npm/v/@danchamorro/pi-agent-modes)](https://www.npmjs.com/package/@danchamorro/pi-agent-modes) |
 | [prompt-enhancer](packages/prompt-enhancer) | Rewrite prompts to be clearer and more actionable before sending | [![npm](https://img.shields.io/npm/v/@danchamorro/pi-prompt-enhancer)](https://www.npmjs.com/package/@danchamorro/pi-prompt-enhancer) |
 
