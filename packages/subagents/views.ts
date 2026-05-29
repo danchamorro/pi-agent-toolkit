@@ -1,6 +1,6 @@
 import { elapsedFor, formatContextUsage } from "./format.ts";
 import { formatPathForDisplay } from "./paths.ts";
-import type { SubagentRecord, SubagentRole } from "./types.ts";
+import type { SubagentRecord, SubagentRole, SubagentRoleDiagnostic } from "./types.ts";
 
 export function formatRecordChoices(recordsToFormat: SubagentRecord[]): string {
   return recordsToFormat
@@ -35,9 +35,25 @@ export function formatRoleList(roles: SubagentRole[]): string {
       const tools = [...new Set([...role.tools, "ask_main_session"])].join(", ");
       const model = role.model?.label ?? "current model";
       const thinking = role.thinking ?? "current thinking";
-      return `- ${role.name}: ${role.description || "No description"} | tools: ${tools} | model: ${model} | thinking: ${thinking}`;
+      const source = role.source === "user" ? "custom" : "built-in";
+      const sourceLabel = role.overridden ? `${source}, overridden` : source;
+      return `- ${role.name}: ${role.description || "No description"} | source: ${sourceLabel} | tools: ${tools} | model: ${model} | thinking: ${thinking}`;
     })
     .join("\n");
+}
+
+export function formatRoleDiagnostics(diagnostics: SubagentRoleDiagnostic[]): string {
+  if (diagnostics.length === 0) {
+    return "";
+  }
+
+  return [
+    "Sub-agent role warnings:",
+    ...diagnostics.map((diagnostic) => {
+      const location = diagnostic.filePath ? ` (${diagnostic.filePath})` : "";
+      return `- ${diagnostic.message}${location}`;
+    }),
+  ].join("\n");
 }
 
 export function formatRecordDetails(record: SubagentRecord): string {

@@ -177,11 +177,19 @@ function renderSubagentWidgetLines(
 }
 
 export class SubagentStatusWidget implements Component {
+  private readonly getRecords: () => SubagentRecord[];
+  private readonly theme: ExtensionContext["ui"]["theme"];
+  private readonly formatters: SubagentWidgetFormatters;
+
   constructor(
-    private readonly getRecords: () => SubagentRecord[],
-    private readonly theme: ExtensionContext["ui"]["theme"],
-    private readonly formatters: SubagentWidgetFormatters,
-  ) {}
+    getRecords: () => SubagentRecord[],
+    theme: ExtensionContext["ui"]["theme"],
+    formatters: SubagentWidgetFormatters,
+  ) {
+    this.getRecords = getRecords;
+    this.theme = theme;
+    this.formatters = formatters;
+  }
 
   invalidate(): void {}
 

@@ -67,8 +67,31 @@ export type SubagentRole = {
   thinking?: SessionThinkingLevel;
   systemPrompt: string;
   filePath: string;
+  source: "built-in" | "user";
+  overridden?: boolean;
   autoExit?: boolean;
   output?: string;
+};
+
+export type SubagentRoleOverride = {
+  model?: string;
+  thinking?: string;
+  tools?: string[] | string;
+};
+
+export type SubagentSettings = {
+  agentOverrides?: Record<string, SubagentRoleOverride>;
+};
+
+export type SubagentRoleDiagnostic = {
+  level: "warning" | "error";
+  message: string;
+  filePath?: string;
+};
+
+export type SubagentRoleLoadResult = {
+  roles: SubagentRole[];
+  diagnostics: SubagentRoleDiagnostic[];
 };
 
 export type ParsedStartArgs = {

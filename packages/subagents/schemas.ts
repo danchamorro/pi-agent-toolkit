@@ -14,7 +14,8 @@ export const AskMainSessionParams = Type.Object({
 export const StartSubagentParams = Type.Object({
   role: Type.Optional(
     Type.String({
-      description: "Optional bundled role to use: planner, reviewer, scout, or worker.",
+      description:
+        "Optional sub-agent role name. Use /subagent agents to list bundled and custom roles.",
     }),
   ),
   task: Type.String({

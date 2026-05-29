@@ -6,8 +6,10 @@ skills, configs, safety guardrails, and installable packages. This is a
 public backup and reference for how I organize my own agent environment,
 not a universal starter kit intended to be cloned unchanged by everyone.
 
-Includes 26 extensions, 43 skills, 1 prompt template, 1 theme,
+Includes 26 extensions, 46 skills, 1 prompt template, 1 theme,
 6 installable Pi packages, MCP server configurations, and safety guardrails.
+It also tracks 2 custom sub-agent roles for local use with the subagents
+package.
 
 ---
 
@@ -75,6 +77,7 @@ paths:
 |---|---|
 | `~/.pi/agent/extensions/` | `dotfiles/extensions/` |
 | `~/.pi/agent/skills/` | `dotfiles/agent-skills/` |
+| `~/.pi/agent/agents/` | `dotfiles/agents/` |
 | `~/.pi/agent/prompts/` | `dotfiles/prompts/` |
 | `~/.pi/agent/themes/` | `dotfiles/themes/` |
 
@@ -235,7 +238,7 @@ and install path:
 Setup refuses to delete non-symlink files or directories in skill install
 roots. Unmanaged and third-party directories are reported and left in place.
 
-**Personal skills** (16, committed to this repo):
+**Personal skills** (19, committed to this repo):
 
 | Category | Skill | Description |
 |----------|-------|-------------|
@@ -254,6 +257,9 @@ roots. Unmanaged and third-party directories are reported and left in place.
 | `developer-workflow` | `sql-specialist` | Write, review, explain, and optimize SQL queries, schemas, DDL, ERDs, and execution plans |
 | `docs-communication` | `technical-docs` | Technical documentation standards |
 | `engineering` | `test-author` | Create or update targeted tests using project-native conventions and validation |
+| `engineering` | `thermo-nuclear-code-quality-review` | Strict maintainability review for abstraction quality, giant files, spaghetti-condition growth, and code-judo restructuring |
+| `engineering` | `thermo-nuclear-review` | Comprehensive security and correctness audit of branch changes |
+| `engineering` | `thermos` | Launch both thermo-nuclear review subagents in parallel |
 | `developer-workflow` | `whats-new` | Git changelog generation between branches |
 
 **Pi-only skills** (1, committed to this repo):
@@ -289,6 +295,17 @@ Not committed to this repo. Maintained by their original authors.
 | `excalidraw-diagram` | [coleam00/excalidraw-diagram-skill](https://github.com/coleam00/excalidraw-diagram-skill) |
 | `browser` | [browser-use/browser-harness](https://github.com/browser-use/browser-harness) |
 | `agent-browser` | [vercel-labs/agent-browser](https://github.com/vercel-labs/agent-browser) |
+
+### Custom sub-agent roles (2)
+
+Custom sub-agent roles live in `dotfiles/agents/` and are installed to
+`~/.pi/agent/agents/`. These are user-managed role prompts consumed by
+`@danchamorro/pi-subagents`; they are not bundled into the npm package.
+
+| Role | Description |
+|------|-------------|
+| `thermo-nuclear-review-subagent` | Thermo-nuclear branch audit for bugs, breaking changes, security, devex regressions, and feature-flag leaks |
+| `thermo-nuclear-code-quality-review-subagent` | Thermo-nuclear code quality audit for maintainability, structure, 1k-line rule, spaghetti, and code-judo review |
 
 ### Prompt templates (1)
 
@@ -339,7 +356,7 @@ Configured in `mcp.json` (created from template during setup):
 
 ## How to add new components
 
-### Extensions, skills, prompts, and themes
+### Extensions, agents, skills, prompts, and themes
 
 Start in the repo whenever possible. Choose the owner path first, then link
 it into the live agent directories:
@@ -347,6 +364,7 @@ it into the live agent directories:
 | Component | Repo-owned source | Installed or linked to | Notes |
 |---|---|---|---|
 | Extension | `dotfiles/extensions/*.ts` or `dotfiles/extensions/<name>/` | `~/.pi/agent/extensions/` | Add the required top-level JSDoc block and update `dotfiles/extensions/CHANGELOG.md`. |
+| Custom sub-agent role | `dotfiles/agents/<role>.md` | `~/.pi/agent/agents/<role>.md` | Use for user-managed role prompts discovered by `@danchamorro/pi-subagents`. |
 | Pi-only skill | `dotfiles/agent-skills/<skill>/` | `~/.pi/agent/skills/<skill>/` | Use for workflows that depend on Pi-only tools or UI. |
 | Personal skill | `dotfiles/personal-skills/<category>/<skill>/` | `~/.agents/skills/<category>/<skill>/` and `~/.claude/skills/<skill>/` | Use for skills shared by Pi and Claude Code. These are not installed into `~/.pi/agent/skills/`. |
 | Prompt template | `dotfiles/prompts/<prompt>.md` | `~/.pi/agent/prompts/` | Keep reusable prompts here instead of scattering local copies. |
@@ -361,7 +379,7 @@ After adding the file:
 
 If you already built the component outside the repo:
 
-- In `~/.pi/agent/extensions`, `skills`, `prompts`, or `themes`, run
+- In `~/.pi/agent/extensions`, `skills`, `agents`, `prompts`, or `themes`, run
   `node setup.mjs sync` and accept the items you want to absorb. The script
   moves them into `dotfiles/` and symlinks the live files back to the repo.
 - In `~/.agents/skills` or `~/.claude/skills`, move the skill manually into
@@ -403,6 +421,7 @@ modified to suit my needs:
 - [Armin Ronacher (mitsuhiko)](https://github.com/mitsuhiko)
 - [Disler](https://github.com/disler)
 - [Jesse Vincent (obra)](https://github.com/obra)
+- [Cursor Thermos](https://github.com/cursor/plugins/tree/main/thermos)
 - [Nico Bailon](https://github.com/nicobailon)
 - [thananon/9arm-skills](https://github.com/thananon/9arm-skills)
 - [pawel-cell/micky-podcast-agentic-engineering](https://github.com/pawel-cell/micky-podcast-agentic-engineering)

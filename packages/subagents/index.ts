@@ -4,7 +4,7 @@
  * Commands:
  * - /subagent start <task> - start a background sub-agent.
  * - /subagent start <role> <task> - start a role-specific background sub-agent.
- * - /subagent agents - list the bundled sub-agent roles.
+ * - /subagent agents - list bundled and custom sub-agent roles.
  * - /subagent list - show known sub-agents.
  * - /subagent view [id] - show sub-agent status or details.
  * - /subagent stop <id> - stop a running sub-agent.
@@ -12,8 +12,7 @@
  *
  * Tools:
  * - start_subagent - let the main agent launch a role-specific background sub-agent.
- *   The tool waits until the sub-agent finishes or needs feedback and can target
- *   an explicit working directory.
+ *   The tool returns after launch and can target an explicit working directory.
  * - stop_subagent - let the main agent stop a running or waiting sub-agent.
  * - reply_subagent - let the main agent answer a sub-agent feedback request.
  *
@@ -23,8 +22,8 @@
  * in-process Pi sessions without inheriting the main conversation transcript,
  * track status and activity in memory, can ask the main session for feedback
  * through an explicit tool, can use bundled planner/reviewer/scout/worker role
- * prompts, and expose a compact live status widget near the editor while
- * background work is active.
+ * prompts, custom user role prompts, role settings overrides, and expose a
+ * compact live status widget near the editor while background work is active.
  */
 
 import {
@@ -76,6 +75,7 @@ import {
 import {
   formatRecordChoices,
   formatRecordDetails,
+  formatRoleDiagnostics,
   formatRoleList,
   formatSubagentList,
 } from "./views.ts";
@@ -95,7 +95,6 @@ import {
   isActiveStatus,
   isFinishedStatus,
   isVisibleInWidget,
-  isWorkingStatus,
 } from "./status-widget.ts";
 
 const WIDGET_INTERVAL_KEY = Symbol.for("pi-agent-toolkit/subagents-widget-interval");
@@ -137,7 +136,9 @@ function disposeSubagentSession(record: SubagentRecord): void {
 }
 
 export default function (pi: ExtensionAPI) {
-  const roles = loadSubagentRoles();
+  const roleRegistry = loadSubagentRoles();
+  const roles = roleRegistry.roles;
+  const roleDiagnostics = roleRegistry.diagnostics;
   const rolesByName = new Map(roles.map((role) => [role.name.toLowerCase(), role]));
   const records = new Map<string, SubagentRecord>();
   let nextSubagentNumber = 1;
@@ -592,68 +593,10 @@ export default function (pi: ExtensionAPI) {
     createSubagentRecord({ ...parsed, cwd: cwdResult.cwd }, ctx);
   }
 
-  function waitForSubagentHandoff(
-    record: SubagentRecord,
-    signal: AbortSignal | undefined,
-  ): Promise<void> {
-    if (!isWorkingStatus(record.status)) {
-      return Promise.resolve();
-    }
-
-    return new Promise((resolve, reject) => {
-      let settled = false;
-
-      function cleanup() {
-        clearInterval(interval);
-        signal?.removeEventListener("abort", abortHandler);
-      }
-
-      const finish = () => {
-        if (settled) {
-          return;
-        }
-        settled = true;
-        cleanup();
-        resolve();
-      };
-
-      const fail = (error: Error) => {
-        if (settled) {
-          return;
-        }
-        settled = true;
-        cleanup();
-        reject(error);
-      };
-
-      const check = () => {
-        if (!isWorkingStatus(record.status)) {
-          finish();
-        }
-      };
-
-      const abortHandler = () => {
-        fail(
-          new Error(`Stopped waiting for sub-agent ${record.id}; it is still ${record.status}.`),
-        );
-      };
-
-      const interval = setInterval(check, 250);
-      if (signal?.aborted) {
-        abortHandler();
-        return;
-      }
-      signal?.addEventListener("abort", abortHandler, { once: true });
-      record.completion?.finally(check);
-      check();
-    });
-  }
-
-  async function startSubagentFromTool(
+  function startSubagentFromTool(
     params: { role?: string; task: string; name?: string; cwd?: string },
     ctx: ExtensionContext,
-    signal: AbortSignal | undefined,
-  ): Promise<StartSubagentDetails> {
+  ): StartSubagentDetails {
     const task = params.task.trim();
     if (!task) {
       return {
@@ -694,7 +637,6 @@ export default function (pi: ExtensionAPI) {
       },
       ctx,
     );
-    await waitForSubagentHandoff(record, signal);
     return detailsForRecord(record);
   }
 
@@ -887,7 +829,14 @@ export default function (pi: ExtensionAPI) {
           postStatusMessage(formatSubagentList(sortedRecords()));
           return;
         case "agents":
-          postStatusMessage(`Available sub-agent roles:\n\n${formatRoleList(roles)}`);
+          postStatusMessage(
+            [
+              `Available sub-agent roles:\n\n${formatRoleList(roles)}`,
+              formatRoleDiagnostics(roleDiagnostics),
+            ]
+              .filter(Boolean)
+              .join("\n\n"),
+          );
           return;
         case "view":
           showStatusView(rest, ctx);
@@ -924,14 +873,15 @@ export default function (pi: ExtensionAPI) {
     label: "Start Subagent",
     description:
       "Start an in-process background Pi sub-agent for delegated work. " +
-      "Use this when a planner, reviewer, scout, or worker can make progress independently. " +
-      "The tool waits until the sub-agent finishes or asks for feedback, so the main session should use the sub-agent result instead of duplicating the work.",
-    promptSnippet:
-      "Delegate work to a sub-agent and wait for its result. Roles: planner, scout, reviewer, worker.",
+      "Use this when a configured sub-agent role can make progress independently. " +
+      "The tool returns after launch so the main session stays interruptible while the sub-agent runs.",
+    promptSnippet: `Launch a background sub-agent and return control immediately. Available roles: ${availableRoleNames().join(", ")}.`,
     promptGuidelines: [
       "Use start_subagent when a clearly bounded task should be delegated.",
       "Choose role=scout for read-only codebase mapping, role=planner for plans and todos, role=reviewer for review, and role=worker for implementation.",
-      "Wait for this tool's result and synthesize it for the user instead of duplicating the sub-agent's investigation in the main session.",
+      "Use custom roles when the user's request matches a role shown by `/subagent agents`.",
+      "After launch, tell the user which sub-agent started and how to inspect or stop it instead of waiting for completion in the main session.",
+      "Do not duplicate the sub-agent's investigation in the main session.",
       "Do not expose implementation parameters or tool details to the user; users can start explicit background jobs with `/subagent start <role> <task>`.",
       "Sub-agents start with fresh conversation context, so give the sub-agent a concrete, self-contained task with enough context to finish without guessing.",
       "Sub-agents stay scoped to their launch cwd. If the task names a relative path, verify it exists in the current cwd before launching; if a different repo/folder is explicit or already verified, pass cwd.",
@@ -977,8 +927,8 @@ export default function (pi: ExtensionAPI) {
         throw new Error("Sub-agent start was cancelled.");
       }
 
-      const details = await startSubagentFromTool(params, ctx, signal);
-      let text = `Sub-agent ${details.name} (${details.subagentId}) is ${details.status} in ${details.cwd}. Inspect it with ${details.command}.`;
+      const details = startSubagentFromTool(params, ctx);
+      let text = `Started sub-agent ${details.name} (${details.subagentId}) in ${details.cwd}. It is running in the background. Inspect it with ${details.command} or stop it with stop_subagent.`;
       if (details.status === "completed" && details.result) {
         text = `Sub-agent ${details.name} (${details.subagentId}) completed in ${details.cwd}.\n\n${details.result}`;
       } else if (details.status === "waiting for feedback") {

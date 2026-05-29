@@ -1,6 +1,6 @@
 {
   "name": "@danchamorro/pi-subagents",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "In-process background sub-agents for Pi with role prompts, feedback handoff, and compact status visibility",
   "keywords": [
     "pi-package",
@@ -19,6 +19,9 @@
     "directory": "packages/subagents"
   },
   "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.ts"
+  },
   "files": [
     "*.ts",
     "agents"

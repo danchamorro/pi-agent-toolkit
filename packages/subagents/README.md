@@ -21,6 +21,8 @@ burning the main session's remaining context.
 - [Quick Start](#quick-start)
 - [Installation](#installation)
 - [Roles](#roles)
+- [Custom Agents](#custom-agents)
+- [Role Settings](#role-settings)
 - [User Commands](#user-commands)
 - [Main-Agent Tools](#main-agent-tools)
 - [How It Works](#how-it-works)
@@ -43,6 +45,10 @@ burning the main session's remaining context.
 - **Bundled role prompts.** The package includes `planner`, `scout`,
   `reviewer`, and `worker` roles with role-specific tools, models, thinking
   levels, and output expectations.
+- **Custom agents.** Users can drop Markdown agents into their Pi agent
+  directory and have them show up beside the bundled roles.
+- **Per-role settings.** Built-in and custom roles can override model,
+  thinking level, and tools without editing package files.
 - **Manual and agent-driven control.** Users can type `/subagent ...` commands,
   while the main agent can use `start_subagent`, `stop_subagent`, and
   `reply_subagent` tools on the user's behalf.
@@ -52,8 +58,8 @@ burning the main session's remaining context.
 - **Scoped working directories.** Sub-agents stay anchored to their launch cwd.
   If a relative path is missing there, the child is instructed to ask for
   direction instead of wandering across unrelated folders.
-- **Compact result rendering.** Tool-launched sub-agent output is summarized by
-  default and can be expanded, or inspected later with `/subagent view <id>`.
+- **Compact result access.** Sub-agent output stays out of the main transcript
+  by default and can be inspected later with `/subagent view <id>`.
 
 ## Quick Start
 
@@ -87,8 +93,8 @@ Start a background scout manually:
 Ask the main agent to delegate naturally:
 
 ```text
-Use a scout subagent to map this repo's extension architecture. Do not duplicate
-the scout's investigation yourself; synthesize its result.
+Use a scout subagent to map this repo's extension architecture. Launch it in the
+background and do not duplicate the scout's investigation yourself.
 ```
 
 ## Installation
@@ -187,6 +193,92 @@ Role files support these fields:
 | `auto-exit` | Tells the role to return a final result when the task is done. |
 | `output` | Human-readable expected output artifact, such as `plan.md` or `review.md`. |
 
+## Custom Agents
+
+Custom agents use the same Markdown format as bundled roles. Put them in the Pi
+agent directory under `agents/*.md`:
+
+```text
+~/.pi/agent/agents/thermos-review.md
+```
+
+If you use `pi-agent-toolkit`, keep repo-managed custom agents under
+`dotfiles/agents/*.md` and run `npm run dev:sync`. Setup links those files into
+`~/.pi/agent/agents/`.
+
+Example:
+
+```markdown
+---
+name: thermos-review
+description: Review a change with a strict correctness and maintainability lens.
+tools: read, bash, grep, find, ls
+model: openai-codex/gpt-5.5
+thinking: high
+auto-exit: true
+output: review.md
+---
+
+You are a focused review sub-agent. Inspect the requested change, report
+concrete defects first, cite files and lines when possible, and keep the final
+answer concise.
+```
+
+After adding or editing a custom agent, restart Pi or run `/reload`, then check:
+
+```text
+/subagent agents
+```
+
+Custom agents are additive. A custom file cannot silently replace a bundled
+role such as `scout` or `reviewer`; conflicting custom roles are skipped and
+shown as warnings in `/subagent agents`. If you want to change a bundled role's
+model, thinking level, or tools, use role settings instead.
+
+This is the intended place to test external agent collections such as
+Thermos-style Cursor agents. Keep those prompts outside the package at first,
+convert one prompt into this Markdown format, reload Pi, and confirm it appears
+as a custom role before deciding whether any behavior belongs in core.
+
+## Role Settings
+
+Role settings live in the Pi agent settings file:
+
+```text
+~/.pi/agent/settings.json
+```
+
+Add a `subagents.agentOverrides` object keyed by role name:
+
+```json
+{
+  "subagents": {
+    "agentOverrides": {
+      "scout": {
+        "model": "openai-codex/gpt-5.5",
+        "thinking": "off",
+        "tools": ["read", "bash", "grep", "find", "ls"]
+      },
+      "thermos-review": {
+        "thinking": "xhigh"
+      }
+    }
+  }
+}
+```
+
+Supported override fields are:
+
+| Field | Meaning |
+|---|---|
+| `model` | Optional `provider/model` model override for that role. |
+| `thinking` | Optional thinking level override, including `off`. |
+| `tools` | Optional tool allowlist as an array or comma-separated string. |
+
+Invalid override values are ignored with a warning and the role keeps its last
+valid value. Unknown role names are also reported in `/subagent agents`, which
+helps catch typos after a reload.
+
 ## User Commands
 
 The package registers one slash command namespace: `/subagent`.
@@ -195,7 +287,7 @@ The package registers one slash command namespace: `/subagent`.
 |---|---|
 | `/subagent` | Shows current sub-agent status. |
 | `/subagent help` | Lists available sub-agent commands. |
-| `/subagent agents` | Lists bundled roles, tools, model, and thinking settings. |
+| `/subagent agents` | Lists bundled and custom roles, tools, model, thinking settings, source, and warnings. |
 | `/subagent start <task>` | Starts a generic background sub-agent using the current model and thinking level. |
 | `/subagent start <role> <task>` | Starts a role-specific background sub-agent. |
 | `/subagent start <name>: <task>` | Starts a named sub-agent; if `<name>` matches a role, that role is used. |
@@ -215,15 +307,16 @@ the other repo" without typing slash commands.
 
 | Tool | Purpose |
 |---|---|
-| `start_subagent` | Starts a sub-agent for a bounded task and waits until it completes, fails, or asks for feedback. |
+| `start_subagent` | Starts a sub-agent for a bounded task and returns after launch. |
 | `stop_subagent` | Stops a running or waiting sub-agent. If exactly one is active, the id can be omitted. |
 | `reply_subagent` | Replies to a waiting feedback request. If exactly one sub-agent is waiting, the id can be omitted. |
 | `ask_main_session` | Child-only tool that lets a sub-agent ask the main session for a decision, missing path, credential, or preference. |
 
-`start_subagent` intentionally waits for the child handoff. That keeps the main
-agent from doing the same investigation in parallel and then dumping duplicate
-summaries into the terminal. The tool result is compact by default, with the
-full result available through expansion or `/subagent view <id>`.
+`start_subagent` is intentionally nonblocking. Natural-language delegation
+should feel like starting any other background job: the main session reports
+which sub-agent started, stays interruptible, and can still stop or reply to the
+child later. The status widget stays visible while the child runs, and the full
+result is available through `/subagent view <id>` after completion.
 
 ## How It Works
 
@@ -296,8 +389,9 @@ Stop or reply manually:
 Let the main agent drive the workflow:
 
 ```text
-Use a scout subagent to map the package source. If it gets blocked, ask me.
-When it finishes, summarize the scout's result and do not repeat its work.
+Use a scout subagent to map the package source. Launch it in the background,
+then tell me how to inspect or stop it. Do not repeat its work in the main
+session.
 ```
 
 ## Development
@@ -361,7 +455,7 @@ These boundaries keep the feature predictable while the package matures.
 |---|---|
 | [index.ts](index.ts#L1) | Extension entrypoint, command/tool registration, sub-agent records, runner lifecycle, and session cleanup. |
 | [agents/](agents/) | Bundled role prompts for planner, scout, reviewer, and worker. |
-| [roles.ts](roles.ts#L1) | Role prompt loading, frontmatter validation, and `/subagent start` argument parsing. |
+| [roles.ts](roles.ts#L1) | Built-in/custom role loading, settings overrides, frontmatter validation, and `/subagent start` argument parsing. |
 | [resource-loader.ts](resource-loader.ts#L1) | Builds the child session resources and task-specific system prompt. |
 | [status-widget.ts](status-widget.ts#L1) | Compact below-editor status widget for active and recent sub-agents. |
 | [views.ts](views.ts#L1) | `/subagent list`, `/subagent agents`, and `/subagent view` text formatting. |

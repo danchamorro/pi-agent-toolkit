@@ -80,14 +80,13 @@ const heading = (msg) => console.log(`\n${BOLD}${msg}${RESET}`);
 const DIRECTORY_MAPS = [
   ["extensions", join(PI_AGENT_DIR, "extensions")],
   ["agent-skills", join(PI_AGENT_DIR, "skills")],
+  ["agents", join(PI_AGENT_DIR, "agents")],
   ["prompts", join(PI_AGENT_DIR, "prompts")],
   ["themes", join(PI_AGENT_DIR, "themes")],
 ];
 
 // Directories that get symlinked/copied as a whole (not entry-by-entry)
-const WHOLE_DIR_MAPS = [
-  ["intercepted-commands", join(PI_AGENT_DIR, "intercepted-commands")],
-];
+const WHOLE_DIR_MAPS = [["intercepted-commands", join(PI_AGENT_DIR, "intercepted-commands")]];
 
 // Configs that get symlinked (--link) or copied into ~/.pi/agent/
 const LINKABLE_CONFIGS = [
@@ -106,11 +105,7 @@ const TEMPLATE_CONFIGS = {
 };
 
 // Entries to skip when scanning directories (never sync or link these)
-const SKIP_ENTRIES = new Set([
-  "node_modules",
-  ".git",
-  ".DS_Store",
-]);
+const SKIP_ENTRIES = new Set(["node_modules", ".git", ".DS_Store"]);
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -359,9 +354,7 @@ function installExternalSkills() {
     info(`Installing from ${entry.source}...`);
     try {
       execSync(cmd, { stdio: "pipe", timeout: 120_000 });
-      const names = entry.skills?.length
-        ? entry.skills.join(", ")
-        : entry.source.split("/").pop();
+      const names = entry.skills?.length ? entry.skills.join(", ") : entry.source.split("/").pop();
       ok(`${names}`);
     } catch (err) {
       fail(`Failed: ${entry.source} - ${err.message}`);
@@ -467,7 +460,7 @@ function installPersonalSkills(useLink) {
       const targetPath = layout === "flat" ? collisionPath : join(targetRoot, category, skill);
       if (pathExists(collisionPath) && !isRepoOwnedSymlink(collisionPath)) {
         warn(
-          `personal skill ${category}/${skill} collides with existing ${collisionPath}; skipping`
+          `personal skill ${category}/${skill} collides with existing ${collisionPath}; skipping`,
         );
         continue;
       }
@@ -583,10 +576,8 @@ async function runInstall(useLink, skipExternal, skipPackages) {
   // Remind about template configs
   const authTarget = join(PI_AGENT_DIR, "auth.json");
   const mcpTarget = join(PI_AGENT_DIR, "mcp.json");
-  const needsAuth = existsSync(authTarget) &&
-    readFileSync(authTarget, "utf-8").includes("YOUR_");
-  const needsMcp = existsSync(mcpTarget) &&
-    readFileSync(mcpTarget, "utf-8").includes("YOUR_");
+  const needsAuth = existsSync(authTarget) && readFileSync(authTarget, "utf-8").includes("YOUR_");
+  const needsMcp = existsSync(mcpTarget) && readFileSync(mcpTarget, "utf-8").includes("YOUR_");
 
   if (needsAuth || needsMcp) {
     console.log("");
@@ -614,6 +605,7 @@ async function runSync(absorbAll) {
   const syncTargets = [
     [join(PI_AGENT_DIR, "extensions"), "extensions", "extensions"],
     [join(PI_AGENT_DIR, "skills"), "agent-skills", "agent-skills"],
+    [join(PI_AGENT_DIR, "agents"), "agents", "agents"],
     [join(PI_AGENT_DIR, "prompts"), "prompts", "prompts"],
     [join(PI_AGENT_DIR, "themes"), "themes", "themes"],
   ];
@@ -651,6 +643,11 @@ async function runSync(absorbAll) {
         if (externalSkills.has(entry)) continue;
       }
 
+      // For custom sub-agent roles: accept Markdown role files
+      if (label === "agents") {
+        if (entryIsDir || !entry.endsWith(".md")) continue;
+      }
+
       found.push({
         name: entry,
         piPath,
@@ -683,7 +680,7 @@ async function runSync(absorbAll) {
     for (const item of found) {
       const suffix = item.isDirectory ? "/" : "";
       const yes = await askYesNo(
-        `Absorb ${BOLD}${item.name}${suffix}${RESET} ${DIM}(${item.label})${RESET} into repo?`
+        `Absorb ${BOLD}${item.name}${suffix}${RESET} ${DIM}(${item.label})${RESET} into repo?`,
       );
       if (yes) toAbsorb.push(item);
     }
@@ -743,7 +740,7 @@ function printHelp() {
   console.log(`
 ${BOLD}pi-agent-toolkit setup${RESET}
 
-Selectively install extensions, skills, and configs for the Pi coding agent.
+  Selectively install extensions, agents, skills, and configs for the Pi coding agent.
 
 ${BOLD}Usage:${RESET}
 
@@ -768,6 +765,8 @@ ${BOLD}Flags (copy and link modes):${RESET}
 ${BOLD}What it does:${RESET}
 
   Copy mode copies files from dotfiles/ into ~/.pi/agent/ and ~/.agents/skills/.
+  Custom sub-agent roles from dotfiles/agents/ are installed into
+  ~/.pi/agent/agents/.
   Categorized personal skills from dotfiles/personal-skills/<category>/<skill>/
   are installed into ~/.agents/skills/<category>/<skill> for Pi and as flat
   entries in ~/.claude/skills/<skill> for Claude Code. They are not installed

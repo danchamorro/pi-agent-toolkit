@@ -1,9 +1,9 @@
 # pi-agent-toolkit dotfiles
 
 Installable Pi and Claude Code configuration for my personal agent setup:
-extensions, personal skills, Pi-only skills, config files, and safety
-guardrails. `setup.mjs` installs the content in this directory into the
-appropriate agent paths. External skills are tracked separately in
+extensions, custom sub-agent roles, personal skills, Pi-only skills, config
+files, and safety guardrails. `setup.mjs` installs the content in this
+directory into the appropriate agent paths. External skills are tracked separately in
 `manifest.json` and installed via `npx skills add`.
 
 ## Directory layout
@@ -11,6 +11,7 @@ appropriate agent paths. External skills are tracked separately in
 ```
 dotfiles/
   extensions/ ............. 26 extensions (.ts files and subdirectories)
+  agents/ ................. Custom sub-agent roles (-> ~/.pi/agent/agents/)
   agent-skills/ ........... Pi-only skills        (-> ~/.pi/agent/skills/)
   personal-skills/ ........ Personal skills       (-> ~/.agents/skills/<category>/<skill> and ~/.claude/skills/<skill>)
   prompts/ ................ Prompt templates      (-> ~/.pi/agent/prompts/)
@@ -40,6 +41,16 @@ scans `~/.agents/skills/`. Create personal skills directly under
 
 Setup refuses to delete non-symlink files or directories in skill install
 roots. Third-party and unmanaged directories are reported and left in place.
+
+## Custom sub-agent roles
+
+Custom sub-agent roles live at `dotfiles/agents/*.md` and install to
+`~/.pi/agent/agents/`. They are discovered by the `@danchamorro/pi-subagents`
+package at Pi startup or after `/reload`.
+
+This directory is for user-managed agents such as adapted Thermos review roles.
+They are linked into the local Pi environment by setup, but they are not bundled
+into the published subagents npm package.
 
 ## Prompt templates
 

@@ -20,10 +20,10 @@ All notable changes to extensions in `~/.pi/agent/extensions/`.
   `/subagent agents` and `/subagent start <role> <task>` support.
 - Added a `start_subagent` tool so the main agent can launch a bundled role
   sub-agent without requiring the user to type a slash command.
-- Changed `start_subagent` to always wait until the delegated sub-agent finishes
-  or asks for feedback, reducing duplicate work in the main session.
-- Suppressed full completion posts for tool-launched sub-agents when the tool
-  is already returning the delegated result to the main agent.
+- Restored `start_subagent` to return immediately after launch so the main
+  session stays interruptible while delegated work runs in the background.
+- Suppressed full completion posts for tool-launched sub-agents so background
+  results stay out of the terminal unless the user asks to inspect them.
 - Added compact call/result rendering for `start_subagent` so raw sub-agent
   output is hidden until the user expands the tool result or runs
   `/subagent view <id>`.

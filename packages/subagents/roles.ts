@@ -1,5 +1,5 @@
-import { parseFrontmatter } from "@earendil-works/pi-coding-agent";
-import { existsSync, readFileSync } from "node:fs";
+import { getAgentDir, parseFrontmatter } from "@earendil-works/pi-coding-agent";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -14,10 +14,21 @@ import type {
   ParsedStartArgs,
   RoleModelSpec,
   SessionThinkingLevel,
+  SubagentRoleDiagnostic,
+  SubagentRoleLoadResult,
+  SubagentRoleOverride,
   SubagentRole,
+  SubagentSettings,
 } from "./types.ts";
 
 const ROLE_AGENT_DIR = join(dirname(fileURLToPath(import.meta.url)), "agents");
+const USER_AGENT_DIR_NAME = "agents";
+const SETTINGS_FILE_NAME = "settings.json";
+
+type RoleLoadOptions = {
+  agentDir?: string;
+  settings?: SubagentSettings;
+};
 
 function parseModelSpec(value: unknown, source: string): RoleModelSpec | undefined {
   if (value === undefined) {
@@ -101,33 +112,232 @@ function parseOptionalString(value: unknown, field: string, source: string): str
   return value.trim() || undefined;
 }
 
-export function loadSubagentRoles(): SubagentRole[] {
+function readSubagentSettings(agentDir: string): {
+  settings: SubagentSettings;
+  diagnostics: SubagentRoleDiagnostic[];
+} {
+  const settingsPath = join(agentDir, SETTINGS_FILE_NAME);
+  if (!existsSync(settingsPath)) {
+    return { settings: {}, diagnostics: [] };
+  }
+
+  try {
+    const raw = JSON.parse(readFileSync(settingsPath, "utf8")) as {
+      subagents?: unknown;
+    };
+    const subagents = raw.subagents;
+    if (!subagents || typeof subagents !== "object" || Array.isArray(subagents)) {
+      return { settings: {}, diagnostics: [] };
+    }
+    return { settings: subagents as SubagentSettings, diagnostics: [] };
+  } catch (error) {
+    return {
+      settings: {},
+      diagnostics: [
+        {
+          level: "warning",
+          filePath: settingsPath,
+          message: `Could not read subagent settings: ${error instanceof Error ? error.message : String(error)}`,
+        },
+      ],
+    };
+  }
+}
+
+function parseRoleFile(filePath: string, source: SubagentRole["source"]): SubagentRole {
+  const { frontmatter, body } = parseFrontmatter<Record<string, unknown>>(
+    readFileSync(filePath, "utf8"),
+  );
+  const name = parseOptionalString(frontmatter.name, "name", filePath);
+  if (!name) {
+    throw new Error(`Role file ${filePath} must declare a name.`);
+  }
+
+  return {
+    name,
+    description: parseOptionalString(frontmatter.description, "description", filePath) ?? "",
+    tools: parseRoleTools(frontmatter.tools, filePath),
+    model: parseModelSpec(frontmatter.model, filePath),
+    thinking: parseThinkingLevel(frontmatter.thinking, filePath),
+    systemPrompt: body.trim(),
+    filePath,
+    source,
+    autoExit: parseOptionalBoolean(frontmatter["auto-exit"], "auto-exit", filePath),
+    output: parseOptionalString(frontmatter.output, "output", filePath),
+  };
+}
+
+function loadBuiltInRoles(): SubagentRole[] {
   return ROLE_AGENT_FILES.map((fileName) => {
     const filePath = join(ROLE_AGENT_DIR, fileName);
     if (!existsSync(filePath)) {
       throw new Error(`Missing sub-agent role file: ${filePath}`);
     }
+    return parseRoleFile(filePath, "built-in");
+  });
+}
 
-    const { frontmatter, body } = parseFrontmatter<Record<string, unknown>>(
-      readFileSync(filePath, "utf8"),
-    );
-    const name = parseOptionalString(frontmatter.name, "name", fileName);
-    if (!name) {
-      throw new Error(`Role file ${fileName} must declare a name.`);
+function listUserRoleFiles(agentDir: string): string[] {
+  const userAgentDir = join(agentDir, USER_AGENT_DIR_NAME);
+  if (!existsSync(userAgentDir)) {
+    return [];
+  }
+
+  return readdirSync(userAgentDir, { withFileTypes: true })
+    .filter((entry) => {
+      if (!entry.name.endsWith(".md")) {
+        return false;
+      }
+      if (entry.isFile()) {
+        return true;
+      }
+      if (!entry.isSymbolicLink()) {
+        return false;
+      }
+      try {
+        return statSync(join(userAgentDir, entry.name)).isFile();
+      } catch {
+        return false;
+      }
+    })
+    .map((entry) => join(userAgentDir, entry.name))
+    .sort();
+}
+
+function addUserRoles(
+  roles: SubagentRole[],
+  diagnostics: SubagentRoleDiagnostic[],
+  agentDir: string,
+): void {
+  const rolesByName = new Map(roles.map((role) => [role.name.toLowerCase(), role]));
+
+  for (const filePath of listUserRoleFiles(agentDir)) {
+    let role: SubagentRole;
+    try {
+      role = parseRoleFile(filePath, "user");
+    } catch (error) {
+      diagnostics.push({
+        level: "warning",
+        filePath,
+        message: `Skipped custom sub-agent role: ${error instanceof Error ? error.message : String(error)}`,
+      });
+      continue;
     }
 
-    return {
-      name,
-      description: parseOptionalString(frontmatter.description, "description", fileName) ?? "",
-      tools: parseRoleTools(frontmatter.tools, fileName),
-      model: parseModelSpec(frontmatter.model, fileName),
-      thinking: parseThinkingLevel(frontmatter.thinking, fileName),
-      systemPrompt: body.trim(),
-      filePath,
-      autoExit: parseOptionalBoolean(frontmatter["auto-exit"], "auto-exit", fileName),
-      output: parseOptionalString(frontmatter.output, "output", fileName),
-    };
+    const existing = rolesByName.get(role.name.toLowerCase());
+    if (existing) {
+      diagnostics.push({
+        level: "warning",
+        filePath,
+        message: `Skipped custom sub-agent role "${role.name}" because it conflicts with ${existing.source} role "${existing.name}". Use settings.json subagents.agentOverrides.${existing.name} to override model/thinking/tools.`,
+      });
+      continue;
+    }
+
+    roles.push(role);
+    rolesByName.set(role.name.toLowerCase(), role);
+  }
+}
+
+function applyRoleOverride(
+  role: SubagentRole,
+  override: SubagentRoleOverride,
+  diagnostics: SubagentRoleDiagnostic[],
+): SubagentRole {
+  let next = role;
+
+  const setOverride = (updates: Partial<SubagentRole>) => {
+    next = { ...next, ...updates, overridden: true };
+  };
+
+  if (override.model !== undefined) {
+    try {
+      setOverride({ model: parseModelSpec(override.model, `settings override for ${role.name}`) });
+    } catch (error) {
+      diagnostics.push({
+        level: "warning",
+        message: `Ignored model override for sub-agent role "${role.name}": ${error instanceof Error ? error.message : String(error)}`,
+      });
+    }
+  }
+
+  if (override.thinking !== undefined) {
+    try {
+      setOverride({
+        thinking: parseThinkingLevel(override.thinking, `settings override for ${role.name}`),
+      });
+    } catch (error) {
+      diagnostics.push({
+        level: "warning",
+        message: `Ignored thinking override for sub-agent role "${role.name}": ${error instanceof Error ? error.message : String(error)}`,
+      });
+    }
+  }
+
+  if (override.tools !== undefined) {
+    try {
+      setOverride({ tools: parseRoleTools(override.tools, `settings override for ${role.name}`) });
+    } catch (error) {
+      diagnostics.push({
+        level: "warning",
+        message: `Ignored tools override for sub-agent role "${role.name}": ${error instanceof Error ? error.message : String(error)}`,
+      });
+    }
+  }
+
+  return next;
+}
+
+function applyRoleOverrides(
+  roles: SubagentRole[],
+  settings: SubagentSettings,
+  diagnostics: SubagentRoleDiagnostic[],
+): SubagentRole[] {
+  const overrides = settings.agentOverrides;
+  if (!overrides || typeof overrides !== "object" || Array.isArray(overrides)) {
+    return roles;
+  }
+
+  const overridesByName = new Map(
+    Object.entries(overrides).map(([name, override]) => [name.toLowerCase(), override]),
+  );
+  const rolesByName = new Map(roles.map((role) => [role.name.toLowerCase(), role]));
+
+  for (const name of overridesByName.keys()) {
+    if (!rolesByName.has(name)) {
+      diagnostics.push({
+        level: "warning",
+        message: `Ignored settings override for unknown sub-agent role "${name}".`,
+      });
+    }
+  }
+
+  return roles.map((role) => {
+    const override = overridesByName.get(role.name.toLowerCase());
+    if (!override || typeof override !== "object" || Array.isArray(override)) {
+      return role;
+    }
+    return applyRoleOverride(role, override, diagnostics);
   });
+}
+
+export function loadSubagentRoles(options: RoleLoadOptions = {}): SubagentRoleLoadResult {
+  const agentDir = options.agentDir ?? getAgentDir();
+  const diagnostics: SubagentRoleDiagnostic[] = [];
+  const roles = loadBuiltInRoles();
+
+  addUserRoles(roles, diagnostics, agentDir);
+
+  const settingsResult =
+    options.settings === undefined
+      ? readSubagentSettings(agentDir)
+      : { settings: options.settings, diagnostics: [] };
+  diagnostics.push(...settingsResult.diagnostics);
+
+  return {
+    roles: applyRoleOverrides(roles, settingsResult.settings, diagnostics),
+    diagnostics,
+  };
 }
 
 export function parseStartArgs(

@@ -280,6 +280,17 @@ If a legitimate command is blocked:
 3. Each skill directory must contain a `SKILL.md` file.
 4. Restart Pi after adding new skills.
 
+### Custom sub-agent roles not appearing
+
+1. Verify role links exist:
+   ```bash
+   ls -la ~/.pi/agent/agents/
+   ```
+
+2. Each custom role must be a Markdown file with a `name` field in
+   frontmatter.
+3. Run `/reload` or restart Pi after adding new custom roles.
+
 ### npm install fails in damage-control
 
 The `damage-control/` extension has its own `package.json`. `setup.mjs`

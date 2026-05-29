@@ -1,5 +1,28 @@
 # @danchamorro/pi-subagents Changelog
 
+## 0.2.0 - 2026-05-29
+
+### Added
+
+- Added custom role discovery from the Pi agent directory's `agents/*.md`
+  files, so users can add external sub-agent prompts without editing the
+  package.
+- Added `settings.json` role overrides for per-role model, thinking, and tool
+  settings.
+- Added role loader tests covering custom roles, settings overrides, duplicate
+  role names, and invalid override diagnostics.
+
+### Changed
+
+- Updated `/subagent agents` output to show whether each role is built-in,
+  custom, or settings-overridden.
+- Restored `start_subagent` to return immediately after launch so
+  natural-language sub-agent delegation stays interruptible.
+- Custom role discovery now follows symlinked Markdown files, matching
+  repo-managed link-mode setups.
+- Custom roles with names that conflict with existing roles are skipped with an
+  explicit warning instead of silently replacing bundled behavior.
+
 ## 0.1.0 - 2026-05-29
 
 ### Added
