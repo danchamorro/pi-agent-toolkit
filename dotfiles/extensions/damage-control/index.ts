@@ -1,8 +1,9 @@
 /**
  * Damage Control Extension
  *
- * Real-time safety auditing that intercepts dangerous bash patterns and
- * enforces path-based access controls. Rules are loaded from YAML config.
+ * Real-time safety auditing that intercepts dangerous bash patterns,
+ * enforces path-based access controls, and requires explicit approval before
+ * guardrail files can be changed. Rules are loaded from YAML config.
  *
  * Config locations (merged, project-local extends global):
  *   ~/.pi/agent/damage-control-rules.yaml  (global)
@@ -130,6 +131,19 @@ const readOnlyPipeCommands = new Set([
 ]);
 const unsafeFindPrimaryPattern = /(?:^|\s)-(?:delete|exec|execdir|ok|okdir|fprint|fprintf|fls)(?:\s|$)/;
 
+const guardrailProtectedPaths = [
+	"dotfiles/extensions/damage-control/",
+	"dotfiles/damage-control-rules.yaml",
+	".pi/extensions/damage-control/",
+	".pi/extensions/damage-control.ts",
+	".pi/damage-control-rules.yaml",
+	".pi/settings.json",
+	"~/.pi/agent/extensions/damage-control/",
+	"~/.pi/agent/extensions/damage-control.ts",
+	"~/.pi/agent/damage-control-rules.yaml",
+	"~/.pi/agent/settings.json",
+];
+
 function mergeRules(...sources: (Partial<DamageControlRules> | null)[]): DamageControlRules {
 	const merged: DamageControlRules = {
 		bashToolPatterns: [],
@@ -189,6 +203,51 @@ export default function (pi: ExtensionAPI) {
 		const projectRules = loadRulesFile(projectPath);
 
 		rules = mergeRules(globalRules, projectRules);
+	}
+
+	function isGuardrailProtectedPath(filePath: string): boolean {
+		return guardrailProtectedPaths.some((p) => pathMatches(filePath, p));
+	}
+
+	function getBashGuardrailTarget(command: string): string | null {
+		for (const candidate of extractCommandPathCandidates(command)) {
+			if (isGuardrailProtectedPath(candidate)) return candidate;
+		}
+		return null;
+	}
+
+	async function confirmGuardrailUpdate(
+		kind: "write" | "edit" | "bash",
+		target: string,
+		preview: string,
+		ctx: ExtensionContext,
+	): Promise<boolean> {
+		recordEvent({
+			timestamp: Date.now(),
+			type: "path",
+			detail: `guardrail ${kind}: ${target}`,
+			action: "asked",
+		});
+
+		if (!ctx.hasUI) return false;
+
+		const noun = kind === "write" ? "write to" : kind === "edit" ? "edit" : "access via mutating bash";
+		const choice = await ctx.ui.select(
+			`[Damage Control] ${target} is part of the guardrail set.\n\nChanging it can weaken or disable agent safety checks. Explicit approval is required before the agent can ${noun} it.\n\n  ${preview}\n\nApprove this guardrail update once?`,
+			["Yes, approve guardrail update once", "No, block it"],
+		);
+
+		if (choice === "Yes, approve guardrail update once") {
+			recordEvent({
+				timestamp: Date.now(),
+				type: "path",
+				detail: `guardrail ${kind}: ${target}`,
+				action: "allowed",
+			});
+			return true;
+		}
+
+		return false;
 	}
 
 	// -- Bash pattern checking ------------------------------------------------
@@ -279,6 +338,30 @@ export default function (pi: ExtensionAPI) {
 				? readOnlyDiscoveryCommands.has(commandName)
 				: readOnlyPipeCommands.has(commandName);
 		});
+	}
+
+	function isReadOnlyGitInspectionCommand(command: string): boolean {
+		const commandWithoutAllowedRedirects = command.replace(/\s*2>\s*\/dev\/null\b/g, "");
+		if (/[;&`]|\$\(|\|\||&&|(?:^|[^&])>{1,2}|&>|\|/.test(commandWithoutAllowedRedirects)) return false;
+
+		const tokens = getShellTokens(commandWithoutAllowedRedirects).map(stripShellTokenQuotes);
+		if (tokens.length === 0 || tokens[0] !== "git") return false;
+
+		let index = 1;
+		if (tokens[index] === "--no-pager") index += 1;
+		if (tokens[index] === "-C") index += 2;
+
+		const commandName = tokens[index];
+		if (!commandName) return false;
+
+		const disallowedOutputFlags = tokens.some((token) => token === "--output" || token.startsWith("--output="));
+		if (disallowedOutputFlags) return false;
+
+		return new Set(["blame", "diff", "grep", "log", "ls-files", "show", "status"]).has(commandName);
+	}
+
+	function isReadOnlyGuardrailCommand(command: string): boolean {
+		return isReadOnlyDiscoveryCommand(command) || isReadOnlyGitInspectionCommand(command);
 	}
 
 	function getShellCommandName(command: string): string | null {
@@ -387,6 +470,24 @@ export default function (pi: ExtensionAPI) {
 		// --- Bash commands ---
 		if (isToolCallEventType("bash", event)) {
 			const cmd = event.input.command;
+			const guardrailTarget = getBashGuardrailTarget(cmd);
+			if (guardrailTarget && !isReadOnlyGuardrailCommand(cmd)) {
+				const allowed = await confirmGuardrailUpdate("bash", guardrailTarget, cmd, ctx);
+				if (!allowed) {
+					recordEvent({
+						timestamp: Date.now(),
+						type: "path",
+						detail: `guardrail bash denied: ${guardrailTarget}`,
+						action: "blocked",
+					});
+					ctx.ui.notify(`[DC] Blocked guardrail update: ${guardrailTarget}`, "error");
+					return {
+						block: true,
+						reason: `Damage Control: "${guardrailTarget}" is part of the guardrail set and requires explicit approval before bash can mutate it.`,
+					};
+				}
+			}
+
 			const pathAccess = getBashPathAccess(cmd);
 			if (pathAccess?.access === "zero") {
 				recordEvent({
@@ -533,6 +634,23 @@ export default function (pi: ExtensionAPI) {
 		// --- Write tool: check zero-access, write-access, ask-access, and read-only paths ---
 		if (event.toolName === "write") {
 			const filePath = (event.input as Record<string, unknown>).path as string;
+			if (isGuardrailProtectedPath(filePath)) {
+				const allowed = await confirmGuardrailUpdate("write", filePath, filePath, ctx);
+				if (!allowed) {
+					recordEvent({
+						timestamp: Date.now(),
+						type: "path",
+						detail: `guardrail write denied: ${filePath}`,
+						action: "blocked",
+					});
+					ctx.ui.notify(`[DC] Blocked guardrail update: ${filePath}`, "error");
+					return {
+						block: true,
+						reason: `Damage Control: "${filePath}" is part of the guardrail set and requires explicit approval before it can be written.`,
+					};
+				}
+			}
+
 			const access = checkWritePathAccess(filePath);
 
 			if (access === "zero") {
@@ -601,6 +719,23 @@ export default function (pi: ExtensionAPI) {
 		// --- Edit tool: check zero-access, write-access, ask-access, and read-only paths ---
 		if (isToolCallEventType("edit", event)) {
 			const filePath = event.input.path;
+			if (isGuardrailProtectedPath(filePath)) {
+				const allowed = await confirmGuardrailUpdate("edit", filePath, filePath, ctx);
+				if (!allowed) {
+					recordEvent({
+						timestamp: Date.now(),
+						type: "path",
+						detail: `guardrail edit denied: ${filePath}`,
+						action: "blocked",
+					});
+					ctx.ui.notify(`[DC] Blocked guardrail update: ${filePath}`, "error");
+					return {
+						block: true,
+						reason: `Damage Control: "${filePath}" is part of the guardrail set and requires explicit approval before it can be edited.`,
+					};
+				}
+			}
+
 			const access = checkWritePathAccess(filePath);
 
 			if (access === "zero") {
@@ -694,6 +829,9 @@ export default function (pi: ExtensionAPI) {
 				lines.push("--- Write-access paths ---");
 				for (const p of rules.writeAccessPaths) lines.push(`  ${p}`);
 				lines.push("");
+				lines.push("--- Guardrail approval paths ---");
+				for (const p of guardrailProtectedPaths) lines.push(`  ${p}`);
+				lines.push("");
 				lines.push("--- Read-only paths ---");
 				for (const p of rules.readOnlyPaths) lines.push(`  ${p}`);
 				lines.push("");
@@ -712,6 +850,7 @@ export default function (pi: ExtensionAPI) {
 			lines.push(`Zero-access paths:  ${rules.zeroAccessPaths.length}`);
 			lines.push(`Ask-access paths:   ${rules.askAccessPaths.length}`);
 			lines.push(`Write-access paths: ${rules.writeAccessPaths.length}`);
+			lines.push(`Guardrail paths:    ${guardrailProtectedPaths.length}`);
 			lines.push(`Read-only paths:    ${rules.readOnlyPaths.length}`);
 			lines.push(`No-delete paths:    ${rules.noDeletePaths.length}`);
 

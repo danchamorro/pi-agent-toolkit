@@ -2,6 +2,16 @@
 
 All notable changes to extensions in `~/.pi/agent/extensions/`.
 
+## 2026-05-29
+
+### damage-control/
+
+- Added an explicit approval gate before agents can edit, write, or run
+  mutating bash commands against Damage Control source, rules, and extension
+  settings files, while still allowing read-only inspection.
+- Listed the hardcoded guardrail approval paths in `/dc rules` and included
+  their count in `/dc` status output.
+
 ## 2026-05-28
 
 ### subagents
