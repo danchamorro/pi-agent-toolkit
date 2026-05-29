@@ -2,6 +2,42 @@
 
 All notable changes to extensions in `~/.pi/agent/extensions/`.
 
+## 2026-05-28
+
+### subagents
+
+- Added `/subagent start`, `/subagent list`, `/subagent view`,
+  `/subagent stop`, and `/subagent reply` for a simple in-process background
+  sub-agent MVP.
+- Added a compact below-editor status widget for sub-agent status, latest
+  activity, elapsed runtime, context usage, results, errors, and pending
+  feedback requests.
+- Added an `ask_main_session` sub-agent tool so blocked background work can
+  pause and request explicit feedback from the main session.
+- Made `/subagent view [id]` report status details instead of opening a
+  floating overlay.
+- Added bundled `planner`, `reviewer`, `scout`, and `worker` role prompts plus
+  `/subagent agents` and `/subagent start <role> <task>` support.
+- Added a `start_subagent` tool so the main agent can launch a bundled role
+  sub-agent without requiring the user to type a slash command.
+- Changed `start_subagent` to always wait until the delegated sub-agent finishes
+  or asks for feedback, reducing duplicate work in the main session.
+- Suppressed full completion posts for tool-launched sub-agents when the tool
+  is already returning the delegated result to the main agent.
+- Added compact call/result rendering for `start_subagent` so raw sub-agent
+  output is hidden until the user expands the tool result or runs
+  `/subagent view <id>`.
+- Changed sub-agent launches to use fresh child conversation context by default
+  instead of seeding the child session with the main session transcript.
+- Added `stop_subagent` and `reply_subagent` tools so the main agent can stop a
+  sub-agent or answer its feedback request without asking the user to type the
+  `/subagent stop` or `/subagent reply` slash commands.
+- Added cwd-aware sub-agent launches so `start_subagent` can target an explicit
+  working directory, child sessions stay scoped to that cwd, and status views
+  surface where each sub-agent is running.
+- Removed the old dotfiles-managed subagents implementation from
+  `dotfiles/extensions/`.
+
 ## 2026-05-26
 
 ### warp-split-fork.ts
