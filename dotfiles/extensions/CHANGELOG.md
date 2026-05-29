@@ -32,6 +32,9 @@ All notable changes to extensions in `~/.pi/agent/extensions/`.
 - Added `stop_subagent` and `reply_subagent` tools so the main agent can stop a
   sub-agent or answer its feedback request without asking the user to type the
   `/subagent stop` or `/subagent reply` slash commands.
+- Added cwd-aware sub-agent launches so `start_subagent` can target an explicit
+  working directory, child sessions stay scoped to that cwd, and status views
+  surface where each sub-agent is running.
 
 ## 2026-05-26
 

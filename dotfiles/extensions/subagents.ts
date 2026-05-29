@@ -12,7 +12,8 @@
  *
  * Tools:
  * - start_subagent - let the main agent launch a role-specific background sub-agent.
- *   The tool waits until the sub-agent finishes or needs feedback.
+ *   The tool waits until the sub-agent finishes or needs feedback and can target
+ *   an explicit working directory.
  * - stop_subagent - let the main agent stop a running or waiting sub-agent.
  * - reply_subagent - let the main agent answer a sub-agent feedback request.
  *
@@ -46,8 +47,9 @@ import {
 	type ThinkingLevel as AiThinkingLevel,
 } from "@earendil-works/pi-ai";
 import { Text, truncateToWidth, visibleWidth, type Component } from "@earendil-works/pi-tui";
-import { existsSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { existsSync, readFileSync, statSync } from "node:fs";
+import { homedir } from "node:os";
+import { dirname, join, resolve as resolvePath } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Type } from "typebox";
 
@@ -73,6 +75,7 @@ type StartSubagentDetails = {
 	subagentId?: string;
 	name?: string;
 	role?: string;
+	cwd?: string;
 	task?: string;
 	status: "started" | "waiting_for_feedback" | "completed" | "failed" | "stopped" | "error";
 	subagentStatus?: SubagentStatus;
@@ -89,6 +92,7 @@ type SubagentControlDetails = {
 	status: "stopped" | "replied" | "noop" | "error";
 	subagentId?: string;
 	name?: string;
+	cwd?: string;
 	subagentStatus?: SubagentStatus;
 	activity?: string;
 	elapsed?: string;
@@ -118,6 +122,7 @@ type ParsedStartArgs = {
 	name: string;
 	task: string;
 	role?: SubagentRole;
+	cwd?: string;
 	notifyOnStart?: boolean;
 	notifyOnCompletion?: boolean;
 };
@@ -126,6 +131,7 @@ type SubagentRecord = {
 	id: string;
 	name: string;
 	task: string;
+	cwd: string;
 	role?: SubagentRole;
 	status: SubagentStatus;
 	startedAt: number;
@@ -190,6 +196,12 @@ const StartSubagentParams = Type.Object({
 			description: "Optional display name. Defaults to the role name or a task-derived name.",
 		}),
 	),
+	cwd: Type.Optional(
+		Type.String({
+			description:
+				"Optional working directory for the sub-agent. Use only when the target repo/folder is explicit or already verified.",
+		}),
+	),
 });
 
 const StopSubagentParams = Type.Object({
@@ -228,6 +240,52 @@ function stripDynamicSystemPromptFooter(systemPrompt: string): string {
 function singleLine(value: string, maxLength = MAX_ACTIVITY_LENGTH): string {
 	const line = value.replace(/\s+/g, " ").trim();
 	return line.length > maxLength ? `${line.slice(0, maxLength - 3)}...` : line;
+}
+
+function expandUserPath(path: string): string {
+	if (path === "~") {
+		return homedir();
+	}
+	if (path.startsWith("~/")) {
+		return join(homedir(), path.slice(2));
+	}
+	return path;
+}
+
+function formatPathForDisplay(path: string): string {
+	const home = homedir();
+	if (path === home) {
+		return "~";
+	}
+	if (path.startsWith(`${home}/`)) {
+		return `~/${path.slice(home.length + 1)}`;
+	}
+	return path;
+}
+
+function resolveSubagentCwd(requestedCwd: string | undefined, baseCwd: string): { cwd?: string; error?: string } {
+	const raw = requestedCwd?.trim();
+	if (!raw) {
+		return { cwd: baseCwd };
+	}
+
+	const cwd = resolvePath(baseCwd, expandUserPath(raw));
+	if (!existsSync(cwd)) {
+		return { error: `Sub-agent cwd does not exist: ${cwd}` };
+	}
+
+	let stats: ReturnType<typeof statSync>;
+	try {
+		stats = statSync(cwd);
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		return { error: `Could not inspect sub-agent cwd ${cwd}: ${message}` };
+	}
+	if (!stats.isDirectory()) {
+		return { error: `Sub-agent cwd is not a directory: ${cwd}` };
+	}
+
+	return { cwd };
 }
 
 function splitCommand(input: string): { command: string; rest: string } {
@@ -474,8 +532,10 @@ function createSubagentResourceLoader(ctx: ExtensionContext, record: SubagentRec
 		"You are a focused Pi sub-agent running in the background for the main session.",
 		`Sub-agent id: ${record.id}`,
 		`Sub-agent name: ${record.name}`,
+		`Launch working directory: ${record.cwd}`,
 		`Assigned task: ${record.task}`,
 		"You do not have the main session's conversation history. Treat the assigned task, role instructions, accessible workspace files, and explicit feedback as your source of truth.",
+		"Stay scoped to the launch working directory. If a requested relative path is missing there, ask the main session for direction instead of searching unrelated directories.",
 		"Work independently, keep the scope narrow, and produce a concise final result.",
 		"When blocked, missing a decision, or needing user input, call ask_main_session with a specific question and wait for the reply.",
 		"Do not assume feedback that was not provided.",
@@ -631,7 +691,7 @@ function renderSubagentWidgetLines(records: SubagentRecord[], width: number, the
 	const displayRecords = visibleRecords.slice(0, 3);
 
 	for (const record of displayRecords) {
-		const left = ` ${elapsedFor(record).padStart(5)}  ${record.id}  ${record.name} `;
+		const left = ` ${elapsedFor(record).padStart(5)}  ${record.id}  ${record.name}  ${formatPathForDisplay(record.cwd)} `;
 		const right = `${statusText(record, theme)} ${theme.fg("dim", compactContextUsage(record))} `;
 		lines.push(widgetContentLine(left, right, width, theme));
 
@@ -791,6 +851,7 @@ export default function (pi: ExtensionAPI) {
 				const bits = [
 					`${record.id} ${record.name}`,
 					record.role ? `role: ${record.role.name}` : undefined,
+					`cwd: ${formatPathForDisplay(record.cwd)}`,
 					`status: ${record.status}`,
 					`elapsed: ${elapsedFor(record)}`,
 					formatContextUsage(record),
@@ -1000,10 +1061,12 @@ export default function (pi: ExtensionAPI) {
 	}
 
 	function createSubagentRecord(parsed: ParsedStartArgs, ctx: ExtensionContext): SubagentRecord {
+		const cwd = parsed.cwd ?? ctx.cwd;
 		const record: SubagentRecord = {
 			id: `sa-${nextSubagentNumber++}`,
 			name: parsed.name,
 			task: parsed.task,
+			cwd,
 			role: parsed.role,
 			status: "starting",
 			startedAt: Date.now(),
@@ -1020,6 +1083,7 @@ export default function (pi: ExtensionAPI) {
 				[
 					`Started sub-agent ${record.name} (${record.id}).`,
 					record.role ? `Role: ${record.role.name}` : "",
+					`Cwd: ${formatPathForDisplay(record.cwd)}`,
 					`Task: ${record.task}`,
 				]
 					.filter(Boolean)
@@ -1042,8 +1106,8 @@ export default function (pi: ExtensionAPI) {
 
 			markActivity(record, record.role ? `Creating ${record.role.name} background Pi session.` : "Creating background Pi session.");
 			const { session } = await createAgentSession({
-				cwd: ctx.cwd,
-				sessionManager: SessionManager.inMemory(ctx.cwd),
+				cwd: record.cwd,
+				sessionManager: SessionManager.inMemory(record.cwd),
 				model,
 				modelRegistry: ctx.modelRegistry as AgentSession["modelRegistry"],
 				thinkingLevel: record.role?.thinking ?? (pi.getThinkingLevel() as SessionThinkingLevel),
@@ -1115,7 +1179,13 @@ export default function (pi: ExtensionAPI) {
 			return;
 		}
 
-		createSubagentRecord(parsed, ctx);
+		const cwdResult = resolveSubagentCwd(parsed.cwd, ctx.cwd);
+		if (!cwdResult.cwd) {
+			ctx.ui.notify(cwdResult.error ?? "Invalid sub-agent cwd.", "warning");
+			return;
+		}
+
+		createSubagentRecord({ ...parsed, cwd: cwdResult.cwd }, ctx);
 	}
 
 	function statusForTool(record: SubagentRecord): StartSubagentDetails["status"] {
@@ -1135,6 +1205,7 @@ export default function (pi: ExtensionAPI) {
 			subagentId: record.id,
 			name: record.name,
 			role: record.role?.name,
+			cwd: record.cwd,
 			task: record.task,
 			command: `/subagent view ${record.id}`,
 			activity: record.activity,
@@ -1144,11 +1215,12 @@ export default function (pi: ExtensionAPI) {
 		};
 	}
 
-	function formatStartSubagentCall(args: { role?: string; task?: string; name?: string }): string {
+	function formatStartSubagentCall(args: { role?: string; task?: string; name?: string; cwd?: string }): string {
 		const role = args.role?.trim() || "default";
 		const name = args.name?.trim();
+		const cwd = args.cwd?.trim();
 		const task = args.task?.trim() || "(no task)";
-		return `start_subagent ${role}${name ? ` ${name}` : ""}: ${singleLine(task, 120)}`;
+		return `start_subagent ${role}${name ? ` ${name}` : ""}${cwd ? ` cwd=${singleLine(cwd, 60)}` : ""}: ${singleLine(task, 120)}`;
 	}
 
 	function formatStartSubagentSummary(details: StartSubagentDetails): string {
@@ -1159,14 +1231,16 @@ export default function (pi: ExtensionAPI) {
 		const id = details.subagentId ?? "?";
 		const name = details.name ?? "sub-agent";
 		const status = details.subagentStatus ?? details.status;
+		const cwd = details.cwd ? ` | cwd ${formatPathForDisplay(details.cwd)}` : "";
 		const task = details.task ? ` | ${singleLine(details.task, 100)}` : "";
-		return `${name} (${id}) ${status}${details.elapsed ? ` in ${details.elapsed}` : ""}${task}`;
+		return `${name} (${id}) ${status}${details.elapsed ? ` in ${details.elapsed}` : ""}${cwd}${task}`;
 	}
 
 	function formatStartSubagentExpanded(details: StartSubagentDetails, contentText: string): string {
 		const lines = [
 			formatStartSubagentSummary(details),
 			details.command ? `Inspect: ${details.command}` : "",
+			details.cwd ? `Cwd: ${details.cwd}` : "",
 			details.activity ? `Latest: ${details.activity}` : "",
 		].filter(Boolean);
 
@@ -1187,14 +1261,16 @@ export default function (pi: ExtensionAPI) {
 
 		const id = details.subagentId ?? "?";
 		const name = details.name ?? "sub-agent";
+		const cwd = details.cwd ? ` | cwd ${formatPathForDisplay(details.cwd)}` : "";
 		const status = details.subagentStatus ? ` | ${details.subagentStatus}` : "";
-		return `${details.action}_subagent ${name} (${id}) ${details.status}${status}`;
+		return `${details.action}_subagent ${name} (${id}) ${details.status}${cwd}${status}`;
 	}
 
 	function formatControlExpanded(details: SubagentControlDetails, contentText: string): string {
 		const lines = [
 			formatControlSummary(details),
 			details.message,
+			details.cwd ? `Cwd: ${details.cwd}` : "",
 			details.activity ? `Latest: ${details.activity}` : "",
 			details.elapsed ? `Elapsed: ${details.elapsed}` : "",
 		].filter(Boolean);
@@ -1275,7 +1351,7 @@ export default function (pi: ExtensionAPI) {
 	}
 
 	async function startSubagentFromTool(
-		params: { role?: string; task: string; name?: string },
+		params: { role?: string; task: string; name?: string; cwd?: string },
 		ctx: ExtensionContext,
 		signal: AbortSignal | undefined,
 	): Promise<StartSubagentDetails> {
@@ -1298,8 +1374,20 @@ export default function (pi: ExtensionAPI) {
 			};
 		}
 
+		const cwdResult = resolveSubagentCwd(params.cwd, ctx.cwd);
+		if (!cwdResult.cwd) {
+			return {
+				status: "error",
+				error: cwdResult.error ?? "Invalid sub-agent cwd.",
+				availableRoles: roles.map((candidate) => candidate.name),
+			};
+		}
+
 		const displayName = params.name?.trim() || role?.name || deriveName(task);
-		const record = createSubagentRecord({ name: displayName, task, role, notifyOnStart: false, notifyOnCompletion: false }, ctx);
+		const record = createSubagentRecord(
+			{ name: displayName, task, role, cwd: cwdResult.cwd, notifyOnStart: false, notifyOnCompletion: false },
+			ctx,
+		);
 		await waitForSubagentHandoff(record, signal);
 		return detailsForRecord(record);
 	}
@@ -1316,6 +1404,7 @@ export default function (pi: ExtensionAPI) {
 			status,
 			subagentId: record?.id,
 			name: record?.name,
+			cwd: record?.cwd,
 			subagentStatus: record?.status,
 			activity: record?.activity,
 			elapsed: record ? elapsedFor(record) : undefined,
@@ -1448,6 +1537,7 @@ export default function (pi: ExtensionAPI) {
 		const lines = [
 			`Sub-agent ${record.id}: ${record.name}`,
 			record.role ? `Role: ${record.role.name}` : undefined,
+			`Cwd: ${record.cwd}`,
 			`Status: ${record.status}`,
 			`Elapsed: ${elapsedFor(record)}`,
 			`Context: ${formatContextUsage(record)}`,
@@ -1553,6 +1643,8 @@ export default function (pi: ExtensionAPI) {
 			"Wait for this tool's result and synthesize it for the user instead of duplicating the sub-agent's investigation in the main session.",
 			"Do not expose implementation parameters or tool details to the user; users can start explicit background jobs with `/subagent start <role> <task>`.",
 			"Sub-agents start with fresh conversation context, so give the sub-agent a concrete, self-contained task with enough context to finish without guessing.",
+			"Sub-agents stay scoped to their launch cwd. If the task names a relative path, verify it exists in the current cwd before launching; if a different repo/folder is explicit or already verified, pass cwd.",
+			"Do not use cwd to send a sub-agent roaming around the filesystem. Ask the user when the correct working directory is unclear.",
 			"If the user wants to stop, cancel, or kill a sub-agent, use stop_subagent instead of asking them to type a slash command.",
 			"If the user answers a sub-agent feedback request, use reply_subagent instead of asking them to type a slash command.",
 			"Users can still manually inspect and control sub-agents with `/subagent view <id>`, `/subagent stop <id>`, and `/subagent reply <id> <feedback>`.",
@@ -1591,13 +1683,13 @@ export default function (pi: ExtensionAPI) {
 			}
 
 			const details = await startSubagentFromTool(params, ctx, signal);
-			let text = `Sub-agent ${details.name} (${details.subagentId}) is ${details.subagentStatus}. Inspect it with ${details.command}.`;
+			let text = `Sub-agent ${details.name} (${details.subagentId}) is ${details.subagentStatus} in ${details.cwd}. Inspect it with ${details.command}.`;
 			if (details.status === "completed" && details.result) {
-				text = `Sub-agent ${details.name} (${details.subagentId}) completed.\n\n${details.result}`;
+				text = `Sub-agent ${details.name} (${details.subagentId}) completed in ${details.cwd}.\n\n${details.result}`;
 			} else if (details.status === "waiting_for_feedback") {
-				text = `Sub-agent ${details.name} (${details.subagentId}) needs feedback. Use reply_subagent to answer it or stop_subagent to stop it. The user can also manually inspect it with ${details.command}.`;
+				text = `Sub-agent ${details.name} (${details.subagentId}) needs feedback in ${details.cwd}. Use reply_subagent to answer it or stop_subagent to stop it. The user can also manually inspect it with ${details.command}.`;
 			} else if (details.status === "failed") {
-				text = `Sub-agent ${details.name} (${details.subagentId}) failed.\n\n${details.error ?? details.activity ?? "Unknown error"}`;
+				text = `Sub-agent ${details.name} (${details.subagentId}) failed in ${details.cwd}.\n\n${details.error ?? details.activity ?? "Unknown error"}`;
 			} else if (details.status === "error") {
 				text = `Error: ${details.error}`;
 			}
