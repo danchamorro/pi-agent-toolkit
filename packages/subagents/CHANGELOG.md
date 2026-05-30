@@ -1,6 +1,6 @@
 # @danchamorro/pi-subagents Changelog
 
-## Unreleased
+## 0.3.0 - 2026-05-29
 
 ### Changed
 
