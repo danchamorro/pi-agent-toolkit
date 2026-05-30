@@ -74,6 +74,9 @@ describe("start_subagent tool", () => {
       getActiveTools() {
         return [];
       },
+      getAllTools() {
+        return [];
+      },
       getThinkingLevel() {
         return "off";
       },
@@ -191,6 +194,43 @@ describe("start_subagent tool", () => {
       reason:
         "Blocked because another tool was already called in this assistant turn. Launch sub-agents in their own turn so the main session returns control immediately.",
     });
+  });
+
+  it("routes hidden completion reports after a queued streaming follow-up", async () => {
+    const model = { provider: "test-provider", id: "test-model" };
+    const { events, startTool, sentMessages } = createPiHarness();
+    const inputHandler = events.find((event) => event.type === "input")?.handler;
+    assert.ok(inputHandler);
+    const ctx = {
+      cwd: testDir,
+      hasUI: false,
+      model,
+      modelRegistry: {
+        getApiKeyAndHeaders() {
+          return { ok: false, error: "No test credentials available." };
+        },
+      },
+    };
+
+    await inputHandler({
+      type: "input",
+      text: "queue this after the current answer",
+      source: "interactive",
+      streamingBehavior: "followUp",
+    });
+    await startTool.execute(
+      "tool-call-1",
+      { task: "Map the package source." },
+      undefined,
+      undefined,
+      ctx,
+    );
+    await wait(150);
+
+    assert.equal(sentMessages.length, 1);
+    assert.equal(sentMessages[0].message.display, false);
+    assert.equal(sentMessages[0].options?.deliverAs, "nextTurn");
+    assert.equal(sentMessages[0].options?.triggerTurn, true);
   });
 
   it("aggregates tool-launched sub-agent failures into one hidden main-session report", async () => {

@@ -1,5 +1,14 @@
 # @danchamorro/pi-subagents Changelog
 
+## Unreleased
+
+### Changed
+
+- Hidden tool-launched completion reports now use Pi's streaming-aware input
+  signal to avoid jumping ahead of a user follow-up queued during streaming.
+- Sub-agent system prompts now include prompt guidelines for their enabled
+  inherited tools using Pi's `getAllTools()` metadata.
+
 ## 0.2.1 - 2026-05-29
 
 ### Fixed

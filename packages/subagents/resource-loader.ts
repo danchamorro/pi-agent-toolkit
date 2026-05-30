@@ -2,14 +2,34 @@ import {
   createExtensionRuntime,
   type ExtensionContext,
   type ResourceLoader,
+  type ToolInfo,
 } from "@earendil-works/pi-coding-agent";
 
 import { stripDynamicSystemPromptFooter } from "./format.ts";
 import type { SubagentRecord } from "./types.ts";
 
+export function formatToolPromptGuidelines(tools: ToolInfo[], enabledToolNames: string[]): string {
+  const enabled = new Set(enabledToolNames);
+  const toolSections = tools
+    .filter((tool) => enabled.has(tool.name) && tool.promptGuidelines?.length)
+    .map((tool) => [tool.name, tool.promptGuidelines ?? []] as const);
+
+  if (toolSections.length === 0) {
+    return "";
+  }
+
+  return [
+    "Tool-specific guidance for this sub-agent's enabled tools:",
+    ...toolSections.map(([name, guidelines]) =>
+      [`${name}:`, ...guidelines.map((guideline) => `- ${guideline}`)].join("\n"),
+    ),
+  ].join("\n\n");
+}
+
 export function createSubagentResourceLoader(
   ctx: ExtensionContext,
   record: SubagentRecord,
+  toolPromptGuidelines = "",
 ): ResourceLoader {
   const extensionsResult = { extensions: [], errors: [], runtime: createExtensionRuntime() };
   const mainSystemPrompt = stripDynamicSystemPromptFooter(ctx.getSystemPrompt());
@@ -46,7 +66,9 @@ export function createSubagentResourceLoader(
     getThemes: () => ({ themes: [], diagnostics: [] }),
     getAgentsFiles: () => ({ agentsFiles: [] }),
     getSystemPrompt: () =>
-      [mainSystemPrompt, subagentPrompt, rolePrompt].filter(Boolean).join("\n\n"),
+      [mainSystemPrompt, subagentPrompt, toolPromptGuidelines, rolePrompt]
+        .filter(Boolean)
+        .join("\n\n"),
     getAppendSystemPrompt: () => [],
     extendResources: () => {},
     reload: async () => {},

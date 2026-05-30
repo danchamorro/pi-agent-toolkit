@@ -34,6 +34,7 @@ import {
   type ExtensionAPI,
   type ExtensionCommandContext,
   type ExtensionContext,
+  type InputEvent,
   type ToolCallEvent,
   type ToolCallEventResult,
   type ToolDefinition,
@@ -57,7 +58,7 @@ import {
   splitCommand,
 } from "./format.ts";
 import { formatPathForDisplay, resolveSubagentCwd } from "./paths.ts";
-import { createSubagentResourceLoader } from "./resource-loader.ts";
+import { createSubagentResourceLoader, formatToolPromptGuidelines } from "./resource-loader.ts";
 import { loadSubagentRoles, parseStartArgs } from "./roles.ts";
 import {
   AskMainSessionParams,
@@ -155,6 +156,7 @@ export default function (pi: ExtensionAPI) {
   let activeToolLaunchGroupId: string | undefined;
   let closeToolLaunchGroupTimer: ReturnType<typeof setTimeout> | undefined;
   let latestCtx: ExtensionContext | undefined;
+  let latestInputStreamingBehavior: InputEvent["streamingBehavior"];
   let widgetInterval: ReturnType<typeof setInterval> | null = null;
   const pendingCompletionReportIds = new Set<string>();
   let startSubagentCalledThisTurn = false;
@@ -331,6 +333,14 @@ export default function (pi: ExtensionAPI) {
     ].join("\n\n");
   }
 
+  function completionReportDeliveryOptions(): StatusMessageOptions {
+    if (latestInputStreamingBehavior === "followUp") {
+      return { deliverAs: "nextTurn", triggerTurn: true, display: false };
+    }
+
+    return { deliverAs: "followUp", triggerTurn: true, display: false };
+  }
+
   function flushCompletionReports(): void {
     const pendingByGroup = new Map<string, SubagentRecord[]>();
     for (const id of pendingCompletionReportIds) {
@@ -364,11 +374,7 @@ export default function (pi: ExtensionAPI) {
         pendingCompletionReportIds.delete(record.id);
       }
 
-      postStatusMessage(formatCompletionReport(pendingRecords), {
-        deliverAs: "followUp",
-        triggerTurn: true,
-        display: false,
-      });
+      postStatusMessage(formatCompletionReport(pendingRecords), completionReportDeliveryOptions());
     }
   }
 
@@ -550,6 +556,10 @@ export default function (pi: ExtensionAPI) {
     return [...new Set([...baseTools, "ask_main_session"])];
   }
 
+  function getSubagentToolPromptGuidelines(toolNames: string[]): string {
+    return formatToolPromptGuidelines(pi.getAllTools(), toolNames);
+  }
+
   function resolveSubagentModel(ctx: ExtensionContext, role?: SubagentRole): Model<Api> {
     if (!role?.model) {
       if (!ctx.model) {
@@ -621,15 +631,20 @@ export default function (pi: ExtensionAPI) {
           ? `Creating ${record.role.name} background Pi session.`
           : "Creating background Pi session.",
       );
+      const subagentTools = getSubagentTools(record);
       const { session } = await createAgentSession({
         cwd: record.cwd,
         sessionManager: SessionManager.inMemory(record.cwd),
         model,
         modelRegistry: ctx.modelRegistry as AgentSession["modelRegistry"],
         thinkingLevel: record.role?.thinking ?? (pi.getThinkingLevel() as SessionThinkingLevel),
-        tools: getSubagentTools(record),
+        tools: subagentTools,
         customTools: [createAskMainSessionTool(record) as unknown as ToolDefinition],
-        resourceLoader: createSubagentResourceLoader(ctx, record),
+        resourceLoader: createSubagentResourceLoader(
+          ctx,
+          record,
+          getSubagentToolPromptGuidelines(subagentTools),
+        ),
       });
 
       record.session = session;
@@ -1175,6 +1190,11 @@ export default function (pi: ExtensionAPI) {
 
   pi.on("tool_call", async (event) => enforceStartSubagentToolIsolation(event));
 
+  pi.on("input", async (event: InputEvent) => {
+    latestInputStreamingBehavior = event.streamingBehavior;
+    return { action: "continue" };
+  });
+
   pi.on("turn_start", async () => {
     startSubagentCalledThisTurn = false;
     nonSubagentToolCalledThisTurn = false;
@@ -1183,11 +1203,13 @@ export default function (pi: ExtensionAPI) {
   pi.on("turn_end", async () => {
     startSubagentCalledThisTurn = false;
     nonSubagentToolCalledThisTurn = false;
+    latestInputStreamingBehavior = undefined;
   });
 
   pi.on("agent_end", async () => {
     startSubagentCalledThisTurn = false;
     nonSubagentToolCalledThisTurn = false;
+    latestInputStreamingBehavior = undefined;
   });
 
   pi.on("session_start", async (_event, ctx) => {
