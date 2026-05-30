@@ -1,5 +1,27 @@
 # @danchamorro/pi-subagents Changelog
 
+## 0.4.0 - 2026-05-30
+
+### Added
+
+- Added guided role discovery output for `/subagent agents`, including workflow
+  ordering, role-specific guidance, grouped capability badges, and quick start
+  and detail commands.
+- Added `/subagent view <role>` support so exact role tools, source details,
+  model, and thinking configuration stay available outside the default role
+  list.
+- Added targeted view tests covering role discovery, role details, and
+  feedback-first status output.
+
+### Changed
+
+- Reworked sub-agent status output to prioritize feedback requests before
+  running and recent sub-agents, making user action requirements easier to
+  spot.
+- Applied Pi theme styling to sub-agent role, status, command, and capability
+  output while preserving plain-text fallbacks for tests and non-themed
+  contexts.
+
 ## 0.3.0 - 2026-05-29
 
 ### Changed
