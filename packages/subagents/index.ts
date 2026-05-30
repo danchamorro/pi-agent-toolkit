@@ -6,7 +6,7 @@
  * - /subagent start <role> <task> - start a role-specific background sub-agent.
  * - /subagent agents - list bundled and custom sub-agent roles.
  * - /subagent list - show known sub-agents.
- * - /subagent view [id] - show sub-agent status or details.
+ * - /subagent view [id|role] - show sub-agent run or role details.
  * - /subagent stop <id> - stop a running sub-agent.
  * - /subagent reply <id> <feedback> - answer a sub-agent feedback request.
  *
@@ -78,6 +78,7 @@ import {
 import {
   formatRecordChoices,
   formatRecordDetails,
+  formatRoleDetails,
   formatRoleDiagnostics,
   formatRoleList,
   formatSubagentList,
@@ -927,17 +928,23 @@ export default function (pi: ExtensionAPI) {
         active.length > 0
           ? "Sub-agent status is visible below the editor while background work is active."
           : "No sub-agents are currently active.";
-      postStatusMessage(`${prefix}\n\n${formatSubagentList(sortedRecords())}`);
+      postStatusMessage(`${prefix}\n\n${formatSubagentList(sortedRecords(), ctx.ui.theme)}`);
       return;
     }
 
     const found = findRecord(id);
-    if (!found.record) {
-      ctx.ui.notify(found.error ?? "Sub-agent not found.", "warning");
+    if (found.record) {
+      postStatusMessage(formatRecordDetails(found.record));
       return;
     }
 
-    postStatusMessage(formatRecordDetails(found.record));
+    const role = rolesByName.get(id.toLowerCase());
+    if (role) {
+      postStatusMessage(formatRoleDetails(role, ctx.ui.theme));
+      return;
+    }
+
+    ctx.ui.notify(found.error ?? "Sub-agent or role not found.", "warning");
   }
 
   function enforceStartSubagentToolIsolation(
@@ -979,14 +986,11 @@ export default function (pi: ExtensionAPI) {
           return;
         case "list":
           updateStatusWidget(ctx);
-          postStatusMessage(formatSubagentList(sortedRecords()));
+          postStatusMessage(formatSubagentList(sortedRecords(), ctx.ui.theme));
           return;
         case "agents":
           postStatusMessage(
-            [
-              `Available sub-agent roles:\n\n${formatRoleList(roles)}`,
-              formatRoleDiagnostics(roleDiagnostics),
-            ]
+            [formatRoleList(roles, ctx.ui.theme), formatRoleDiagnostics(roleDiagnostics)]
               .filter(Boolean)
               .join("\n\n"),
           );
@@ -1009,7 +1013,7 @@ export default function (pi: ExtensionAPI) {
               "- /subagent start <role> <task>",
               "- /subagent agents",
               "- /subagent list",
-              "- /subagent view [id]",
+              "- /subagent view [id|role]",
               "- /subagent stop <id>",
               "- /subagent reply <id> <feedback>",
             ].join("\n"),
