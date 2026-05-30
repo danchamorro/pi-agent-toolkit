@@ -1,5 +1,14 @@
 # @danchamorro/pi-subagents Changelog
 
+## 0.4.1 - 2026-05-30
+
+### Changed
+
+- Polished sub-agent status presentation with boxed tables for role lists,
+  launch output, and feedback-first status views.
+- Randomized the live status widget refresh cadence between 1 and 4 seconds
+  while preserving immediate updates for real sub-agent status changes.
+
 ## 0.4.0 - 2026-05-30
 
 ### Added
