@@ -1,5 +1,6 @@
 import { singleLine } from "./format.ts";
 import { formatPathForDisplay } from "./paths.ts";
+import { renderBoxTable } from "./terminal-layout.ts";
 import type { StartSubagentDetails, SubagentControlDetails } from "./types.ts";
 
 export function formatStartSubagentCall(args: {
@@ -10,9 +11,8 @@ export function formatStartSubagentCall(args: {
 }): string {
   const role = args.role?.trim() || "default";
   const name = args.name?.trim();
-  const cwd = args.cwd?.trim();
-  const task = args.task?.trim() || "(no task)";
-  return `start_subagent ${role}${name ? ` ${name}` : ""}${cwd ? ` cwd=${singleLine(cwd, 60)}` : ""}: ${singleLine(task, 120)}`;
+  const displayName = name ? ` · ${singleLine(name, 42)}` : "";
+  return `start_subagent ${role}${displayName}`;
 }
 
 export function formatStartSubagentSummary(details: StartSubagentDetails): string {
@@ -21,28 +21,19 @@ export function formatStartSubagentSummary(details: StartSubagentDetails): strin
   }
 
   const id = details.subagentId ?? "?";
-  const name = details.name ?? "sub-agent";
-  const cwd = details.cwd ? ` | cwd ${formatPathForDisplay(details.cwd)}` : "";
-  const task = details.task ? ` | ${singleLine(details.task, 100)}` : "";
-  return `${name} (${id}) ${details.status}${details.elapsed ? ` in ${details.elapsed}` : ""}${cwd}${task}`;
+  return `${id} started`;
 }
 
 export function formatStartSubagentExpanded(
   details: StartSubagentDetails,
   contentText: string,
 ): string {
-  const lines = [
-    formatStartSubagentSummary(details),
-    details.command ? `Inspect: ${details.command}` : "",
-    details.cwd ? `Cwd: ${details.cwd}` : "",
-    details.activity ? `Latest: ${details.activity}` : "",
-  ].filter(Boolean);
-
-  if (contentText.trim()) {
-    lines.push("", contentText.trim());
-  }
-
-  return lines.join("\n");
+  const rows = [launchRow(details)];
+  const extra = contentText.trim();
+  return [
+    launchTable(details.status === "error" ? "start_subagent error" : "subagent launch", rows),
+    extra ? `\n${extra}` : "",
+  ].join("");
 }
 
 export function formatControlSummary(details: SubagentControlDetails): string {
@@ -89,4 +80,20 @@ export function formatReplySubagentCall(args: { id?: string; feedback?: string }
   const id = args.id?.trim() || "waiting";
   const feedback = args.feedback?.trim() || "(no feedback)";
   return `reply_subagent ${id}: ${singleLine(feedback, 120)}`;
+}
+
+function launchTable(title: string, rows: string[][]): string {
+  return renderBoxTable(["ID", "ROLE", "STATUS", "TASK / NEXT"], rows, [8, 16, 14, 78], {
+    title,
+    rowDividers: false,
+    cellWrap: "truncate",
+  });
+}
+
+function launchRow(details: StartSubagentDetails): string[] {
+  const id = details.subagentId ?? "?";
+  const role = details.role ?? "ad hoc";
+  const command = details.command ?? "";
+  const task = details.task ? singleLine(details.task, 120) : (details.name ?? "sub-agent");
+  return [id, role, details.status, command ? `${task}\n${command}` : task];
 }

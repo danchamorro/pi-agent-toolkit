@@ -1,6 +1,7 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth, type Component } from "@earendil-works/pi-tui";
 
+import { padToVisibleWidth } from "./terminal-layout.ts";
 import type { SubagentRecord, SubagentStatus } from "./types.ts";
 
 const RECENT_FINISHED_WIDGET_MS = 60_000;
@@ -29,10 +30,6 @@ type SubagentWidgetFormatters = {
   formatPathForDisplay: (path: string) => string;
 };
 
-function padToWidth(line: string, width: number): string {
-  return line + " ".repeat(Math.max(0, width - visibleWidth(line)));
-}
-
 function widgetTopLine(
   title: string,
   info: string,
@@ -43,14 +40,14 @@ function widgetTopLine(
     return "";
   }
   if (width === 1) {
-    return theme.fg("accent", "+");
+    return theme.fg("borderAccent", "┌");
   }
 
   const innerWidth = width - 2;
   const label = ` ${title}${info ? ` ${info}` : ""} `;
   const clippedLabel = truncateToWidth(label, innerWidth);
-  const fill = "-".repeat(Math.max(0, innerWidth - visibleWidth(clippedLabel)));
-  return `${theme.fg("accent", "+")}${theme.fg("accent", clippedLabel)}${theme.fg("accent", fill)}${theme.fg("accent", "+")}`;
+  const fill = "─".repeat(Math.max(0, innerWidth - visibleWidth(clippedLabel)));
+  return `${theme.fg("borderAccent", "┌")}${theme.fg("borderAccent", clippedLabel)}${theme.fg("borderAccent", fill)}${theme.fg("borderAccent", "┐")}`;
 }
 
 function widgetBottomLine(width: number, theme: ExtensionContext["ui"]["theme"]): string {
@@ -58,9 +55,9 @@ function widgetBottomLine(width: number, theme: ExtensionContext["ui"]["theme"])
     return "";
   }
   if (width === 1) {
-    return theme.fg("accent", "+");
+    return theme.fg("borderAccent", "└");
   }
-  return theme.fg("accent", `+${"-".repeat(width - 2)}+`);
+  return theme.fg("borderAccent", `└${"─".repeat(width - 2)}┘`);
 }
 
 function widgetContentLine(
@@ -73,19 +70,44 @@ function widgetContentLine(
     return "";
   }
   if (width === 1) {
-    return theme.fg("accent", "|");
+    return theme.fg("borderAccent", "│");
   }
 
   const contentWidth = Math.max(0, width - 2);
   const rightWidth = visibleWidth(right);
   if (rightWidth >= contentWidth) {
     const clippedRight = truncateToWidth(right, contentWidth);
-    return `${theme.fg("accent", "|")}${padToWidth(clippedRight, contentWidth)}${theme.fg("accent", "|")}`;
+    return `${theme.fg("borderAccent", "│")}${padToVisibleWidth(clippedRight, contentWidth)}${theme.fg("borderAccent", "│")}`;
   }
 
   const clippedLeft = truncateToWidth(left, contentWidth - rightWidth);
   const padding = " ".repeat(Math.max(0, contentWidth - visibleWidth(clippedLeft) - rightWidth));
-  return `${theme.fg("accent", "|")}${clippedLeft}${padding}${right}${theme.fg("accent", "|")}`;
+  return `${theme.fg("borderAccent", "│")}${clippedLeft}${padding}${right}${theme.fg("borderAccent", "│")}`;
+}
+
+function widgetRow(
+  age: string,
+  id: string,
+  role: string,
+  task: string,
+  stream: string,
+  status: string,
+  context: string,
+  width: number,
+): string {
+  const fixedWidth = 10 + 7 + 14 + 14 + 10 + 12;
+  const flexibleWidth = Math.max(56, width - fixedWidth);
+  const taskWidth = Math.max(24, Math.floor(flexibleWidth * 0.35));
+  const streamWidth = Math.max(32, flexibleWidth - taskWidth);
+  return [
+    ` ${age.padStart(7)}`,
+    truncateToWidth(id, 5).padEnd(5),
+    truncateToWidth(role, 12).padEnd(12),
+    truncateToWidth(task, taskWidth).padEnd(taskWidth),
+    truncateToWidth(stream, streamWidth).padEnd(streamWidth),
+    truncateToWidth(status, 12).padEnd(12),
+    truncateToWidth(context, 10).padEnd(10),
+  ].join("  ");
 }
 
 function compactContextUsage(record: SubagentRecord): string {
@@ -99,6 +121,14 @@ function compactContextUsage(record: SubagentRecord): string {
 function latestRunningTool(record: SubagentRecord): string | undefined {
   const running = [...record.toolCalls.values()].filter((tool) => tool.status === "running");
   return running.at(-1)?.name;
+}
+
+function streamText(record: SubagentRecord): string {
+  if (record.activity === "Turn finished." && isWorkingStatus(record.status)) {
+    const runningTool = latestRunningTool(record);
+    return runningTool ? `Running ${runningTool}` : "Waiting for next step";
+  }
+  return record.activity;
 }
 
 function statusText(record: SubagentRecord, theme: ExtensionContext["ui"]["theme"]): string {
@@ -138,12 +168,29 @@ function renderSubagentWidgetLines(
       ? `${activeCount} active`
       : `${activeCount} active, ${visibleRecords.length - activeCount} recent`;
   const lines = [widgetTopLine("Subagents", info, width, theme)];
+  lines.push(
+    widgetContentLine(
+      widgetRow("AGE", "ID", "ROLE", "TASK", "STREAM", "STATUS", "CTX", width),
+      "",
+      width,
+      theme,
+    ),
+  );
   const displayRecords = visibleRecords.slice(0, 3);
 
   for (const record of displayRecords) {
-    const left = ` ${formatters.elapsedFor(record).padStart(5)}  ${record.id}  ${record.name}  ${formatters.formatPathForDisplay(record.cwd)} `;
-    const right = `${statusText(record, theme)} ${theme.fg("dim", compactContextUsage(record))} `;
-    lines.push(widgetContentLine(left, right, width, theme));
+    const role = record.role?.name ?? "ad hoc";
+    const row = widgetRow(
+      formatters.elapsedFor(record),
+      record.id,
+      role,
+      record.name,
+      streamText(record),
+      statusText(record, theme),
+      theme.fg("dim", compactContextUsage(record)),
+      width,
+    );
+    lines.push(widgetContentLine(row, "", width, theme));
 
     if (record.pendingFeedback) {
       const feedback = `   needs feedback: ${record.pendingFeedback.question} `;
@@ -155,9 +202,6 @@ function renderSubagentWidgetLines(
           theme,
         ),
       );
-    } else if (record.status === "running" || record.status === "starting") {
-      const activity = `   ${record.activity} `;
-      lines.push(widgetContentLine(theme.fg("dim", activity), "", width, theme));
     }
   }
 

@@ -60,15 +60,13 @@ describe("subagent views", () => {
       role({ name: "planner", tools: ["read", "bash"], thinking: "high" }),
     ]);
 
-    assert.match(output, /^Available sub-agent roles/);
+    assert.match(output, /┌─ Available sub-agent roles/);
     assert.match(output, /Choose by intent/);
-    assert.match(output, /scout\n\s+scout role description\./);
-    assert.match(output, /Use first when you need fast read-only codebase reconnaissance\./);
-    assert.match(
-      output,
-      /capabilities: read feedback\s+model: openai-codex\/gpt-5\.5\s+thinking: off/,
-    );
-    assert.match(output, /worker[\s\S]*capabilities: read shell write feedback/);
+    assert.match(output, /│ Role\s+│ Best for\s+│ Capabilities/);
+    assert.match(output, /scout[\s\S]*scout role description\./);
+    assert.match(output, /Use first when you need fast read-only codebase/);
+    assert.match(output, /read feedback[\s\S]*openai-codex\/gpt-5\.5[\s\S]*thinking: off/);
+    assert.match(output, /worker[\s\S]*read shell write feedback/);
     assert.ok(output.indexOf("scout") < output.indexOf("planner"));
     assert.ok(output.indexOf("planner") < output.indexOf("worker"));
     assert.doesNotMatch(output, /tools: read, bash/);
@@ -120,8 +118,8 @@ describe("subagent views", () => {
     assert.match(output, /Subagents \(2 active, 1 recent\)/);
     assert.ok(output.indexOf("Needs feedback") < output.indexOf("Running"));
     assert.ok(output.indexOf("Running") < output.indexOf("Recent"));
-    assert.match(output, /reply: \/subagent reply sa-1 <feedback>/);
-    assert.match(output, /latest: Mapping packages\/subagents\./);
+    assert.match(output, /needs reply:[\s\S]*\/subagent reply sa-1 <feedback>/);
+    assert.match(output, /Mapping packages\/subagents\./);
     assert.match(output, /Inspect: \/subagent view <id>\s+Stop: \/subagent stop <id>/);
   });
 });

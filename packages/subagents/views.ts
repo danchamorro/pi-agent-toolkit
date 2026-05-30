@@ -1,7 +1,7 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 
-import { elapsedFor, formatContextUsage } from "./format.ts";
-import { formatPathForDisplay } from "./paths.ts";
+import { elapsedFor, formatContextUsage, singleLine } from "./format.ts";
+import { renderBoxTable, renderPanel } from "./terminal-layout.ts";
 import type { SubagentRecord, SubagentRole, SubagentRoleDiagnostic } from "./types.ts";
 
 type Capability = "read" | "shell" | "write" | "feedback" | "review";
@@ -28,6 +28,8 @@ const ROLE_GUIDANCE: Record<string, string> = {
 };
 
 const WORKFLOW_ORDER = ["scout", "planner", "worker", "reviewer"];
+const ROLE_TABLE_WIDTHS = [24, 54, 30, 24, 38];
+const STATUS_TABLE_WIDTHS = [8, 9, 18, 18, 12, 52];
 
 export function formatRecordChoices(recordsToFormat: SubagentRecord[]): string {
   return recordsToFormat
@@ -37,7 +39,14 @@ export function formatRecordChoices(recordsToFormat: SubagentRecord[]): string {
 
 export function formatSubagentList(records: SubagentRecord[], theme?: Theme): string {
   if (records.length === 0) {
-    return "No sub-agents yet. Start one with `/subagent start <task>` or `/subagent start <role> <task>`.";
+    return renderPanel(
+      "Subagents",
+      [
+        "No sub-agents yet.",
+        `${label("Start", theme)} ${command("/subagent start <task>", theme)} ${muted("or", theme)} ${command("/subagent start <role> <task>", theme)}`,
+      ],
+      theme,
+    );
   }
 
   const waiting = records.filter((record) => record.pendingFeedback);
@@ -48,80 +57,75 @@ export function formatSubagentList(records: SubagentRecord[], theme?: Theme): st
     (record) => !record.pendingFeedback && !["starting", "running"].includes(record.status),
   );
   const activeCount = waiting.length + running.length;
-  const lines = [heading(`Subagents (${activeCount} active, ${recent.length} recent)`, theme)];
+  const lines: string[] = [];
 
   if (waiting.length > 0) {
-    lines.push("", sectionHeading("Needs feedback", "warning", theme));
-    for (const record of waiting) {
-      lines.push(
-        `  ${strong(record.id, theme)} ${strong(record.name, theme)} ${muted(`(${record.role?.name ?? "ad hoc"})`, theme)}`,
-      );
-      lines.push(
-        `    ${label("asks", theme)} ${record.pendingFeedback?.question ?? "Feedback requested."}`,
-      );
-      lines.push(
-        `    ${label("reply", theme)} ${command(`/subagent reply ${record.id} <feedback>`, theme)}`,
-      );
-    }
+    lines.push(sectionHeading("Needs feedback", "warning", theme));
+    lines.push(...formatStatusRows(waiting, theme));
+    lines.push("");
   }
 
   if (running.length > 0) {
-    lines.push("", sectionHeading("Running", "accent", theme));
-    for (const record of running) {
-      lines.push(formatRecordStatusLine(record, theme));
-      lines.push(`    ${label("latest", theme)} ${muted(record.activity, theme)}`);
-    }
+    lines.push(sectionHeading("Running", "accent", theme));
+    lines.push(...formatStatusRows(running, theme));
+    lines.push("");
   }
 
   if (recent.length > 0) {
-    lines.push("", sectionHeading("Recent", "dim", theme));
-    for (const record of recent) {
-      lines.push(formatRecordStatusLine(record, theme));
-    }
+    lines.push(sectionHeading("Recent", "dim", theme));
+    lines.push(...formatStatusRows(recent, theme));
+    lines.push("");
   }
 
   lines.push(
-    "",
     `${label("Inspect", theme)} ${command("/subagent view <id>", theme)}   ${label("Stop", theme)} ${command("/subagent stop <id>", theme)}`,
   );
-  return lines.join("\n");
+
+  return renderPanel(
+    `Subagents (${activeCount} active, ${recent.length} recent)`,
+    trimTrailingBlank(lines),
+    theme,
+  );
 }
 
 export function formatRoleList(roles: SubagentRole[], theme?: Theme): string {
   const summaries = roles.map(summarizeRole).sort(compareRoleSummaries);
-  const lines = [
-    heading("Available sub-agent roles", theme),
-    `${muted("Choose by intent. Exact tools and source details are in `", theme)}${command("/subagent view <role>", theme)}${muted("`.", theme)}`,
-  ];
+  const header = ["Role", "Best for", "Capabilities", "Model", "Launch"];
+  const rows = summaries.map((summary) => [
+    roleName(summary.name, theme),
+    `${summary.intent}\n${muted(summary.guidance, theme)}`,
+    formatCapabilities(summary.capabilities, theme),
+    `${muted(summary.model, theme)}\n${label("thinking", theme)} ${thinking(summary.thinking, theme)}`,
+    `${command(summary.startCommand, theme)}\n${muted("details", theme)} ${command(summary.detailCommand, theme)}`,
+  ]);
 
-  for (const summary of summaries) {
-    lines.push("", roleName(summary.name, theme));
-    lines.push(`  ${summary.intent}`);
-    lines.push(`  ${muted(summary.guidance, theme)}`);
-    lines.push(
-      `  ${label("capabilities", theme)} ${formatCapabilities(summary.capabilities, theme)}   ${label("model", theme)} ${muted(summary.model, theme)}   ${label("thinking", theme)} ${thinking(summary.thinking, theme)}`,
-    );
-    lines.push(
-      `  ${label("start", theme)} ${command(summary.startCommand, theme)}   ${label("details", theme)} ${command(summary.detailCommand, theme)}`,
-    );
-  }
-
-  return lines.join("\n");
+  return renderPanel(
+    "Available sub-agent roles",
+    [
+      `${muted("Choose by intent. Exact tools and source details are in", theme)} ${command("/subagent view <role>", theme)}${muted(".", theme)}`,
+      "",
+      renderTable(header, rows, ROLE_TABLE_WIDTHS, theme),
+    ],
+    theme,
+  );
 }
 
 export function formatRoleDetails(role: SubagentRole, theme?: Theme): string {
   const summary = summarizeRole(role);
-  return [
-    `${heading("Sub-agent role:", theme)} ${roleName(summary.name, theme)}`,
-    `${label("Use when", theme)} ${summary.guidance}`,
-    `${label("Description", theme)} ${summary.intent}`,
-    `${label("Capabilities", theme)} ${formatCapabilities(summary.capabilities, theme)}`,
-    `${label("Tools", theme)} ${muted(summary.tools.join(", "), theme)}`,
-    `${label("Model", theme)} ${muted(summary.model, theme)}`,
-    `${label("Thinking", theme)} ${thinking(summary.thinking, theme)}`,
-    `${label("Source", theme)} ${muted(summary.sourceLabel, theme)}`,
-    `${label("Start", theme)} ${command(summary.startCommand, theme)}`,
-  ].join("\n");
+  return renderPanel(
+    `Sub-agent role: ${summary.name}`,
+    [
+      `${label("Use when", theme)} ${summary.guidance}`,
+      `${label("Description", theme)} ${summary.intent}`,
+      `${label("Capabilities", theme)} ${formatCapabilities(summary.capabilities, theme)}`,
+      `${label("Tools", theme)} ${muted(summary.tools.join(", "), theme)}`,
+      `${label("Model", theme)} ${muted(summary.model, theme)}`,
+      `${label("Thinking", theme)} ${thinking(summary.thinking, theme)}`,
+      `${label("Source", theme)} ${muted(summary.sourceLabel, theme)}`,
+      `${label("Start", theme)} ${command(summary.startCommand, theme)}`,
+    ],
+    theme,
+  );
 }
 
 export function formatRoleDiagnostics(diagnostics: SubagentRoleDiagnostic[]): string {
@@ -162,6 +166,26 @@ export function formatRecordDetails(record: SubagentRecord): string {
   }
 
   return lines.join("\n");
+}
+
+function formatStatusRows(records: SubagentRecord[], theme?: Theme): string[] {
+  const header = ["Age", "ID", "Role", "Status", "Context", "Task"];
+  const rows = records.map((record) => [
+    elapsedFor(record),
+    strong(record.id, theme),
+    muted(record.role?.name ?? "ad hoc", theme),
+    status(record.status, theme),
+    muted(formatContextUsage(record), theme),
+    statusTask(record, theme),
+  ]);
+  return renderTable(header, rows, STATUS_TABLE_WIDTHS, theme).split("\n");
+}
+
+function statusTask(record: SubagentRecord, theme?: Theme): string {
+  if (record.pendingFeedback) {
+    return `${theme ? theme.fg("warning", "needs reply") : "needs reply"}: ${record.pendingFeedback.question}\n${command(`/subagent reply ${record.id} <feedback>`, theme)}`;
+  }
+  return `${record.name}\n${muted(singleLine(record.activity, 80), theme)}`;
 }
 
 function summarizeRole(role: SubagentRole): RoleSummary {
@@ -216,15 +240,21 @@ function capabilitiesForTools(tools: string[]): Capability[] {
   return capabilities;
 }
 
-function formatRecordStatusLine(record: SubagentRecord, theme?: Theme): string {
-  return [
-    `  ${strong(record.id, theme)} ${strong(record.name, theme)}`,
-    `${label("role", theme)} ${muted(record.role?.name ?? "ad hoc", theme)}`,
-    `${label("status", theme)} ${status(record.status, theme)}`,
-    `${label("elapsed", theme)} ${muted(elapsedFor(record), theme)}`,
-    muted(formatContextUsage(record), theme),
-    `${label("cwd", theme)} ${muted(formatPathForDisplay(record.cwd), theme)}`,
-  ].join("   ");
+function renderTable(header: string[], rows: string[][], widths: number[], theme?: Theme): string {
+  return renderBoxTable(
+    header.map((cell) => headingCell(cell, theme)),
+    rows,
+    widths,
+    { theme },
+  );
+}
+
+function trimTrailingBlank(lines: string[]): string[] {
+  const next = [...lines];
+  while (next.at(-1) === "") {
+    next.pop();
+  }
+  return next;
 }
 
 function formatCapabilities(capabilities: Capability[], theme?: Theme): string {
@@ -276,8 +306,8 @@ function command(value: string, theme?: Theme): string {
   return theme ? theme.fg("accent", value) : value;
 }
 
-function heading(value: string, theme?: Theme): string {
-  return theme ? theme.fg("accent", theme.bold(value)) : value;
+function headingCell(value: string, theme?: Theme): string {
+  return theme ? theme.fg("muted", theme.bold(value.toUpperCase())) : value;
 }
 
 function label(value: string, theme?: Theme): string {

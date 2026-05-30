@@ -108,18 +108,27 @@ type StatusMessageOptions = {
 };
 
 const TOOL_LAUNCH_GROUP_WINDOW_MS = 100;
-const WIDGET_INTERVAL_KEY = Symbol.for("pi-agent-toolkit/subagents-widget-interval");
+const MIN_WIDGET_UPDATE_MS = 1_000;
+const MAX_WIDGET_UPDATE_MS = 4_000;
+const WIDGET_TIMER_KEY = Symbol.for("pi-agent-toolkit/subagents-widget-interval");
+
+type WidgetTimer = ReturnType<typeof setTimeout>;
 
 {
-  const previousInterval = (
-    globalThis as Record<symbol, ReturnType<typeof setInterval> | null | undefined>
-  )[WIDGET_INTERVAL_KEY];
-  if (previousInterval) {
-    clearInterval(previousInterval);
-    (globalThis as Record<symbol, ReturnType<typeof setInterval> | null | undefined>)[
-      WIDGET_INTERVAL_KEY
-    ] = null;
+  const previousTimer = (globalThis as Record<symbol, WidgetTimer | null | undefined>)[
+    WIDGET_TIMER_KEY
+  ];
+  if (previousTimer) {
+    clearTimeout(previousTimer);
+    (globalThis as Record<symbol, WidgetTimer | null | undefined>)[WIDGET_TIMER_KEY] = null;
   }
+}
+
+function randomWidgetUpdateDelayMs(): number {
+  return (
+    MIN_WIDGET_UPDATE_MS +
+    Math.floor(Math.random() * (MAX_WIDGET_UPDATE_MS - MIN_WIDGET_UPDATE_MS + 1))
+  );
 }
 
 function updateRecordContextUsage(record: SubagentRecord): void {
@@ -158,7 +167,7 @@ export default function (pi: ExtensionAPI) {
   let closeToolLaunchGroupTimer: ReturnType<typeof setTimeout> | undefined;
   let latestCtx: ExtensionContext | undefined;
   let latestInputStreamingBehavior: InputEvent["streamingBehavior"];
-  let widgetInterval: ReturnType<typeof setInterval> | null = null;
+  let widgetTimer: WidgetTimer | null = null;
   const pendingCompletionReportIds = new Set<string>();
   let startSubagentCalledThisTurn = false;
   let nonSubagentToolCalledThisTurn = false;
@@ -167,18 +176,29 @@ export default function (pi: ExtensionAPI) {
     return [...records.values()].sort((a, b) => a.startedAt - b.startedAt);
   }
 
-  function setWidgetInterval(interval: ReturnType<typeof setInterval> | null): void {
-    widgetInterval = interval;
-    (globalThis as Record<symbol, ReturnType<typeof setInterval> | null | undefined>)[
-      WIDGET_INTERVAL_KEY
-    ] = interval;
+  function setWidgetTimer(timer: WidgetTimer | null): void {
+    widgetTimer = timer;
+    (globalThis as Record<symbol, WidgetTimer | null | undefined>)[WIDGET_TIMER_KEY] = timer;
   }
 
-  function clearWidgetInterval(): void {
-    if (widgetInterval) {
-      clearInterval(widgetInterval);
-      setWidgetInterval(null);
+  function clearWidgetTimer(): void {
+    if (widgetTimer) {
+      clearTimeout(widgetTimer);
+      setWidgetTimer(null);
     }
+  }
+
+  function scheduleStatusWidgetUpdate(): void {
+    if (widgetTimer) {
+      return;
+    }
+
+    setWidgetTimer(
+      setTimeout(() => {
+        setWidgetTimer(null);
+        updateStatusWidget();
+      }, randomWidgetUpdateDelayMs()),
+    );
   }
 
   function activeRecords(): SubagentRecord[] {
@@ -210,7 +230,7 @@ export default function (pi: ExtensionAPI) {
     if (visibleRecords.length === 0) {
       ctx.ui.setWidget("subagents", undefined);
       ctx.ui.setStatus("subagents", undefined);
-      clearWidgetInterval();
+      clearWidgetTimer();
       return;
     }
 
@@ -233,13 +253,7 @@ export default function (pi: ExtensionAPI) {
       },
     );
 
-    if (!widgetInterval) {
-      setWidgetInterval(
-        setInterval(() => {
-          updateStatusWidget();
-        }, 1000),
-      );
-    }
+    scheduleStatusWidgetUpdate();
   }
 
   function findRecord(query: string): { record?: SubagentRecord; error?: string } {
@@ -533,7 +547,7 @@ export default function (pi: ExtensionAPI) {
         break;
       }
       case "turn_end": {
-        markActivity(record, "Turn finished.");
+        updateRecordContextUsage(record);
         break;
       }
       case "compaction_end": {
@@ -1050,6 +1064,7 @@ export default function (pi: ExtensionAPI) {
       "Users can still manually inspect and control sub-agents with `/subagent view <id>`, `/subagent stop <id>`, and `/subagent reply <id> <feedback>`.",
     ],
     parameters: StartSubagentParams,
+    renderShell: "self",
     renderCall(args, theme) {
       return new Text(theme.fg("accent", formatStartSubagentCall(args)), 0, 0);
     },
@@ -1227,7 +1242,7 @@ export default function (pi: ExtensionAPI) {
       ctx.ui.setWidget("subagents", undefined);
       ctx.ui.setStatus("subagents", undefined);
     }
-    clearWidgetInterval();
+    clearWidgetTimer();
     if (closeToolLaunchGroupTimer) {
       clearTimeout(closeToolLaunchGroupTimer);
       closeToolLaunchGroupTimer = undefined;
