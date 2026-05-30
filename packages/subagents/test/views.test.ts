@@ -33,6 +33,7 @@ function record(
     role: overrides.role,
     status: overrides.status ?? "running",
     startedAt: overrides.startedAt ?? Date.now() - 1_000,
+    lastActivityAt: overrides.lastActivityAt ?? Date.now(),
     finishedAt: overrides.finishedAt,
     activity: overrides.activity ?? "Reading files.",
     result: overrides.result,

@@ -59,6 +59,7 @@ import {
 } from "./format.ts";
 import { formatPathForDisplay, resolveSubagentCwd } from "./paths.ts";
 import { createSubagentResourceLoader, formatToolPromptGuidelines } from "./resource-loader.ts";
+import { loadPersistedSubagentRecords, persistSubagentRecord } from "./persistence.ts";
 import { loadSubagentRoles, parseStartArgs } from "./roles.ts";
 import {
   AskMainSessionParams,
@@ -92,7 +93,6 @@ import type {
   SubagentControlDetails,
   SubagentRecord,
   SubagentRole,
-  SubagentStatus,
 } from "./types.ts";
 import {
   SubagentStatusWidget,
@@ -137,11 +137,9 @@ function updateRecordContextUsage(record: SubagentRecord): void {
 
 function markActivity(record: SubagentRecord, activity: string): void {
   record.activity = singleLine(activity);
+  record.lastActivityAt = Date.now();
   updateRecordContextUsage(record);
-}
-
-function hasStatus(record: SubagentRecord, status: SubagentStatus): boolean {
-  return record.status === status;
+  persistSubagentRecord(record);
 }
 
 function messageFromUnknownError(error: unknown): string {
@@ -161,6 +159,7 @@ export default function (pi: ExtensionAPI) {
   const roleDiagnostics = roleRegistry.diagnostics;
   const rolesByName = new Map(roles.map((role) => [role.name.toLowerCase(), role]));
   const records = new Map<string, SubagentRecord>();
+  const loadedPersistedCwds = new Set<string>();
   let nextSubagentNumber = 1;
   let nextCompletionGroupNumber = 1;
   let activeToolLaunchGroupId: string | undefined;
@@ -174,6 +173,25 @@ export default function (pi: ExtensionAPI) {
 
   function sortedRecords(): SubagentRecord[] {
     return [...records.values()].sort((a, b) => a.startedAt - b.startedAt);
+  }
+
+  function trackNextSubagentNumber(id: string): void {
+    const match = /^sa-(\d+)$/u.exec(id);
+    if (!match) {
+      return;
+    }
+    nextSubagentNumber = Math.max(nextSubagentNumber, Number(match[1]) + 1);
+  }
+
+  function ensurePersistedRecordsLoaded(cwd: string): void {
+    if (loadedPersistedCwds.has(cwd)) {
+      return;
+    }
+    loadedPersistedCwds.add(cwd);
+    for (const record of loadPersistedSubagentRecords(rolesByName, { cwd })) {
+      records.set(record.id, record);
+      trackNextSubagentNumber(record.id);
+    }
   }
 
   function setWidgetTimer(timer: WidgetTimer | null): void {
@@ -602,6 +620,7 @@ export default function (pi: ExtensionAPI) {
       role: parsed.role,
       status: "starting",
       startedAt: Date.now(),
+      lastActivityAt: Date.now(),
       activity: "Queued.",
       feedbackSerial: 0,
       toolCalls: new Map(),
@@ -610,6 +629,7 @@ export default function (pi: ExtensionAPI) {
       completionGroupId: parsed.completionGroupId,
     };
     records.set(record.id, record);
+    persistSubagentRecord(record);
     updateStatusWidget(ctx);
 
     if (parsed.notifyOnStart ?? true) {
@@ -671,7 +691,7 @@ export default function (pi: ExtensionAPI) {
 
       await session.prompt(record.task, { source: "extension" });
 
-      if (hasStatus(record, "stopped")) {
+      if (isFinishedStatus(record.status)) {
         return;
       }
 
@@ -697,7 +717,7 @@ export default function (pi: ExtensionAPI) {
         postStatusMessage(`Sub-agent ${record.name} (${record.id}) completed.\n\n${record.result}`);
       }
     } catch (error) {
-      if (record.status === "stopped") {
+      if (isFinishedStatus(record.status)) {
         return;
       }
       record.error = messageFromUnknownError(error);
@@ -710,12 +730,14 @@ export default function (pi: ExtensionAPI) {
     } finally {
       record.pendingFeedback?.cancel("The sub-agent is no longer running.");
       updateRecordContextUsage(record);
+      persistSubagentRecord(record);
       disposeSubagentSession(record);
       updateStatusWidget();
     }
   }
 
   async function startSubagent(args: string, ctx: ExtensionCommandContext): Promise<void> {
+    ensurePersistedRecordsLoaded(ctx.cwd);
     const parsed = parseStartArgs(args, rolesByName);
     if (!parsed) {
       ctx.ui.notify("Usage: /subagent start <task> or /subagent start <role> <task>", "warning");
@@ -735,6 +757,7 @@ export default function (pi: ExtensionAPI) {
     params: { role?: string; task: string; name?: string; cwd?: string },
     ctx: ExtensionContext,
   ): StartSubagentDetails {
+    ensurePersistedRecordsLoaded(ctx.cwd);
     const task = params.task.trim();
     if (!task) {
       return {
@@ -934,6 +957,7 @@ export default function (pi: ExtensionAPI) {
   }
 
   function showStatusView(args: string, ctx: ExtensionCommandContext): void {
+    ensurePersistedRecordsLoaded(ctx.cwd);
     updateStatusWidget(ctx);
     const id = args.trim();
     if (!id) {
@@ -993,6 +1017,7 @@ export default function (pi: ExtensionAPI) {
       "Manage simple background sub-agents. Use `/subagent start <task>`, `/subagent start <role> <task>`, `/subagent agents`, `/subagent list`, `/subagent view [id]`, `/subagent stop <id>`, or `/subagent reply <id> <feedback>`.",
     handler: async (args, ctx) => {
       latestCtx = ctx;
+      ensurePersistedRecordsLoaded(ctx.cwd);
       const { command, rest } = splitCommand(args);
       switch (command) {
         case "start":
@@ -1233,6 +1258,7 @@ export default function (pi: ExtensionAPI) {
 
   pi.on("session_start", async (_event, ctx) => {
     latestCtx = ctx;
+    ensurePersistedRecordsLoaded(ctx.cwd);
     updateStatusWidget(ctx);
   });
 
@@ -1252,10 +1278,10 @@ export default function (pi: ExtensionAPI) {
       if (isFinishedStatus(record.status)) {
         continue;
       }
-      record.status = "stopped";
+      record.status = "interrupted";
       record.finishedAt = Date.now();
       record.pendingFeedback?.cancel("The Pi session shut down before feedback arrived.");
-      markActivity(record, "Stopped because the main session shut down.");
+      markActivity(record, "Interrupted because the main session shut down.");
       try {
         await record.session?.abort();
       } catch (error) {

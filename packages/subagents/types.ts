@@ -8,7 +8,8 @@ export type SubagentStatus =
   | "waiting for feedback"
   | "completed"
   | "failed"
-  | "stopped";
+  | "stopped"
+  | "interrupted";
 
 export type FeedbackRequest = {
   id: string;
@@ -113,6 +114,7 @@ export type SubagentRecord = {
   role?: SubagentRole;
   status: SubagentStatus;
   startedAt: number;
+  lastActivityAt: number;
   finishedAt?: number;
   activity: string;
   result?: string;

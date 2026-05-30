@@ -62,6 +62,10 @@ export function elapsedFor(record: SubagentRecord): string {
   return formatDuration((record.finishedAt ?? Date.now()) - record.startedAt);
 }
 
+export function lastActivityFor(record: SubagentRecord): string {
+  return formatDuration(Date.now() - record.lastActivityAt);
+}
+
 export function formatContextUsage(record: SubagentRecord): string {
   const usage = record.session?.getContextUsage() ?? record.contextUsage;
   if (!usage) {

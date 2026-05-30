@@ -5,6 +5,9 @@ import { padToVisibleWidth } from "./terminal-layout.ts";
 import type { SubagentRecord, SubagentStatus } from "./types.ts";
 
 const RECENT_FINISHED_WIDGET_MS = 60_000;
+const STALE_ACTIVITY_MS = 15 * 60 * 1000;
+
+export const NO_RECENT_ACTIVITY_LABEL = "no recent activity";
 
 export function isActiveStatus(status: SubagentStatus): boolean {
   return status === "starting" || status === "running" || status === "waiting for feedback";
@@ -14,8 +17,17 @@ export function isWorkingStatus(status: SubagentStatus): boolean {
   return status === "starting" || status === "running";
 }
 
+export function hasNoRecentActivity(record: SubagentRecord, now = Date.now()): boolean {
+  return isWorkingStatus(record.status) && now - record.lastActivityAt >= STALE_ACTIVITY_MS;
+}
+
 export function isFinishedStatus(status: SubagentStatus): boolean {
-  return status === "completed" || status === "failed" || status === "stopped";
+  return (
+    status === "completed" ||
+    status === "failed" ||
+    status === "stopped" ||
+    status === "interrupted"
+  );
 }
 
 export function isVisibleInWidget(record: SubagentRecord, now: number): boolean {
@@ -132,6 +144,10 @@ function streamText(record: SubagentRecord): string {
 }
 
 function statusText(record: SubagentRecord, theme: ExtensionContext["ui"]["theme"]): string {
+  if (hasNoRecentActivity(record)) {
+    return theme.fg("warning", NO_RECENT_ACTIVITY_LABEL);
+  }
+
   switch (record.status) {
     case "starting":
       return theme.fg("accent", "starting");
@@ -147,6 +163,8 @@ function statusText(record: SubagentRecord, theme: ExtensionContext["ui"]["theme
       return theme.fg("error", "failed");
     case "stopped":
       return theme.fg("warning", "stopped");
+    case "interrupted":
+      return theme.fg("warning", "interrupted");
   }
 }
 

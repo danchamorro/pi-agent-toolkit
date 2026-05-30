@@ -1,5 +1,22 @@
 # @danchamorro/pi-subagents Changelog
 
+## 0.5.0 - 2026-05-30
+
+### Added
+
+- Added lightweight persisted run metadata for recoverable sub-agent states so
+  active work interrupted by a Pi reload remains visible after restart.
+- Added an `interrupted` status for sub-agents that were still active when the
+  main Pi session shut down.
+- Added last-activity tracking and a `no recent activity` status hint for
+  long-running sub-agents that have not produced activity recently.
+
+### Changed
+
+- Scoped persisted recovery records to the current working directory and a short
+  recovery window so unrelated repos and old completed runs do not appear in
+  new sessions.
+
 ## 0.4.1 - 2026-05-30
 
 ### Changed

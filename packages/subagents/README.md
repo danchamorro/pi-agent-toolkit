@@ -331,22 +331,28 @@ the child runs, and the full result remains available through
    `ask_main_session` tool, renderers, and lifecycle handlers in
    [index.ts](index.ts#L875).
 2. When a sub-agent starts, the package creates an in-memory record with an id,
-   name, cwd, task, status, activity text, context usage, and optional role.
+   name, cwd, task, status, activity text, last activity time, context usage,
+   and optional role.
 3. The child session is created with `SessionManager.inMemory(...)`, so subagent
-   history is not persisted to disk.
-4. The child receives a task-specific system prompt built by
+   conversation history is not persisted to disk. The package only persists
+   lightweight run metadata needed for reload recovery.
+4. On startup, the package reloads recent recoverable metadata for the current
+   cwd only. Active records from before reload are shown as `interrupted`; old
+   completed/stopped/failed records are not restored into new sessions.
+5. The child receives a task-specific system prompt built by
    [resource-loader.ts](resource-loader.ts#L8). That prompt includes the launch
    cwd, assigned task, role prompt, and the rule that the child does not have
    the parent transcript.
-5. The child runs with a narrow tool set. Role tools are loaded from the role
+6. The child runs with a narrow tool set. Role tools are loaded from the role
    file, and `ask_main_session` is added automatically.
-6. The status widget in [status-widget.ts](status-widget.ts#L117) refreshes
+7. The status widget in [status-widget.ts](status-widget.ts#L117) refreshes
    while work is active and keeps recently completed sub-agents visible for a
-   short time.
-7. If the child calls `ask_main_session`, the main session receives a feedback
+   short time. Running records with no activity for a while show a `no recent
+   activity` hint.
+8. If the child calls `ask_main_session`, the main session receives a feedback
    request and the child waits. The user can answer with `/subagent reply`, or
    the main agent can call `reply_subagent`.
-8. On completion, failure, stop, or shutdown, the package records the final
+9. On completion, failure, stop, or shutdown, the package records the final
    status, captures the last context usage, cancels pending feedback, and
    disposes the child session.
 
@@ -445,10 +451,11 @@ developing this package from a checkout.
 
 This package is intentionally small and in-process.
 
-- Sub-agent records are process-local and in-memory.
-- Sub-agent history is not persisted across Pi shutdown.
+- Sub-agent records are process-local and in-memory, with lightweight metadata
+  persisted only for same-cwd reload recovery.
+- Full sub-agent conversation history is not persisted across Pi shutdown.
 - Sub-agents do not open separate terminal panes or external workers.
-- Running sub-agents are stopped when the main Pi session shuts down.
+- Running sub-agents are marked interrupted when the main Pi session shuts down.
 - A reload picks up source changes for newly started sub-agents, but it does
   not rewrite the code already executing inside an active child session.
 - The package does not try to route sub-agents across arbitrary directories. If
@@ -464,6 +471,7 @@ These boundaries keep the feature predictable while the package matures.
 | [agents/](agents/) | Bundled role prompts for planner, scout, reviewer, and worker. |
 | [roles.ts](roles.ts#L1) | Built-in/custom role loading, settings overrides, frontmatter validation, and `/subagent start` argument parsing. |
 | [resource-loader.ts](resource-loader.ts#L1) | Builds the child session resources and task-specific system prompt. |
+| [persistence.ts](persistence.ts#L1) | Persists lightweight same-cwd recovery metadata for interrupted sub-agent runs. |
 | [status-widget.ts](status-widget.ts#L1) | Compact below-editor status widget for active and recent sub-agents. |
 | [views.ts](views.ts#L1) | `/subagent list`, `/subagent agents`, and `/subagent view` text formatting. |
 | [tool-rendering.ts](tool-rendering.ts#L1) | Compact and expanded rendering for main-agent tool calls/results. |

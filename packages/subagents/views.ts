@@ -1,6 +1,7 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 
-import { elapsedFor, formatContextUsage, singleLine } from "./format.ts";
+import { elapsedFor, formatContextUsage, lastActivityFor, singleLine } from "./format.ts";
+import { hasNoRecentActivity, NO_RECENT_ACTIVITY_LABEL } from "./status-widget.ts";
 import { renderBoxTable, renderPanel } from "./terminal-layout.ts";
 import type { SubagentRecord, SubagentRole, SubagentRoleDiagnostic } from "./types.ts";
 
@@ -149,6 +150,7 @@ export function formatRecordDetails(record: SubagentRecord): string {
     `Cwd: ${record.cwd}`,
     `Status: ${record.status}`,
     `Elapsed: ${elapsedFor(record)}`,
+    `Last activity: ${lastActivityFor(record)} ago`,
     `Context: ${formatContextUsage(record)}`,
     `Task: ${record.task}`,
     `Latest: ${record.activity}`,
@@ -174,11 +176,18 @@ function formatStatusRows(records: SubagentRecord[], theme?: Theme): string[] {
     elapsedFor(record),
     strong(record.id, theme),
     muted(record.role?.name ?? "ad hoc", theme),
-    status(record.status, theme),
+    statusTextForRecord(record, theme),
     muted(formatContextUsage(record), theme),
     statusTask(record, theme),
   ]);
   return renderTable(header, rows, STATUS_TABLE_WIDTHS, theme).split("\n");
+}
+
+function statusTextForRecord(record: SubagentRecord, theme?: Theme): string {
+  if (hasNoRecentActivity(record)) {
+    return theme ? theme.fg("warning", NO_RECENT_ACTIVITY_LABEL) : NO_RECENT_ACTIVITY_LABEL;
+  }
+  return status(record.status, theme);
 }
 
 function statusTask(record: SubagentRecord, theme?: Theme): string {
@@ -289,6 +298,7 @@ function status(value: string, theme?: Theme): string {
       return theme.fg("error", value);
     case "waiting for feedback":
     case "stopped":
+    case "interrupted":
       return theme.fg("warning", value);
     default:
       return theme.fg("accent", value);
