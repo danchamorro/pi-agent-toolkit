@@ -71,6 +71,72 @@ Or create a `.env` file in the skill directory:
 echo 'EXA_API_KEY=your_key' > ~/.pi/agent/skills/exa-search/.env
 ```
 
+### AgentMemory
+
+[AgentMemory](https://github.com/rohitg00/agentmemory) is tracked in
+`manifest.json` as an external skill source, so `setup.mjs` can install the
+repo-provided skills such as `remember`, `recall`, `handoff`, and
+`session-history`. Those skills are only the agent-facing commands; they do
+not install or supervise the local AgentMemory daemon.
+
+Install the daemon globally and wire any non-Pi agents separately:
+
+```bash
+npm install -g @agentmemory/agentmemory
+agentmemory connect pi
+agentmemory connect claude-code
+agentmemory connect cursor
+agentmemory connect warp
+```
+
+The Pi integration uses a native extension rather than MCP. If `agentmemory
+connect pi` reports that manual installation is required, follow the upstream
+Pi integration guide and place the extension under
+`~/.pi/agent/extensions/agentmemory/`.
+
+For always-on local memory, run AgentMemory outside this repo with your
+machine's service manager. On macOS, a LaunchAgent works well, but the plist,
+wrapper script, and service-account token are intentionally local-only because
+they contain machine-specific paths and secret-access policy. If you want
+OpenAI-backed embeddings without writing the OpenAI key to disk, use a
+1Password service account that can read a non-Personal vault item, store that
+service-account token in macOS Keychain, and start AgentMemory through
+`op run`.
+
+If you are not using 1Password or macOS Keychain, put provider settings in
+AgentMemory's local env file instead. This is simpler, but it stores secrets
+on disk, so keep the file private and never commit it:
+
+```bash
+agentmemory init
+chmod 600 ~/.agentmemory/.env
+```
+
+Then edit `~/.agentmemory/.env` and uncomment or add the provider values you
+want. For OpenAI embeddings:
+
+```dotenv
+OPENAI_API_KEY=sk-your-openai-key
+EMBEDDING_PROVIDER=openai
+OPENAI_EMBEDDING_MODEL=text-embedding-3-small
+```
+
+For free local embeddings with no API key:
+
+```dotenv
+EMBEDDING_PROVIDER=local
+```
+
+After changing `~/.agentmemory/.env`, restart the daemon or your local service
+manager so AgentMemory reloads the file.
+
+Useful checks:
+
+```bash
+agentmemory status
+agentmemory doctor --dry-run
+```
+
 ---
 
 ## MCP server setup

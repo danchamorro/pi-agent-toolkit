@@ -28,7 +28,20 @@
     { "source": "firecrawl/cli", "skills": ["firecrawl"] },
     { "source": "coleam00/excalidraw-diagram-skill", "skills": [] },
     { "source": "browser-use/browser-harness", "skills": ["browser"] },
-    { "source": "vercel-labs/agent-browser", "skills": ["agent-browser"] }
+    { "source": "vercel-labs/agent-browser", "skills": ["agent-browser"] },
+    {
+      "source": "rohitg00/agentmemory",
+      "skills": [
+        "commit-context",
+        "commit-history",
+        "forget",
+        "handoff",
+        "recall",
+        "recap",
+        "remember",
+        "session-history"
+      ]
+    }
   ],
   "packages": [
     "npm:@danchamorro/pi-subagents",

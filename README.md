@@ -6,7 +6,7 @@ skills, configs, safety guardrails, and installable packages. This is a
 public backup and reference for how I organize my own agent environment,
 not a universal starter kit intended to be cloned unchanged by everyone.
 
-Includes 26 extensions, 46 skills, 1 prompt template, 1 theme,
+Includes 26 extensions, 54 skills, 1 prompt template, 1 theme,
 6 installable Pi packages, MCP server configurations, and safety guardrails.
 It also tracks 2 custom sub-agent roles for local use with the subagents
 package.
@@ -277,7 +277,7 @@ Installed automatically when these packages are present in
 |-------|--------|
 | `design-deck` | [`npm:pi-design-deck`](https://github.com/nicobailon/pi-design-deck) |
 
-**External skills** (25, installed from source repos):
+**External skills** (33, installed from source repos):
 
 Listed in `manifest.json` and installed automatically by `setup.mjs`.
 Not committed to this repo. Maintained by their original authors.
@@ -295,6 +295,7 @@ Not committed to this repo. Maintained by their original authors.
 | `excalidraw-diagram` | [coleam00/excalidraw-diagram-skill](https://github.com/coleam00/excalidraw-diagram-skill) |
 | `browser` | [browser-use/browser-harness](https://github.com/browser-use/browser-harness) |
 | `agent-browser` | [vercel-labs/agent-browser](https://github.com/vercel-labs/agent-browser) |
+| `commit-context`, `commit-history`, `forget`, `handoff`, `recall`, `recap`, `remember`, `session-history` | [rohitg00/agentmemory](https://github.com/rohitg00/agentmemory) |
 
 ### Custom sub-agent roles (2)
 
