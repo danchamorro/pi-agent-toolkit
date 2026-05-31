@@ -32,12 +32,6 @@ const WORKFLOW_ORDER = ["scout", "planner", "worker", "reviewer"];
 const ROLE_TABLE_WIDTHS = [24, 54, 30, 24, 38];
 const STATUS_TABLE_WIDTHS = [8, 9, 18, 18, 12, 52];
 
-export function formatRecordChoices(recordsToFormat: SubagentRecord[]): string {
-  return recordsToFormat
-    .map((record) => `${record.id} ${record.name} (${record.status})`)
-    .join(", ");
-}
-
 export function formatSubagentList(records: SubagentRecord[], theme?: Theme): string {
   if (records.length === 0) {
     return renderPanel(

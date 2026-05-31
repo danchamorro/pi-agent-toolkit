@@ -23,6 +23,7 @@ burning the main session's remaining context.
 - [Roles](#roles)
 - [Custom Agents](#custom-agents)
 - [Role Settings](#role-settings)
+- [Session Limits](#session-limits)
 - [User Commands](#user-commands)
 - [Main-Agent Tools](#main-agent-tools)
 - [How It Works](#how-it-works)
@@ -49,6 +50,8 @@ burning the main session's remaining context.
   directory and have them show up beside the bundled roles.
 - **Per-role settings.** Built-in and custom roles can override model,
   thinking level, and tools without editing package files.
+- **Bounded concurrency.** A configurable soft cap limits how many sub-agents
+  run at once, with an optional idle auto-stop for stalled background work.
 - **Manual and agent-driven control.** Users can type `/subagent ...` commands,
   while the main agent can use `start_subagent`, `stop_subagent`, and
   `reply_subagent` tools on the user's behalf.
@@ -282,6 +285,29 @@ Invalid override values are ignored with a warning and the role keeps its last
 valid value. Unknown role names are also reported in `/subagent agents`, which
 helps catch typos after a reload.
 
+## Session Limits
+
+Two optional settings in `~/.pi/agent/settings.json` bound background work:
+
+| Field | Meaning | Default |
+|---|---|---|
+| `subagents.maxConcurrent` | Maximum number of simultaneously active sub-agents. New launches are refused with a clear message once the cap is reached. | `5` |
+| `subagents.idleTimeoutMinutes` | Auto-stop a working sub-agent after this many minutes with no activity. `0` disables it. Sub-agents waiting for feedback are never auto-stopped. | `0` (off) |
+
+```json
+{
+  "subagents": {
+    "maxConcurrent": 3,
+    "idleTimeoutMinutes": 15
+  }
+}
+```
+
+Each active sub-agent is a full background model session, so the concurrency cap
+guards against runaway cost and provider rate limits. Idle auto-stop is opt-in
+so background work is never killed unless you ask for it. Invalid values are
+ignored with a warning in `/subagent agents` and the default is used.
+
 ## User Commands
 
 The package registers one slash command namespace: `/subagent`.
@@ -452,9 +478,13 @@ developing this package from a checkout.
 This package is intentionally small and in-process.
 
 - Sub-agent records are process-local and in-memory, with lightweight metadata
-  persisted only for same-cwd reload recovery.
+  persisted only for same-cwd reload recovery. Frequent activity updates are
+  written on a short debounce to keep streaming off the synchronous disk path.
 - Full sub-agent conversation history is not persisted across Pi shutdown.
 - Sub-agents do not open separate terminal panes or external workers.
+- Concurrency is bounded by `subagents.maxConcurrent` (default 5), and idle
+  auto-stop (`subagents.idleTimeoutMinutes`) is opt-in. Idle auto-stop applies
+  to interactive sessions while the status widget is refreshing.
 - Running sub-agents are marked interrupted when the main Pi session shuts down.
 - A reload picks up source changes for newly started sub-agents, but it does
   not rewrite the code already executing inside an active child session.
@@ -467,11 +497,14 @@ These boundaries keep the feature predictable while the package matures.
 
 | File | Responsibility |
 |---|---|
-| [index.ts](index.ts#L1) | Extension entrypoint, command/tool registration, sub-agent records, runner lifecycle, and session cleanup. |
+| [index.ts](index.ts#L1) | Extension entrypoint: command/tool registration, runner lifecycle, status widget, concurrency/idle limits, and session cleanup. |
 | [agents/](agents/) | Bundled role prompts for planner, scout, reviewer, and worker. |
-| [roles.ts](roles.ts#L1) | Built-in/custom role loading, settings overrides, frontmatter validation, and `/subagent start` argument parsing. |
+| [roles.ts](roles.ts#L1) | Built-in/custom role loading, settings overrides and limits, frontmatter validation, and `/subagent start` argument parsing. |
+| [record-store.ts](record-store.ts#L1) | In-memory sub-agent record store: id allocation, lookups, recovery loading, and debounced/eager persistence scheduling. |
+| [completion-reporter.ts](completion-reporter.ts#L1) | Batches tool-launched completions into one hidden main-session report and captures streaming-aware delivery at launch time. |
+| [reload-safe-timer.ts](reload-safe-timer.ts#L1) | Single live status-widget refresh timer that survives Pi hot reloads. |
 | [resource-loader.ts](resource-loader.ts#L1) | Builds the child session resources and task-specific system prompt. |
-| [persistence.ts](persistence.ts#L1) | Persists lightweight same-cwd recovery metadata for interrupted sub-agent runs. |
+| [persistence.ts](persistence.ts#L1) | Persists lightweight same-cwd recovery metadata and prunes old runs cheaply. |
 | [status-widget.ts](status-widget.ts#L1) | Compact below-editor status widget for active and recent sub-agents. |
 | [views.ts](views.ts#L1) | `/subagent list`, `/subagent agents`, and `/subagent view` text formatting. |
 | [tool-rendering.ts](tool-rendering.ts#L1) | Compact and expanded rendering for main-agent tool calls/results. |

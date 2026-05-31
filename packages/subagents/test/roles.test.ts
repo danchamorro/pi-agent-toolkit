@@ -4,7 +4,8 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { loadSubagentRoles } from "../roles.ts";
+import { loadSubagentRoles, parseStartArgs } from "../roles.ts";
+import type { SubagentRole } from "../types.ts";
 
 let testDir = "";
 let agentDir = "";
@@ -180,5 +181,92 @@ describe("loadSubagentRoles", () => {
 
     assert.equal(result.diagnostics.length, 1);
     assert.match(result.diagnostics[0]?.message ?? "", /unknown sub-agent role "missing"/);
+  });
+
+  it("defaults concurrency and idle limits when settings omit them", () => {
+    const result = loadSubagentRoles({ agentDir });
+    assert.equal(result.limits.maxConcurrent, 5);
+    assert.equal(result.limits.idleTimeoutMs, 0);
+  });
+
+  it("reads valid concurrency and idle limits from settings", () => {
+    const result = loadSubagentRoles({
+      agentDir,
+      settings: { maxConcurrent: 3, idleTimeoutMinutes: 2 },
+    });
+    assert.equal(result.limits.maxConcurrent, 3);
+    assert.equal(result.limits.idleTimeoutMs, 120_000);
+    assert.deepEqual(result.diagnostics, []);
+  });
+
+  it("ignores invalid limit values with diagnostics and keeps safe defaults", () => {
+    const result = loadSubagentRoles({
+      agentDir,
+      settings: {
+        maxConcurrent: 0,
+        idleTimeoutMinutes: -5,
+      },
+    });
+    assert.equal(result.limits.maxConcurrent, 5);
+    assert.equal(result.limits.idleTimeoutMs, 0);
+    assert.equal(result.diagnostics.length, 2);
+    assert.match(result.diagnostics[0]?.message ?? "", /maxConcurrent/);
+    assert.match(result.diagnostics[1]?.message ?? "", /idleTimeoutMinutes/);
+  });
+});
+
+describe("parseStartArgs", () => {
+  function buildRoles(): Map<string, SubagentRole> {
+    const scout: SubagentRole = {
+      name: "scout",
+      description: "",
+      tools: ["read"],
+      systemPrompt: "",
+      filePath: "/tmp/scout.md",
+      source: "built-in",
+    };
+    return new Map([["scout", scout]]);
+  }
+
+  it("returns null for empty input", () => {
+    assert.equal(parseStartArgs("   ", buildRoles()), null);
+  });
+
+  it("derives a name for a plain ad hoc task", () => {
+    const parsed = parseStartArgs("Investigate the flaky test", buildRoles());
+    assert.equal(parsed?.role, undefined);
+    assert.equal(parsed?.task, "Investigate the flaky test");
+    assert.equal(parsed?.name, "Investigate the flaky test");
+  });
+
+  it("matches a leading role word", () => {
+    const parsed = parseStartArgs("scout map the repo", buildRoles());
+    assert.equal(parsed?.role?.name, "scout");
+    assert.equal(parsed?.name, "scout");
+    assert.equal(parsed?.task, "map the repo");
+  });
+
+  it("supports a leading role via the name: task form", () => {
+    const parsed = parseStartArgs("scout: map the repo", buildRoles());
+    assert.equal(parsed?.role?.name, "scout");
+    assert.equal(parsed?.task, "map the repo");
+  });
+
+  it("treats a non-role name prefix as a display name", () => {
+    const parsed = parseStartArgs("docs: read the readme", buildRoles());
+    assert.equal(parsed?.role, undefined);
+    assert.equal(parsed?.name, "docs");
+    assert.equal(parsed?.task, "read the readme");
+  });
+
+  it("returns null when a role is named without a task", () => {
+    assert.equal(parseStartArgs("scout", buildRoles()), null);
+  });
+
+  it("does not treat a far-away colon as a name separator", () => {
+    const input = `${"x".repeat(60)}: do the thing`;
+    const parsed = parseStartArgs(input, buildRoles());
+    assert.equal(parsed?.role, undefined);
+    assert.equal(parsed?.task, input);
   });
 });

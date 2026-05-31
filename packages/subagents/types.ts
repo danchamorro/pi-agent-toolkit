@@ -82,6 +82,19 @@ export type SubagentRoleOverride = {
 
 export type SubagentSettings = {
   agentOverrides?: Record<string, SubagentRoleOverride>;
+  maxConcurrent?: number;
+  idleTimeoutMinutes?: number;
+};
+
+export type SubagentLimits = {
+  maxConcurrent: number;
+  idleTimeoutMs: number;
+};
+
+export type StatusMessageOptions = {
+  deliverAs?: "steer" | "followUp" | "nextTurn";
+  triggerTurn?: boolean;
+  display?: boolean;
 };
 
 export type SubagentRoleDiagnostic = {
@@ -93,6 +106,7 @@ export type SubagentRoleDiagnostic = {
 export type SubagentRoleLoadResult = {
   roles: SubagentRole[];
   diagnostics: SubagentRoleDiagnostic[];
+  limits: SubagentLimits;
 };
 
 export type ParsedStartArgs = {

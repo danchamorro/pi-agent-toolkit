@@ -1,5 +1,13 @@
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 
 import type { SubagentRecord, SubagentRole, SubagentStatus } from "./types.ts";
@@ -43,7 +51,6 @@ export function persistSubagentRecord(record: SubagentRecord): void {
     `${JSON.stringify(toPersistedRecord(record), null, 2)}\n`,
     "utf8",
   );
-  prunePersistedRecords(runsDir);
 }
 
 export function loadPersistedSubagentRecords(
@@ -173,19 +180,28 @@ function validatePersistedRecord(value: unknown): PersistedSubagentRecord | unde
   return record as PersistedSubagentRecord;
 }
 
-function prunePersistedRecords(runsDir: string): void {
+/**
+ * Drops the oldest run files beyond the retention limit. This is intentionally
+ * cheap: it sorts by file mtime (one stat per file) instead of reading and
+ * parsing every record body, so it is safe to call when a new run is created
+ * without it ever landing on the per-activity write path.
+ */
+export function prunePersistedRecords(runsDir = getSubagentRunsDir()): void {
+  if (!existsSync(runsDir)) {
+    return;
+  }
+
   const entries = readdirSync(runsDir)
     .filter((fileName) => fileName.endsWith(".json"))
     .map((fileName) => {
       const path = join(runsDir, fileName);
       try {
-        const parsed = JSON.parse(readFileSync(path, "utf8")) as { startedAt?: unknown };
-        return { path, startedAt: typeof parsed.startedAt === "number" ? parsed.startedAt : 0 };
+        return { path, mtimeMs: statSync(path).mtimeMs };
       } catch {
-        return { path, startedAt: 0 };
+        return { path, mtimeMs: 0 };
       }
     })
-    .sort((a, b) => b.startedAt - a.startedAt);
+    .sort((a, b) => b.mtimeMs - a.mtimeMs);
 
   for (const entry of entries.slice(RETAIN_RUN_COUNT)) {
     rmSync(entry.path, { force: true });

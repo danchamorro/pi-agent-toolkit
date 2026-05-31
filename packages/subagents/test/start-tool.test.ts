@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, it } from "node:test";
@@ -313,5 +313,86 @@ describe("start_subagent tool", () => {
     assert.equal(sentMessages[0].message.display, false);
     assert.equal(sentMessages[0].options?.deliverAs, "followUp");
     assert.equal(sentMessages[0].options?.triggerTurn, true);
+  });
+
+  it("keeps the streaming follow-up route when turn_end fires before the report flushes", async () => {
+    const model = { provider: "test-provider", id: "test-model" };
+    const { events, startTool, sentMessages } = createPiHarness();
+    const inputHandler = events.find((event) => event.type === "input")?.handler;
+    const turnEndHandler = events.find((event) => event.type === "turn_end")?.handler;
+    assert.ok(inputHandler);
+    assert.ok(turnEndHandler);
+    const ctx = {
+      cwd: testDir,
+      hasUI: false,
+      model,
+      modelRegistry: {
+        getApiKeyAndHeaders() {
+          return { ok: false, error: "No test credentials available." };
+        },
+      },
+    };
+
+    await inputHandler({
+      type: "input",
+      text: "queue this after the current answer",
+      source: "interactive",
+      streamingBehavior: "followUp",
+    });
+    await startTool.execute(
+      "tool-call-1",
+      { task: "Map the package source." },
+      undefined,
+      undefined,
+      ctx,
+    );
+    // The launch turn ends (resetting the live streaming behavior) before the
+    // 100ms completion group window closes. The captured-at-launch behavior must
+    // still route the report as a next-turn message.
+    await turnEndHandler({ type: "turn_end", turnIndex: 0, timestamp: Date.now() });
+    await wait(150);
+
+    assert.equal(sentMessages.length, 1);
+    assert.equal(sentMessages[0].options?.deliverAs, "nextTurn");
+    assert.equal(sentMessages[0].options?.triggerTurn, true);
+    assert.equal(sentMessages[0].message.display, false);
+  });
+
+  it("enforces the configured concurrency cap", async () => {
+    writeFileSync(
+      join(testDir, "agent", "settings.json"),
+      JSON.stringify({ subagents: { maxConcurrent: 1 } }),
+    );
+    const model = { provider: "test-provider", id: "test-model" };
+    const { startTool } = createPiHarness();
+    const ctx = {
+      cwd: testDir,
+      hasUI: false,
+      model,
+      modelRegistry: {
+        getApiKeyAndHeaders() {
+          return neverResolve();
+        },
+      },
+    };
+
+    const first = (await startTool.execute(
+      "tc-1",
+      { task: "First task." },
+      undefined,
+      undefined,
+      ctx,
+    )) as ToolResult;
+    const second = (await startTool.execute(
+      "tc-2",
+      { task: "Second task." },
+      undefined,
+      undefined,
+      ctx,
+    )) as ToolResult;
+
+    assert.equal(first.details?.status, "starting");
+    assert.equal(second.details?.status, "error");
+    assert.match(second.content[0]?.text ?? "", /concurrency limit reached/);
   });
 });

@@ -1,5 +1,36 @@
 # @danchamorro/pi-subagents Changelog
 
+## 0.6.0 - 2026-05-31
+
+### Added
+
+- Added `subagents.maxConcurrent` (default 5) to cap simultaneously active
+  sub-agents and refuse new launches past the cap, guarding against runaway
+  cost and provider rate limits.
+- Added optional `subagents.idleTimeoutMinutes` (default off) to auto-stop
+  working sub-agents that produce no activity for the configured window.
+  Sub-agents waiting for feedback are never auto-stopped.
+- Added focused tests for the record store, completion reporter, start-argument
+  parsing, system-prompt footer stripping, the concurrency cap, and
+  streaming-aware completion delivery.
+
+### Changed
+
+- Extracted the in-memory record store (`record-store.ts`), completion reporter
+  (`completion-reporter.ts`), and the reload-safe widget timer
+  (`reload-safe-timer.ts`) out of `index.ts` so the orchestration logic is unit
+  testable without a live Pi session.
+- Coalesced high-frequency sub-agent activity writes into a single debounced
+  persist and moved run pruning off the per-activity path onto a cheaper
+  stat-based prune at record creation, reducing synchronous disk I/O during
+  streaming.
+
+### Fixed
+
+- Tool-launched completion reports now capture the streaming follow-up signal at
+  launch time instead of at flush time, so a queued user follow-up is still
+  routed as a next-turn message even after `turn_end` clears the live signal.
+
 ## 0.5.0 - 2026-05-30
 
 ### Added

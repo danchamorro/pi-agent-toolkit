@@ -4,11 +4,29 @@ import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import { MAX_ACTIVITY_LENGTH } from "./constants.ts";
 import type { SubagentRecord } from "./types.ts";
 
+/**
+ * Removes the dynamic "Current date and time" / "Current working directory"
+ * footer Pi appends to the end of the main system prompt, so a sub-agent
+ * session does not inherit the parent's (possibly different) cwd/date before
+ * Pi appends a fresh footer for the child.
+ *
+ * WARNING: this is coupled to the exact wording Pi appends today. If Pi changes
+ * that footer text this becomes a silent no-op and sub-agents would inherit a
+ * stale date/cwd line. `format.test.ts` pins the expected formats; if those
+ * tests fail after a Pi upgrade, update both the regexes and the fixtures
+ * together rather than loosening the assertions.
+ */
 export function stripDynamicSystemPromptFooter(systemPrompt: string): string {
   return systemPrompt
     .replace(/\nCurrent date and time:[^\n]*(?:\nCurrent working directory:[^\n]*)?$/u, "")
     .replace(/\nCurrent working directory:[^\n]*$/u, "")
     .trim();
+}
+
+export function formatRecordChoices(recordsToFormat: SubagentRecord[]): string {
+  return recordsToFormat
+    .map((record) => `${record.id} ${record.name} (${record.status})`)
+    .join(", ");
 }
 
 export function singleLine(value: string, maxLength = MAX_ACTIVITY_LENGTH): string {

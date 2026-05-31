@@ -4,6 +4,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  DEFAULT_IDLE_TIMEOUT_MINUTES,
+  DEFAULT_MAX_CONCURRENT,
   DEFAULT_TOOLS,
   ROLE_AGENT_FILES,
   SUBAGENT_TOOL_NAMES,
@@ -14,6 +16,7 @@ import type {
   ParsedStartArgs,
   RoleModelSpec,
   SessionThinkingLevel,
+  SubagentLimits,
   SubagentRoleDiagnostic,
   SubagentRoleLoadResult,
   SubagentRoleOverride,
@@ -321,6 +324,45 @@ function applyRoleOverrides(
   });
 }
 
+function parseLimits(
+  settings: SubagentSettings,
+  diagnostics: SubagentRoleDiagnostic[],
+): SubagentLimits {
+  let maxConcurrent = DEFAULT_MAX_CONCURRENT;
+  if (settings.maxConcurrent !== undefined) {
+    if (
+      typeof settings.maxConcurrent === "number" &&
+      Number.isInteger(settings.maxConcurrent) &&
+      settings.maxConcurrent >= 1
+    ) {
+      maxConcurrent = settings.maxConcurrent;
+    } else {
+      diagnostics.push({
+        level: "warning",
+        message: `Ignored invalid subagents.maxConcurrent value; using ${DEFAULT_MAX_CONCURRENT}.`,
+      });
+    }
+  }
+
+  let idleTimeoutMinutes = DEFAULT_IDLE_TIMEOUT_MINUTES;
+  if (settings.idleTimeoutMinutes !== undefined) {
+    if (
+      typeof settings.idleTimeoutMinutes === "number" &&
+      Number.isFinite(settings.idleTimeoutMinutes) &&
+      settings.idleTimeoutMinutes >= 0
+    ) {
+      idleTimeoutMinutes = settings.idleTimeoutMinutes;
+    } else {
+      diagnostics.push({
+        level: "warning",
+        message: "Ignored invalid subagents.idleTimeoutMinutes value; idle auto-stop disabled.",
+      });
+    }
+  }
+
+  return { maxConcurrent, idleTimeoutMs: Math.round(idleTimeoutMinutes * 60_000) };
+}
+
 export function loadSubagentRoles(options: RoleLoadOptions = {}): SubagentRoleLoadResult {
   const agentDir = options.agentDir ?? getAgentDir();
   const diagnostics: SubagentRoleDiagnostic[] = [];
@@ -337,6 +379,7 @@ export function loadSubagentRoles(options: RoleLoadOptions = {}): SubagentRoleLo
   return {
     roles: applyRoleOverrides(roles, settingsResult.settings, diagnostics),
     diagnostics,
+    limits: parseLimits(settingsResult.settings, diagnostics),
   };
 }
 
