@@ -6,7 +6,7 @@ skills, configs, safety guardrails, and installable packages. This is a
 public backup and reference for how I organize my own agent environment,
 not a universal starter kit intended to be cloned unchanged by everyone.
 
-Includes 26 extensions, 54 skills, 1 prompt template, 1 theme,
+Includes 26 extensions, 55 skills, 1 prompt template, 1 theme,
 6 installable Pi packages, MCP server configurations, and safety guardrails.
 It also tracks 2 custom sub-agent roles for local use with the subagents
 package.
@@ -238,7 +238,7 @@ and install path:
 Setup refuses to delete non-symlink files or directories in skill install
 roots. Unmanaged and third-party directories are reported and left in place.
 
-**Personal skills** (19, committed to this repo):
+**Personal skills** (20, committed to this repo):
 
 | Category | Skill | Description |
 |----------|-------|-------------|
@@ -261,6 +261,7 @@ roots. Unmanaged and third-party directories are reported and left in place.
 | `engineering` | `thermo-nuclear-review` | Comprehensive security and correctness audit of branch changes |
 | `engineering` | `thermos` | Launch both thermo-nuclear review subagents in parallel |
 | `developer-workflow` | `whats-new` | Git changelog generation between branches |
+| `media` | `youtube-video-context` | YouTube transcript, summary, and video context extraction via summarize CLI with Codex and local Whisper fallback |
 
 **Pi-only skills** (1, committed to this repo):
 
