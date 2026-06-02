@@ -33,6 +33,10 @@ Run all `node setup.mjs ...` commands from the repo root.
   and AI agents. It adds shell command checks, generated Pi bash-tool
   protection, and MCP tools for checking commands, URLs, pasted content,
   files, directories, and MCP configs. Install: `brew install sheeki03/tap/tirith`
+- **[RTK](https://github.com/rtk-ai/rtk)**: Shell-output token optimizer
+  for AI coding agents. It rewrites common commands such as `git status`,
+  `rg`, and `npm test` through `rtk` so the model sees compact output.
+  Install: `brew install rtk-ai/tap/rtk`
 
 ---
 
@@ -136,6 +140,91 @@ Useful checks:
 agentmemory status
 agentmemory doctor --dry-run
 ```
+
+### RTK shell-output token savings
+
+[RTK](https://github.com/rtk-ai/rtk) is a token-saving CLI proxy for shell
+commands. It complements `context-mode` and jCodeMunch rather than replacing
+them: RTK reduces output from Bash or shell commands, while `context-mode`
+handles large tool output and jCodeMunch handles indexed code navigation.
+
+This repo documents RTK setup but does not install it automatically. RTK is a
+system CLI that mutates multiple agent configs outside `~/.pi/agent`, so keep
+that installation step explicit on each machine.
+
+Install RTK on macOS:
+
+```bash
+brew install rtk-ai/tap/rtk
+```
+
+If Homebrew is unavailable, use the upstream installer or pinned GitHub
+release from `rtk-ai/rtk`. Avoid `cargo install rtk`, which can install the
+unrelated Rust Type Kit package with the same binary name.
+
+Configure the agents used by this toolkit:
+
+```bash
+# Claude Code global shell hook
+rtk init -g --auto-patch
+
+# Pi global extension
+rtk init -g --agent pi
+
+# Cursor global shell hook
+rtk init -g --agent cursor --auto-patch
+
+# Codex global instructions
+rtk init -g --codex
+```
+
+Windsurf uses rules rather than a reliable command-rewrite hook. Add a short
+global rule in `~/.codeium/windsurf/memories/global_rules.md`:
+
+```markdown
+# RTK shell token savings
+
+For shell commands in Windsurf Cascade, prefer `rtk <command>` instead of the
+raw command so common developer output is filtered before it reaches the model
+context. Use `rtk proxy <command>` only when exact raw output is required.
+```
+
+Verify the setup:
+
+```bash
+rtk --version
+rtk rewrite 'git status'
+rtk init --show
+rtk init --show --codex
+```
+
+Expected checks:
+
+- `rtk rewrite 'git status'` prints `rtk git status`.
+- `rtk init --show` reports the Claude Code hook and Cursor hook.
+- `rtk init --show --codex` reports global `RTK.md` and `AGENTS.md`.
+- Restart Pi, Claude Code, Cursor, Codex, and Windsurf after setup.
+
+Operational notes:
+
+- RTK rewrites shell commands only. Pi tools, MCP tools, `context-mode`, and
+  jCodeMunch calls are not rewritten.
+- In Claude Code, existing safety hooks should run before RTK so unsafe Bash
+  commands are checked before any token-saving rewrite.
+- Use `rtk proxy <command>` for raw output, exact-output debugging, or cases
+  where RTK filtering hides details you need.
+- Set `RTK_DISABLED=1` in a session to bypass RTK temporarily.
+
+Rollback commands:
+
+```bash
+rtk init -g --uninstall
+rtk init -g --agent pi --uninstall
+rtk init -g --agent cursor --uninstall
+rtk init -g --codex --uninstall
+```
+
+Remove the Windsurf global rule manually if you added it.
 
 ---
 

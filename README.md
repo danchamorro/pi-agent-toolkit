@@ -31,8 +31,9 @@ already exist.
 
 For full functionality on a new machine, review the prerequisites in
 [`dotfiles/SETUP.md`](dotfiles/SETUP.md). Some helper tools, including
-`opensrc` for dependency source lookups and Tirith for local terminal
-security, are documented there rather than installed by this repo.
+`opensrc` for dependency source lookups, Tirith for local terminal
+security, and RTK for shell-output token savings, are documented there
+rather than installed by this repo.
 
 Skip external skills or packages if you don't want them:
 
