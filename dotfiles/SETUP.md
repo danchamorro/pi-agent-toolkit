@@ -209,6 +209,11 @@ Operational notes:
 
 - RTK rewrites shell commands only. Pi tools, MCP tools, `context-mode`, and
   jCodeMunch calls are not rewritten.
+- `ctx-approval-gate.ts` covers execution-capable context-mode tools separately:
+  it prompts before `ctx_execute`, `ctx_execute_file`, `ctx_batch_execute`,
+  `ctx_upgrade`, `ctx_purge`, and `ctx_insight`, and hard-blocks nested commit,
+  push, PR, and destructive command payloads so they must use direct Bash or
+  first-class Pi tools.
 - In Claude Code, existing safety hooks should run before RTK so unsafe Bash
   commands are checked before any token-saving rewrite.
 - Use `rtk proxy <command>` for raw output, exact-output debugging, or cases

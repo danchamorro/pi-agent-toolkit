@@ -2,6 +2,15 @@
 
 All notable changes to extensions in `~/.pi/agent/extensions/`.
 
+## 2026-06-09
+
+### ctx-approval-gate.ts
+
+- Added and documented a context-mode approval gate that prompts before
+  execution-capable `ctx_*` tools and high-risk context-mode maintenance tools,
+  while hard-blocking nested commit, push, PR, and destructive shell payloads
+  that must go through direct Bash or first-class Pi tools.
+
 ## 2026-05-29
 
 ### damage-control/

@@ -6,7 +6,7 @@ skills, configs, safety guardrails, and installable packages. This is a
 public backup and reference for how I organize my own agent environment,
 not a universal starter kit intended to be cloned unchanged by everyone.
 
-Includes 26 extensions, 55 skills, 1 prompt template, 1 theme,
+Includes 27 extensions, 55 skills, 1 prompt template, 1 theme,
 6 installable Pi packages, MCP server configurations, and safety guardrails.
 It also tracks 2 custom sub-agent roles for local use with the subagents
 package.
@@ -164,7 +164,7 @@ pi install git:https://github.com/badlogic/pi-diff-review
 | `pi-annotate` | Visual browser annotation for AI-assisted UI debugging. Adds `/annotate` plus companion Chrome extension tooling. | [nicobailon/pi-annotate](https://github.com/nicobailon/pi-annotate) |
 | `pi-diff-review` | Native diff review window for Pi. Adds a `/diff-review` command that opens changed files in a Monaco diff editor and turns review notes into a prompt back in Pi. | [badlogic/pi-diff-review](https://github.com/badlogic/pi-diff-review) |
 
-### Extensions (26)
+### Extensions (27)
 
 All extensions live in `dotfiles/extensions/`.
 
@@ -174,6 +174,7 @@ All extensions live in `dotfiles/extensions/`.
 |-----------|-------------|
 | `damage-control/` | Safety guardrail engine: blocks destructive commands, enforces path access rules, prevents accidental deletes |
 | `commit-approval.ts` | Intercepts git commits for interactive review before execution |
+| `ctx-approval-gate.ts` | Prompts before execution-capable context-mode tools and hard-blocks nested commits, pushes, PR actions, and destructive shell payloads that must go through direct Bash guardrails |
 | `pr-approval.ts` | Intercepts PR creation for interactive review |
 | `dirty-repo-guard.ts` | Warns when working in a repo with uncommitted changes |
 | `require-session-name-on-exit.ts` | Prompts for a session name before `/quit`, `/q`, `/safe-quit`, or Ctrl+Shift+Q exits |

@@ -10,7 +10,7 @@ directory into the appropriate agent paths. External skills are tracked separate
 
 ```
 dotfiles/
-  extensions/ ............. 26 extensions (.ts files and subdirectories)
+  extensions/ ............. 27 extensions (.ts files and subdirectories)
   agents/ ................. Custom sub-agent roles (-> ~/.pi/agent/agents/)
   agent-skills/ ........... Pi-only skills        (-> ~/.pi/agent/skills/)
   personal-skills/ ........ Personal skills       (-> ~/.agents/skills/<category>/<skill> and ~/.claude/skills/<skill>)
@@ -73,7 +73,7 @@ into the published subagents npm package.
 
 ## Extensions
 
-See the [root README Extensions section](../README.md#extensions-26) for the
+See the [root README Extensions section](../README.md#extensions-27) for the
 full list with descriptions.
 
 ## Safety guardrails (Damage Control)
@@ -93,6 +93,14 @@ safety system that protects against destructive operations:
   `Dockerfile`, CI configs), `~/.pi/`, `~/.claude/`.
 - **AWS S3 allowlist**: Only `ls` and `cp` are permitted; all other S3
   operations are blocked.
+
+`ctx-approval-gate.ts` adds a separate guard for context-mode tools because
+those tools can execute nested shell or code payloads outside direct Bash
+interception. It prompts before `ctx_execute`, `ctx_execute_file`,
+`ctx_batch_execute`, `ctx_upgrade`, `ctx_purge`, and `ctx_insight`; denies
+execution when no interactive UI is available; and hard-blocks nested commits,
+pushes, PR create or merge commands, and destructive shell patterns so they
+must go through direct Bash or first-class Pi tools.
 
 ## MCP servers
 
