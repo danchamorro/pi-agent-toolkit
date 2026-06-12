@@ -2,6 +2,14 @@
 
 All notable changes to extensions in `~/.pi/agent/extensions/`.
 
+## 2026-06-11
+
+### ctx-approval-gate.ts
+
+- Allowed clearly read-only `ctx_batch_execute` inspection batches to proceed
+  without interactive approval, while still prompting for uncertain nested
+  execution and hard-blocking destructive or approval-bypassing payloads.
+
 ## 2026-06-09
 
 ### ctx-approval-gate.ts

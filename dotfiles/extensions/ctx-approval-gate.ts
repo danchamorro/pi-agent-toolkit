@@ -3,7 +3,8 @@
  *
  * Intercepts execution-capable context-mode tools before they run so nested
  * shell/code payloads cannot bypass direct Bash guardrails such as
- * commit-approval, PR approval, and Damage Control.
+ * commit-approval, PR approval, and Damage Control. Recognized read-only
+ * ctx_batch_execute inspection batches are allowed without prompting.
  */
 
 import type {
@@ -92,6 +93,32 @@ const HARD_BLOCK_PATTERNS: HardBlockPattern[] = [
 	},
 ];
 
+const READ_ONLY_SIMPLE_COMMANDS = new Set([
+	"cat",
+	"cut",
+	"grep",
+	"head",
+	"ls",
+	"pwd",
+	"sort",
+	"tail",
+	"uniq",
+	"wc",
+]);
+
+const READ_ONLY_GIT_SUBCOMMANDS = new Set([
+	"blame",
+	"diff",
+	"grep",
+	"log",
+	"ls-files",
+	"rev-parse",
+	"show",
+	"status",
+]);
+
+const SED_UNSAFE_SCRIPT_CHARS = /[;\n`<>]/;
+
 function asRecord(value: unknown): Record<string, unknown> {
 	return value && typeof value === "object" && !Array.isArray(value)
 		? (value as Record<string, unknown>)
@@ -121,6 +148,233 @@ function findHardBlock(text: string): string | null {
 		if (pattern.regex.test(text)) return pattern.name;
 	}
 	return null;
+}
+
+function splitReadOnlyPipeline(command: string): string[] | null {
+	const segments: string[] = [];
+	let current = "";
+	let quote: "'" | '"' | null = null;
+	let escaped = false;
+
+	for (let index = 0; index < command.length; index += 1) {
+		const char = command[index];
+		const next = command[index + 1];
+
+		if (escaped) {
+			current += char;
+			escaped = false;
+			continue;
+		}
+
+		if (char === "\\" && quote !== "'") {
+			current += char;
+			escaped = true;
+			continue;
+		}
+
+		if (quote) {
+			if (char === quote) quote = null;
+			current += char;
+			continue;
+		}
+
+		if (char === "'" || char === '"') {
+			quote = char;
+			current += char;
+			continue;
+		}
+
+		if (char === "$" && (next === "(" || next === "{")) return null;
+		if (["\n", ";", "&", "<", ">", "`"].includes(char)) return null;
+
+		if (char === "|") {
+			if (next === "|") return null;
+			const segment = current.trim();
+			if (!segment) return null;
+			segments.push(segment);
+			current = "";
+			continue;
+		}
+
+		current += char;
+	}
+
+	if (quote || escaped) return null;
+
+	const finalSegment = current.trim();
+	if (!finalSegment) return null;
+	segments.push(finalSegment);
+	return segments;
+}
+
+function tokenizeShellSegment(segment: string): string[] | null {
+	const tokens: string[] = [];
+	let current = "";
+	let quote: "'" | '"' | null = null;
+	let escaped = false;
+	let tokenStarted = false;
+
+	for (let index = 0; index < segment.length; index += 1) {
+		const char = segment[index];
+
+		if (escaped) {
+			current += char;
+			escaped = false;
+			tokenStarted = true;
+			continue;
+		}
+
+		if (char === "\\" && quote !== "'") {
+			escaped = true;
+			tokenStarted = true;
+			continue;
+		}
+
+		if (quote) {
+			if (char === quote) {
+				quote = null;
+			} else {
+				current += char;
+			}
+			tokenStarted = true;
+			continue;
+		}
+
+		if (char === "'" || char === '"') {
+			quote = char;
+			tokenStarted = true;
+			continue;
+		}
+
+		if (/\s/.test(char)) {
+			if (tokenStarted) {
+				tokens.push(current);
+				current = "";
+				tokenStarted = false;
+			}
+			continue;
+		}
+
+		current += char;
+		tokenStarted = true;
+	}
+
+	if (quote || escaped) return null;
+	if (tokenStarted) tokens.push(current);
+	return tokens;
+}
+
+function commandBasename(command: string): string {
+	return command.split("/").pop() ?? command;
+}
+
+function hasLongOption(tokens: string[], option: string): boolean {
+	return tokens.some((token) => token === option || token.startsWith(`${option}=`));
+}
+
+function hasShortOption(tokens: string[], option: string): boolean {
+	return tokens.some(
+		(token) => token.startsWith("-") && !token.startsWith("--") && token.slice(1).includes(option),
+	);
+}
+
+function isSedReadOnlyAddress(address: string): boolean {
+	return /^(?:\d+|\$)$/.test(address) || /^\/[^;\n`<>]+\/$/.test(address);
+}
+
+function isSedReadOnlyPrintScript(script: string): boolean {
+	if (SED_UNSAFE_SCRIPT_CHARS.test(script)) return false;
+	if (!script.endsWith("p")) return false;
+
+	const addresses = script.slice(0, -1).split(",");
+	if (addresses.length < 1 || addresses.length > 2) return false;
+	return addresses.every(isSedReadOnlyAddress);
+}
+
+function isReadOnlySed(tokens: string[]): boolean {
+	if (hasLongOption(tokens, "--in-place") || hasShortOption(tokens, "i")) return false;
+	if (!hasLongOption(tokens, "--quiet") && !hasLongOption(tokens, "--silent") && !hasShortOption(tokens, "n")) {
+		return false;
+	}
+
+	const scripts: string[] = [];
+	for (let index = 1; index < tokens.length; index += 1) {
+		const token = tokens[index];
+
+		if (token === "-e") {
+			const script = tokens[index + 1];
+			if (!script) return false;
+			scripts.push(script);
+			index += 1;
+			continue;
+		}
+
+		if (token.startsWith("-e") && token.length > 2) {
+			scripts.push(token.slice(2));
+			continue;
+		}
+
+		if (token.startsWith("--expression=")) {
+			scripts.push(token.slice("--expression=".length));
+			continue;
+		}
+
+		if (token.startsWith("-")) continue;
+
+		scripts.push(token);
+		break;
+	}
+
+	return scripts.length > 0 && scripts.every(isSedReadOnlyPrintScript);
+}
+
+function getGitSubcommand(tokens: string[]): string | null {
+	for (let index = 1; index < tokens.length; index += 1) {
+		const token = tokens[index];
+
+		if (token === "--") return null;
+		if (["-C", "-c", "--git-dir", "--work-tree", "--namespace"].includes(token)) {
+			index += 1;
+			continue;
+		}
+		if (/^(?:-C|-c)\S/.test(token)) continue;
+		if (/^--(?:git-dir|work-tree|namespace)=/.test(token)) continue;
+		if (token.startsWith("-")) continue;
+
+		return token;
+	}
+
+	return null;
+}
+
+function isReadOnlyCommandSegment(segment: string): boolean {
+	const tokens = tokenizeShellSegment(segment);
+	if (!tokens || tokens.length === 0) return false;
+
+	const command = commandBasename(tokens[0]);
+	if (READ_ONLY_SIMPLE_COMMANDS.has(command)) return true;
+	if (command === "rg") return !hasLongOption(tokens, "--pre");
+	if (command === "fd") {
+		return !hasLongOption(tokens, "--exec") && !hasLongOption(tokens, "--exec-batch") && !hasShortOption(tokens, "x") && !hasShortOption(tokens, "X");
+	}
+	if (command === "jq" || command === "yq") return !hasLongOption(tokens, "--in-place") && !hasShortOption(tokens, "i");
+	if (command === "sed") return isReadOnlySed(tokens);
+	if (command === "git") {
+		const subcommand = getGitSubcommand(tokens);
+		return subcommand !== null && READ_ONLY_GIT_SUBCOMMANDS.has(subcommand);
+	}
+
+	return false;
+}
+
+function isReadOnlyBatchCommand(command: string): boolean {
+	const segments = splitReadOnlyPipeline(command);
+	return segments !== null && segments.every(isReadOnlyCommandSegment);
+}
+
+function isReadOnlyCtxBatch(input: Record<string, unknown>): boolean {
+	const commands = getBatchCommands(input);
+	return commands.length > 0 && commands.every((command) => isReadOnlyBatchCommand(command.command));
 }
 
 function getBatchCommands(input: Record<string, unknown>): CtxBatchCommand[] {
@@ -276,6 +530,10 @@ export default function ctxApprovalGateExtension(_pi: ExtensionAPI) {
 					`Context Mode blocked: ${toolName} payload contains ${hardBlock}. ` +
 					"Use direct Bash or the first-class Pi tool so commit-approval, PR approval, and Damage Control can inspect it.",
 			};
+		}
+
+		if (toolName === "ctx_batch_execute" && isReadOnlyCtxBatch(input)) {
+			return undefined;
 		}
 
 		if (!ctx.hasUI) {
