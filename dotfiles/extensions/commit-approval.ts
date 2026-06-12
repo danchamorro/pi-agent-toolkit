@@ -10,7 +10,8 @@
  * Shortcut: none.
  */
 
-import { basename } from "node:path";
+import { readFile } from "node:fs/promises";
+import { basename, isAbsolute, resolve } from "node:path";
 
 import type {
   ExtensionAPI,
@@ -33,7 +34,7 @@ const REASON_APPROVAL_DENIED = "git commit blocked: approval denied.";
 const PREVIEW_REUSE_PREVIOUS_MESSAGE =
   "(reusing previous commit message via --no-edit)";
 const PREVIEW_EDITOR_FALLBACK =
-  "(no -m/--message provided; git may open your editor)";
+  "(no -m/--message or -F/--file provided; approval cannot inspect editor-only messages)";
 
 const GIT_GLOBAL_OPTIONS_WITH_VALUE = new Set<string>([
   "-c",
@@ -48,11 +49,25 @@ const GIT_GLOBAL_OPTIONS_WITH_VALUE = new Set<string>([
 
 interface CommitInvocation {
   args: string[];
+  cwd: string;
+}
+
+interface ParsedCommitMetadata {
+  messageInputs: CommitMessageInput[];
+  hasNoEdit: boolean;
+}
+
+interface CommitMessageInput {
+  kind: "inline" | "file";
+  value: string;
 }
 
 interface CommitMetadata {
   messages: string[];
   hasNoEdit: boolean;
+  hasExplicitMessageInput: boolean;
+  messageFilePaths: string[];
+  messageFileErrors: string[];
 }
 
 interface CommitReviewDetails {
@@ -260,29 +275,90 @@ function findGitSubcommandIndex(tokens: string[]): number {
   return -1;
 }
 
-function parseCommitInvocation(command: string): CommitInvocation | null {
+function resolvePathFromCwd(cwd: string, path: string): string {
+  return isAbsolute(path) ? path : resolve(cwd, path);
+}
+
+function getCdTarget(tokens: string[]): string | null {
+  if (tokens[0] !== "cd") {
+    return null;
+  }
+
+  const target = tokens[1];
+  if (!target || target === "-" || target.startsWith("-")) {
+    return null;
+  }
+
+  return target;
+}
+
+function getGitCwd(tokens: string[], subcommandIndex: number, baseCwd: string): string {
+  let cwd = baseCwd;
+  let gitTokenIndex = 0;
+  while (
+    gitTokenIndex < tokens.length &&
+    isEnvAssignment(tokens[gitTokenIndex] ?? "")
+  ) {
+    gitTokenIndex += 1;
+  }
+
+  for (let i = gitTokenIndex + 1; i < subcommandIndex; i += 1) {
+    const token = tokens[i] ?? "";
+
+    if (token === "-C") {
+      const next = tokens[i + 1];
+      if (next) {
+        cwd = resolvePathFromCwd(cwd, next);
+        i += 1;
+      }
+      continue;
+    }
+
+    if (token.startsWith("-C") && token.length > 2 && !token.startsWith("--")) {
+      cwd = resolvePathFromCwd(cwd, token.slice(2));
+    }
+  }
+
+  return cwd;
+}
+
+function parseCommitInvocation(command: string, cwd: string): CommitInvocation | null {
+  let currentCwd = cwd;
+
   for (const segment of splitByShellOperators(command)) {
     const tokens = shellSplit(segment);
+    const cdTarget = getCdTarget(tokens);
+    if (cdTarget) {
+      currentCwd = resolvePathFromCwd(currentCwd, cdTarget);
+      continue;
+    }
+
     const subcommandIndex = findGitSubcommandIndex(tokens);
 
     if (subcommandIndex >= 0 && tokens[subcommandIndex] === "commit") {
-      return { args: tokens.slice(subcommandIndex + 1) };
+      return {
+        args: tokens.slice(subcommandIndex + 1),
+        cwd: getGitCwd(tokens, subcommandIndex, currentCwd),
+      };
     }
   }
 
   return null;
 }
 
-function parseCommitMetadata(args: string[]): CommitMetadata {
-  const messages: string[] = [];
+function parseCommitMetadata(args: string[]): ParsedCommitMetadata {
+  const messageInputs: CommitMessageInput[] = [];
   let hasNoEdit = false;
 
-  const addMessage = (value: string | undefined): boolean => {
+  const addMessageInput = (
+    kind: CommitMessageInput["kind"],
+    value: string | undefined,
+  ): boolean => {
     if (!value) {
       return false;
     }
 
-    messages.push(value);
+    messageInputs.push({ kind, value });
     return true;
   };
 
@@ -299,34 +375,182 @@ function parseCommitMetadata(args: string[]): CommitMetadata {
     }
 
     if (token === "-m" || token === "--message") {
-      if (addMessage(args[i + 1])) {
+      if (addMessageInput("inline", args[i + 1])) {
+        i += 1;
+      }
+      continue;
+    }
+
+    if (token === "-F" || token === "--file") {
+      if (addMessageInput("file", args[i + 1])) {
         i += 1;
       }
       continue;
     }
 
     if (token.startsWith("--message=")) {
-      addMessage(token.slice("--message=".length));
+      addMessageInput("inline", token.slice("--message=".length));
+      continue;
+    }
+
+    if (token.startsWith("--file=")) {
+      addMessageInput("file", token.slice("--file=".length));
       continue;
     }
 
     if (token.startsWith("-m") && token.length > 2 && !token.startsWith("--")) {
-      addMessage(token.slice(2));
+      addMessageInput("inline", token.slice(2));
+      continue;
+    }
+
+    if (token.startsWith("-F") && token.length > 2 && !token.startsWith("--")) {
+      addMessageInput("file", token.slice(2));
     }
   }
 
-  return { messages, hasNoEdit };
+  return { messageInputs, hasNoEdit };
 }
 
-function parseCommitMetadataFromCommand(
+function getRedirectionTarget(tokens: string[]): string | null {
+  for (let i = 0; i < tokens.length; i += 1) {
+    const token = tokens[i] ?? "";
+
+    if (token === ">" || /^\d>$/.test(token)) {
+      return tokens[i + 1] ?? null;
+    }
+
+    const compactRedirect = token.match(/^\d?>(.+)$/);
+    if (compactRedirect?.[1]) {
+      return compactRedirect[1];
+    }
+  }
+
+  return null;
+}
+
+function getHereDocDelimiter(tokens: string[]): { delimiter: string; trimTabs: boolean } | null {
+  for (let i = 0; i < tokens.length; i += 1) {
+    const token = tokens[i] ?? "";
+
+    if (token === "<<" || token === "<<-") {
+      const delimiter = tokens[i + 1];
+      return delimiter ? { delimiter, trimTabs: token === "<<-" } : null;
+    }
+
+    if (token.startsWith("<<-") && token.length > 3) {
+      return { delimiter: token.slice(3), trimTabs: true };
+    }
+
+    if (token.startsWith("<<") && token.length > 2) {
+      return { delimiter: token.slice(2), trimTabs: false };
+    }
+  }
+
+  return null;
+}
+
+function getHereDocMessageForFile(
   command: string,
-): CommitMetadata | null {
-  const invocation = parseCommitInvocation(command);
+  filePath: string,
+  cwd: string,
+): string | null {
+  if (filePath === "-") {
+    return null;
+  }
+
+  const expectedPath = resolvePathFromCwd(cwd, filePath);
+  const lines = command.replace(/\r\n/g, "\n").split("\n");
+
+  for (let i = 0; i < lines.length; i += 1) {
+    const tokens = shellSplit(lines[i] ?? "");
+    const target = getRedirectionTarget(tokens);
+    const hereDoc = getHereDocDelimiter(tokens);
+
+    if (!target || !hereDoc) {
+      continue;
+    }
+
+    if (resolvePathFromCwd(cwd, target) !== expectedPath) {
+      continue;
+    }
+
+    const content: string[] = [];
+    for (let j = i + 1; j < lines.length; j += 1) {
+      const line = lines[j] ?? "";
+      const delimiterCandidate = hereDoc.trimTabs ? line.replace(/^\t+/, "") : line;
+      if (delimiterCandidate === hereDoc.delimiter) {
+        return content.join("\n");
+      }
+
+      content.push(line);
+    }
+
+    return null;
+  }
+
+  return null;
+}
+
+async function loadCommitMessageFile(
+  command: string,
+  filePath: string,
+  cwd: string,
+): Promise<string> {
+  if (filePath === "-") {
+    throw new Error("message file uses stdin, which approval cannot preview");
+  }
+
+  const hereDocMessage = getHereDocMessageForFile(command, filePath, cwd);
+  if (hereDocMessage !== null) {
+    return hereDocMessage;
+  }
+
+  return readFile(resolvePathFromCwd(cwd, filePath), "utf8");
+}
+
+async function resolveCommitMetadata(
+  command: string,
+  invocation: CommitInvocation,
+): Promise<CommitMetadata> {
+  const parsed = parseCommitMetadata(invocation.args);
+  const messages: string[] = [];
+  const messageFilePaths: string[] = [];
+  const messageFileErrors: string[] = [];
+
+  for (const input of parsed.messageInputs) {
+    if (input.kind === "inline") {
+      messages.push(input.value);
+      continue;
+    }
+
+    messageFilePaths.push(input.value);
+    try {
+      messages.push(await loadCommitMessageFile(command, input.value, invocation.cwd));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      messageFileErrors.push(`${input.value}: ${message}`);
+    }
+  }
+
+  return {
+    messages,
+    hasNoEdit: parsed.hasNoEdit,
+    hasExplicitMessageInput: parsed.messageInputs.length > 0,
+    messageFilePaths,
+    messageFileErrors,
+  };
+}
+
+async function parseCommitMetadataFromCommand(
+  command: string,
+  cwd: string,
+): Promise<CommitMetadata | null> {
+  const invocation = parseCommitInvocation(command, cwd);
   if (!invocation) {
     return null;
   }
 
-  return parseCommitMetadata(invocation.args);
+  return resolveCommitMetadata(command, invocation);
 }
 
 function normalizeCommitMessageText(message: string): string {
@@ -344,6 +568,10 @@ function getNormalizedMessages(metadata: CommitMetadata): string[] {
 function getCommitMessagePreview(metadata: CommitMetadata): string {
   if (metadata.messages.length > 0) {
     return getNormalizedMessages(metadata).join("\n\n");
+  }
+
+  if (metadata.messageFileErrors.length > 0) {
+    return `Commit message file could not be read:\n${metadata.messageFileErrors.join("\n")}`;
   }
 
   if (metadata.hasNoEdit) {
@@ -523,8 +751,34 @@ function countCommitBodySentences(body: string): number {
 function validateCommitMessage(metadata: CommitMetadata): ValidationResult {
   const issues: ValidationIssue[] = [];
 
+  if (!metadata.hasExplicitMessageInput && !metadata.hasNoEdit) {
+    issues.push({
+      level: "error",
+      message:
+        "Commit message must be provided with -m/--message or -F/--file so approval can preview it.",
+    });
+  }
+
+  if (metadata.hasNoEdit && metadata.messages.length === 0) {
+    issues.push({
+      level: "error",
+      message:
+        "Commit message reuse via --no-edit cannot be previewed by approval. Provide the message explicitly.",
+    });
+  }
+
+  for (const messageFileError of metadata.messageFileErrors) {
+    issues.push({
+      level: "error",
+      message: `Commit message file could not be read: ${messageFileError}`,
+    });
+  }
+
   if (metadata.messages.length === 0) {
-    return { issues, hasErrors: false };
+    return {
+      issues,
+      hasErrors: issues.some((i) => i.level === "error"),
+    };
   }
 
   const subject = getCommitSubject(metadata);
@@ -833,7 +1087,7 @@ export default function commitApprovalExtension(pi: ExtensionAPI) {
       return;
     }
 
-    const metadata = parseCommitMetadataFromCommand(command);
+    const metadata = await parseCommitMetadataFromCommand(command, ctx.cwd);
     if (!metadata) {
       return;
     }
@@ -874,19 +1128,20 @@ export default function commitApprovalExtension(pi: ExtensionAPI) {
       return;
     }
 
-    const metadata = parseCommitMetadataFromCommand(command);
+    const metadata = await parseCommitMetadataFromCommand(command, ctx.cwd);
     if (!metadata) {
       return;
     }
 
     const validation = validateCommitMessage(metadata);
 
+    if (validation.hasErrors) {
+      return userBashBlocked(
+        `git commit blocked: message does not meet standards.\n${formatValidationIssues(validation.issues)}\nFix the commit message and retry.`,
+      );
+    }
+
     if (!ctx.hasUI) {
-      if (validation.hasErrors) {
-        return userBashBlocked(
-          `git commit blocked: message does not meet standards.\n${formatValidationIssues(validation.issues)}`,
-        );
-      }
       return userBashBlocked(REASON_INTERACTIVE_APPROVAL_REQUIRED);
     }
 

@@ -4,6 +4,15 @@ All notable changes to extensions in `~/.pi/agent/extensions/`.
 
 ## 2026-06-11
 
+### commit-approval.ts
+
+- Loaded commit messages provided via `-F`/`--file`, including common
+  here-doc temp file patterns, so approval previews show the real subject and
+  body before a commit can proceed.
+- Blocked editor-only and `--no-edit` commit messages that the approval gate
+  cannot preview instead of showing neutral checklist items as if validation
+  could happen later.
+
 ### ctx-approval-gate.ts
 
 - Allowed clearly read-only `ctx_batch_execute` inspection batches to proceed
