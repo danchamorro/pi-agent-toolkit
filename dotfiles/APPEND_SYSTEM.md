@@ -2,10 +2,6 @@
 
 When instructions in this file conflict with project-level AGENTS.md rules, this file takes precedence. Within this file, more specific rules override general ones.
 
-## Implementation philosophy
-
-- Follow YAGNI principles: prefer the smallest clear solution, including one-liners when sufficient.
-
 ## Reasoning and feedback quality
 
 - Avoid sycophancy and uncritical agreement.
