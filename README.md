@@ -137,7 +137,7 @@ npm run update:packages   # Pi packages from manifest.json
 
 ### Packages (installable via pi)
 
-This setup installs six Pi packages via `manifest.json`:
+This setup installs seven Pi packages via `manifest.json`:
 
 ```bash
 pi install npm:@danchamorro/pi-subagents
@@ -146,6 +146,7 @@ pi install npm:@danchamorro/pi-prompt-enhancer
 pi install npm:pi-design-deck
 pi install npm:pi-annotate
 pi install git:https://github.com/badlogic/pi-diff-review
+pi install git:github.com/DietrichGebert/ponytail
 ```
 
 **Published from this repo:**
@@ -163,6 +164,7 @@ pi install git:https://github.com/badlogic/pi-diff-review
 | `pi-design-deck` | Present multi-slide visual decision decks with high-fidelity previews. Bundles the `design-deck` skill used in this setup. | [nicobailon/pi-design-deck](https://github.com/nicobailon/pi-design-deck) |
 | `pi-annotate` | Visual browser annotation for AI-assisted UI debugging. Adds `/annotate` plus companion Chrome extension tooling. | [nicobailon/pi-annotate](https://github.com/nicobailon/pi-annotate) |
 | `pi-diff-review` | Native diff review window for Pi. Adds a `/diff-review` command that opens changed files in a Monaco diff editor and turns review notes into a prompt back in Pi. | [badlogic/pi-diff-review](https://github.com/badlogic/pi-diff-review) |
+| `ponytail` | Lazy senior developer mode for Pi. Adds `/ponytail` controls, prompt injection, and simplification-focused skills. | [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail) |
 
 ### Extensions (27)
 
@@ -271,7 +273,7 @@ roots. Unmanaged and third-party directories are reported and left in place.
 |-------|-------------|
 | `exa-search` | Semantic web search via Exa API |
 
-**Package-provided skills** (1, installed via Pi packages):
+**Package-provided skills** (7, installed via Pi packages):
 
 Installed automatically when these packages are present in
 `manifest.json`.
@@ -279,6 +281,12 @@ Installed automatically when these packages are present in
 | Skill | Source |
 |-------|--------|
 | `design-deck` | [`npm:pi-design-deck`](https://github.com/nicobailon/pi-design-deck) |
+| `ponytail` | [`git:github.com/DietrichGebert/ponytail`](https://github.com/DietrichGebert/ponytail) |
+| `ponytail-review` | [`git:github.com/DietrichGebert/ponytail`](https://github.com/DietrichGebert/ponytail) |
+| `ponytail-audit` | [`git:github.com/DietrichGebert/ponytail`](https://github.com/DietrichGebert/ponytail) |
+| `ponytail-debt` | [`git:github.com/DietrichGebert/ponytail`](https://github.com/DietrichGebert/ponytail) |
+| `ponytail-gain` | [`git:github.com/DietrichGebert/ponytail`](https://github.com/DietrichGebert/ponytail) |
+| `ponytail-help` | [`git:github.com/DietrichGebert/ponytail`](https://github.com/DietrichGebert/ponytail) |
 
 **External skills** (33, installed from source repos):
 
