@@ -430,7 +430,7 @@ function isRelaxedAllowedCommand(command: string): boolean {
 	const subcommand = runnable[1];
 
 	if (executable === "ruff") return subcommand === "format" || subcommand === "check";
-	return executable === "basedpyright" || executable === "pyright";
+	return ["basedpyright", "mypy", "pyright", "pytest"].includes(executable);
 }
 
 function isRelaxedAllowedShellScript(code: string): boolean {

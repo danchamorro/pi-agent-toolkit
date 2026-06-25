@@ -9,8 +9,8 @@ All notable changes to extensions in `~/.pi/agent/extensions/`.
 - Added `/ctx-gate` modes (`strict`, `relaxed`, and `off`) with a status
   indicator so Context Mode approval prompts can be dialed back per session.
 - Allowed relaxed mode to skip prompts for read-only shell inspection plus
-  common formatter and typecheck commands such as `ruff` and `basedpyright`,
-  while keeping destructive nested payloads hard-blocked.
+  common validation commands such as `ruff`, `pytest`, `basedpyright`, and
+  `mypy`, while keeping destructive nested payloads hard-blocked.
 
 ## 2026-06-11
 
