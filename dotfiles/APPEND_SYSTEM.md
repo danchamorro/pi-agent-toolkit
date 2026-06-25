@@ -41,6 +41,17 @@ When instructions in this file conflict with project-level AGENTS.md rules, this
   messages, config values, log text), non-code files (config, JSON, YAML,
   markdown), and files outside the indexed repository.
 
+## Context-mode scope
+
+- Context-mode is for large, noisy, or unpredictable output. For small files, exact lookups, or files you may edit, use first-class Pi tools (`read`, `rg`, editor tools) before `ctx_execute_file`.
+- Do not write ad hoc analysis scripts when an existing tool answers the task directly.
+
+## Tool-first approach
+
+- Before writing custom code to accomplish a task, check for relevant existing tools, skills, MCP servers, or CLI utilities that are likely to handle the request.
+- Purpose-built tools are often faster, more reliable, and better maintained than ad-hoc scripts.
+- Only fall back to writing custom code when no available tool covers the requirement or when the tool's output needs non-trivial post-processing.
+
 ## Preferred CLI tools
 
 - **ripgrep** (`rg`) is installed. Prefer over `grep` for searching file contents. Faster, respects `.gitignore`, and has sane defaults. Example: `rg "pattern"` instead of `grep -r "pattern"`.
@@ -63,12 +74,6 @@ When instructions in this file conflict with project-level AGENTS.md rules, this
   documentation lookup when Exa is available. If Exa cannot satisfy the
   request, say so explicitly before considering another path.
 
-## Tool-first approach
-
-- Before writing custom code to accomplish a task, check for relevant existing tools, skills, MCP servers, or CLI utilities that are likely to handle the request.
-- Purpose-built tools are often faster, more reliable, and better maintained than ad-hoc scripts.
-- Only fall back to writing custom code when no available tool covers the requirement or when the tool's output needs non-trivial post-processing.
-
 ## OpenSRC source lookups
 
 - The `opensrc` CLI is installed for fetching external source code into a
@@ -79,7 +84,7 @@ When instructions in this file conflict with project-level AGENTS.md rules, this
   behavior, or resolving ambiguity that docs and types do not cover.
 - Prefer `opensrc` over inspecting `node_modules/` for dependency internals.
   It retrieves source repositories and keeps them out of the current project.
-- Use `opensrc path <spec>` to fetch on cache miss and print the absolute
+- Use `opensrc path package-spec` to fetch on cache miss and print the absolute
   cached source path. Compose the returned path with `rg`, `fd`, `read`, or
   targeted editor commands:
   - npm: `opensrc path zod`, `opensrc path npm:react`, `opensrc path zod@3.22.0`
@@ -87,10 +92,10 @@ When instructions in this file conflict with project-level AGENTS.md rules, this
   - crates.io: `opensrc path crates:serde`
   - GitHub: `opensrc path vercel/next.js`, `opensrc path https://github.com/vercel-labs/opensrc`
   - GitLab: `opensrc path gitlab:owner/repo`
-- Use `opensrc fetch <spec...>` to prime the cache for one or more sources
+- Use `opensrc fetch package-spec...` to prime the cache for one or more sources
   without printing paths, for example `opensrc fetch zod pypi:requests
   crates:serde vercel/next.js`.
-- For npm packages inside a project, pass `--cwd <project-dir>` when lockfile
+- For npm packages inside a project, pass `--cwd project-dir` when lockfile
   version resolution matters, for example `opensrc path zod --cwd .`.
 - Use `opensrc list` or `opensrc list --json` to see cached sources. Do not
   run `opensrc clean` or remove cached sources unless the user asks, or the
@@ -100,6 +105,7 @@ When instructions in this file conflict with project-level AGENTS.md rules, this
 
 ## Writing style
 
+- When reporting information to me be extremely concise. Sacrifice grammar for the sake of concision.
 - Do not use em dash punctuation in prose. Use commas, parentheses, colons, semicolons, or separate sentences instead.
 - CLI flags such as long options are allowed when they are part of a command.
 
