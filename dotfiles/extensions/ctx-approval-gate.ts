@@ -3,8 +3,9 @@
  *
  * Intercepts execution-capable context-mode tools before they run so nested
  * shell/code payloads cannot bypass direct Bash guardrails such as
- * commit-approval, PR approval, and Damage Control. Recognized read-only
- * ctx_batch_execute inspection batches are allowed without prompting.
+ * commit-approval, PR approval, and Damage Control. Use `/ctx-gate` to switch
+ * between strict, relaxed, and off modes. Recognized read-only inspection
+ * batches and common formatter/typecheck commands are allowed in relaxed mode.
  */
 
 import type {
@@ -15,6 +16,13 @@ import type {
 
 const APPROVE_OPTION = "Approve context-mode execution once";
 const DENY_OPTION = "Deny context-mode execution";
+const CTX_GATE_STATE_TYPE = "ctx-approval-gate-state";
+
+type CtxGateMode = "strict" | "relaxed" | "off";
+
+interface CtxGateState {
+	mode: CtxGateMode;
+}
 
 const EXECUTION_TOOLS = new Set([
 	"ctx_execute",
@@ -396,6 +404,63 @@ function getBatchCommands(input: Record<string, unknown>): CtxBatchCommand[] {
 	});
 }
 
+function getSafeShellCommandSegment(command: string): string | null {
+	const segments = splitReadOnlyPipeline(command);
+	if (!segments) return null;
+	if (segments.every(isReadOnlyCommandSegment)) return command;
+	return segments.length === 1 ? segments[0] : null;
+}
+
+function stripUvRun(tokens: string[]): string[] {
+	if (commandBasename(tokens[0] ?? "") !== "uv" || tokens[1] !== "run") return tokens;
+	return tokens.slice(2);
+}
+
+function isRelaxedAllowedCommand(command: string): boolean {
+	if (isReadOnlyBatchCommand(command)) return true;
+
+	const segment = getSafeShellCommandSegment(command);
+	if (!segment) return false;
+
+	const tokens = tokenizeShellSegment(segment);
+	if (!tokens || tokens.length === 0) return false;
+
+	const runnable = stripUvRun(tokens);
+	const executable = commandBasename(runnable[0] ?? "");
+	const subcommand = runnable[1];
+
+	if (executable === "ruff") return subcommand === "format" || subcommand === "check";
+	return executable === "basedpyright" || executable === "pyright";
+}
+
+function isRelaxedAllowedShellScript(code: string): boolean {
+	const commands = code
+		.split("\n")
+		.map((line) => line.trim())
+		.filter((line) => line.length > 0 && !line.startsWith("#"));
+
+	return commands.length > 0 && commands.every(isRelaxedAllowedCommand);
+}
+
+function isRelaxedAllowedCtxExecute(input: Record<string, unknown>): boolean {
+	const language = asString(input.language).toLowerCase();
+	if (language && !["bash", "shell", "sh"].includes(language)) return false;
+	return isRelaxedAllowedShellScript(asString(input.code));
+}
+
+function isRelaxedAllowedCtxBatch(input: Record<string, unknown>): boolean {
+	const commands = getBatchCommands(input);
+	return commands.length > 0 && commands.every((command) => isRelaxedAllowedCommand(command.command));
+}
+
+function isRelaxedAllowed(toolName: string, input: Record<string, unknown>): boolean {
+	if (toolName === "ctx_batch_execute") return isRelaxedAllowedCtxBatch(input);
+	if (toolName === "ctx_execute" || toolName === "ctx_execute_file") {
+		return isRelaxedAllowedCtxExecute(input);
+	}
+	return false;
+}
+
 function formatOptionalLine(label: string, value: unknown): string | null {
 	if (value === undefined || value === null || value === "") return null;
 	return `${label}: ${String(value)}`;
@@ -517,6 +582,73 @@ function buildPreview(toolName: string, input: Record<string, unknown>): string 
 }
 
 export default function ctxApprovalGateExtension(_pi: ExtensionAPI) {
+	let mode: CtxGateMode = "relaxed";
+
+	function setStatus(ctx: ExtensionContext): void {
+		if (mode === "strict") {
+			ctx.ui.setStatus("ctx-gate", ctx.ui.theme.fg("warning", "CTX:strict"));
+		} else if (mode === "relaxed") {
+			ctx.ui.setStatus("ctx-gate", ctx.ui.theme.fg("accent", "CTX:relaxed"));
+		} else {
+			ctx.ui.setStatus("ctx-gate", ctx.ui.theme.fg("dim", "CTX:off"));
+		}
+	}
+
+	function persistState(): void {
+		_pi.appendEntry<CtxGateState>(CTX_GATE_STATE_TYPE, { mode });
+	}
+
+	function restoreState(ctx: ExtensionContext): void {
+		for (const entry of ctx.sessionManager.getBranch()) {
+			if (entry.type !== "custom" || entry.customType !== CTX_GATE_STATE_TYPE) continue;
+			const data = entry.data as Partial<CtxGateState> | undefined;
+			if (data?.mode === "strict" || data?.mode === "relaxed" || data?.mode === "off") {
+				mode = data.mode;
+			}
+		}
+		setStatus(ctx);
+	}
+
+	function setMode(nextMode: CtxGateMode, ctx: ExtensionContext): void {
+		mode = nextMode;
+		persistState();
+		setStatus(ctx);
+		ctx.ui.notify(`Context Mode approval gate: ${mode}`, "info");
+	}
+
+	_pi.registerCommand("ctx-gate", {
+		description: "Set Context Mode approval gate mode (strict, relaxed, off)",
+		handler: async (args, ctx) => {
+			const action = args.trim().toLowerCase();
+
+			if (action === "strict" || action === "on" || action === "enable") {
+				setMode("strict", ctx);
+				return;
+			}
+
+			if (action === "relaxed" || action === "relax") {
+				setMode("relaxed", ctx);
+				return;
+			}
+
+			if (action === "off" || action === "disable") {
+				setMode("off", ctx);
+				return;
+			}
+
+			if (action === "" || action === "status") {
+				ctx.ui.notify(`Context Mode approval gate is ${mode}. Usage: /ctx-gate [strict|relaxed|off|status]`, "info");
+				return;
+			}
+
+			ctx.ui.notify("Usage: /ctx-gate [strict|relaxed|off|status]", "warning");
+		},
+	});
+
+	_pi.on("session_start", async (_event, ctx) => {
+		restoreState(ctx);
+	});
+
 	_pi.on("tool_call", async (event, ctx): Promise<ToolCallEventResult | undefined> => {
 		const toolName = String(event.toolName ?? "");
 		if (!PROMPTED_TOOLS.has(toolName)) return undefined;
@@ -532,7 +664,13 @@ export default function ctxApprovalGateExtension(_pi: ExtensionAPI) {
 			};
 		}
 
+		if (mode === "off") return undefined;
+
 		if (toolName === "ctx_batch_execute" && isReadOnlyCtxBatch(input)) {
+			return undefined;
+		}
+
+		if (mode === "relaxed" && isRelaxedAllowed(toolName, input)) {
 			return undefined;
 		}
 

@@ -2,6 +2,16 @@
 
 All notable changes to extensions in `~/.pi/agent/extensions/`.
 
+## 2026-06-24
+
+### ctx-approval-gate.ts
+
+- Added `/ctx-gate` modes (`strict`, `relaxed`, and `off`) with a status
+  indicator so Context Mode approval prompts can be dialed back per session.
+- Allowed relaxed mode to skip prompts for read-only shell inspection plus
+  common formatter and typecheck commands such as `ruff` and `basedpyright`,
+  while keeping destructive nested payloads hard-blocked.
+
 ## 2026-06-11
 
 ### commit-approval.ts
