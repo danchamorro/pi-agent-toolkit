@@ -4,6 +4,10 @@
       "command": "uvx",
       "args": ["jcodemunch-mcp"]
     },
+    "codebase-memory-mcp": {
+      "command": "codebase-memory-mcp",
+      "lifecycle": "lazy"
+    },
     "pg-example-prod": {
       "command": "docker",
       "args": [
