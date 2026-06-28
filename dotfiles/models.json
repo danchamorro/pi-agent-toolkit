@@ -73,6 +73,52 @@
         }
       ]
     },
+    "vllm-ornith": {
+      "name": "vLLM Metal Ornith local",
+      "baseUrl": "http://127.0.0.1:8000/v1",
+      "api": "openai-completions",
+      "apiKey": "vllm-local",
+      "compat": {
+        "maxTokensField": "max_tokens",
+        "supportsDeveloperRole": false,
+        "supportsReasoningEffort": false,
+        "supportsStore": false,
+        "supportsStrictMode": false,
+        "supportsUsageInStreaming": true,
+        "thinkingFormat": "qwen-chat-template",
+        "chatTemplateKwargs": {
+          "enable_thinking": {
+            "$var": "thinking.enabled"
+          },
+          "preserve_thinking": true
+        }
+      },
+      "models": [
+        {
+          "id": "Ornith-1.0-9B",
+          "name": "Ornith 1.0 9B BF16 TQ (vLLM Metal)",
+          "input": [
+            "text"
+          ],
+          "contextWindow": 262144,
+          "maxTokens": 32768,
+          "reasoning": true,
+          "thinkingLevelMap": {
+            "minimal": null,
+            "low": null,
+            "medium": null,
+            "high": "high",
+            "xhigh": null
+          },
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        }
+      ]
+    },
     "llamacpp-ornith": {
       "name": "llama.cpp Ornith local",
       "baseUrl": "http://127.0.0.1:8022/v1",
