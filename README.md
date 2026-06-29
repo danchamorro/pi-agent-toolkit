@@ -6,7 +6,7 @@ skills, configs, safety guardrails, and installable packages. This is a
 public backup and reference for how I organize my own agent environment,
 not a universal starter kit intended to be cloned unchanged by everyone.
 
-Includes 26 extensions, 55 skills, 1 prompt template, 1 theme,
+Includes 26 extensions, 61 skills, 1 prompt template, 1 theme,
 7 installable Pi packages, MCP server configurations, and safety guardrails.
 It also tracks 2 custom sub-agent roles for local use with the subagents
 package.
@@ -345,7 +345,7 @@ default; pick one via `/settings` or set `"theme"` in your local
 | `AGENTS.md` | Global agent rules: git safety, commit style, code style, path discipline |
 | `APPEND_SYSTEM.md` | System prompt: reasoning quality, jCodeMunch policies, documentation lookup, writing style |
 | `settings.json` | Pi settings: default provider/model, enabled models, compaction. Live-only at `~/.pi/agent/`; mutated by Pi at runtime and gitignored (not shipped in this repo). |
-| `models.json` | Custom provider definitions (e.g., local models via Ollama) |
+| `models.json` | Custom provider definitions, including local Ollama, vLLM, and llama.cpp models |
 | `agent-modes.json` | Per-mode model/thinking overrides for debug, review, etc. |
 | `damage-control-rules.yaml` | Safety rules: bash patterns, path access, delete protection |
 | `auth.json.template` | Template for `auth.json` (provider API keys). Setup copies to live `~/.pi/agent/auth.json` on first run; never committed. |

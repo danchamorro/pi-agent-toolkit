@@ -65,7 +65,7 @@ into the published subagents npm package.
 | `AGENTS.md` | Global agent rules: git safety, commit style, PR style, code style, path discipline, cmux integration |
 | `APPEND_SYSTEM.md` | System prompt additions: reasoning quality, jCodeMunch policies, documentation lookup, writing style |
 | `settings.json` | Pi settings: default provider/model, enabled models, compaction, installed packages. Mutated by Pi at runtime, so it is gitignored and not installed by `setup.mjs`. |
-| `models.json` | Custom model/provider definitions (e.g., local models via Ollama) |
+| `models.json` | Custom model/provider definitions, including local Ollama, vLLM, and llama.cpp models |
 | `agent-modes.json` | Per-mode overrides: which provider/model/thinking level to use in debug, review, etc. |
 | `damage-control-rules.yaml` | Safety guardrails (see section below) |
 | `auth.json.template` | Template for `auth.json` (provider API keys, created on first run) |
