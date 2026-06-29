@@ -144,9 +144,9 @@ agentmemory doctor --dry-run
 ### RTK shell-output token savings
 
 [RTK](https://github.com/rtk-ai/rtk) is a token-saving CLI proxy for shell
-commands. It complements `context-mode` and jCodeMunch rather than replacing
-them: RTK reduces output from Bash or shell commands, while `context-mode`
-handles large tool output and jCodeMunch handles indexed code navigation.
+commands. It complements jCodeMunch rather than replacing it: RTK reduces
+output from Bash or shell commands, while jCodeMunch handles indexed code
+navigation.
 
 This repo documents RTK setup but does not install it automatically. RTK is a
 system CLI that mutates multiple agent configs outside `~/.pi/agent`, so keep
@@ -207,13 +207,8 @@ Expected checks:
 
 Operational notes:
 
-- RTK rewrites shell commands only. Pi tools, MCP tools, `context-mode`, and
-  jCodeMunch calls are not rewritten.
-- `ctx-approval-gate.ts` covers execution-capable context-mode tools separately:
-  it prompts before `ctx_execute`, `ctx_execute_file`, `ctx_batch_execute`,
-  `ctx_upgrade`, `ctx_purge`, and `ctx_insight`, and hard-blocks nested commit,
-  push, PR, and destructive command payloads so they must use direct Bash or
-  first-class Pi tools.
+- RTK rewrites shell commands only. Pi tools, MCP tools, and jCodeMunch calls
+  are not rewritten.
 - In Claude Code, existing safety hooks should run before RTK so unsafe Bash
   commands are checked before any token-saving rewrite.
 - Use `rtk proxy <command>` for raw output, exact-output debugging, or cases
@@ -244,6 +239,17 @@ immediately with the template config. Requires `uvx` (`brew install uv`).
 The agent automatically indexes the current repo on session start
 (configured in `APPEND_SYSTEM.md`). Incremental indexing keeps subsequent
 runs fast.
+
+### codebase-memory-mcp (graph architecture)
+
+[codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp)
+provides graph-backed architecture summaries, call/data-flow tracing,
+Cypher-style code queries, cross-service relationships, and ADR support. It
+runs lazily from the template config and should be indexed on demand when a
+task needs graph or architecture analysis.
+
+Do not commit `.codebase-memory/graph.db.zst` unless you intentionally want a
+shared graph artifact in the repo.
 
 ### Postgres MCP (database access)
 

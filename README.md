@@ -6,8 +6,8 @@ skills, configs, safety guardrails, and installable packages. This is a
 public backup and reference for how I organize my own agent environment,
 not a universal starter kit intended to be cloned unchanged by everyone.
 
-Includes 27 extensions, 55 skills, 1 prompt template, 1 theme,
-6 installable Pi packages, MCP server configurations, and safety guardrails.
+Includes 26 extensions, 55 skills, 1 prompt template, 1 theme,
+7 installable Pi packages, MCP server configurations, and safety guardrails.
 It also tracks 2 custom sub-agent roles for local use with the subagents
 package.
 
@@ -166,7 +166,7 @@ pi install git:github.com/DietrichGebert/ponytail
 | `pi-diff-review` | Native diff review window for Pi. Adds a `/diff-review` command that opens changed files in a Monaco diff editor and turns review notes into a prompt back in Pi. | [badlogic/pi-diff-review](https://github.com/badlogic/pi-diff-review) |
 | `ponytail` | Lazy senior developer mode for Pi. Adds `/ponytail` controls, prompt injection, and simplification-focused skills. | [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail) |
 
-### Extensions (27)
+### Extensions (26)
 
 All extensions live in `dotfiles/extensions/`.
 
@@ -176,7 +176,6 @@ All extensions live in `dotfiles/extensions/`.
 |-----------|-------------|
 | `damage-control/` | Safety guardrail engine: blocks destructive commands, enforces path access rules, prevents accidental deletes |
 | `commit-approval.ts` | Intercepts git commits for interactive review before execution |
-| `ctx-approval-gate.ts` | Prompts before execution-capable context-mode tools and hard-blocks nested commits, pushes, PR actions, and destructive shell payloads that must go through direct Bash guardrails |
 | `pr-approval.ts` | Intercepts PR creation for interactive review |
 | `dirty-repo-guard.ts` | Warns when working in a repo with uncommitted changes |
 | `require-session-name-on-exit.ts` | Prompts for a session name before `/quit`, `/q`, `/safe-quit`, or Ctrl+Shift+Q exits |
@@ -358,7 +357,8 @@ Configured in `mcp.json` (created from template during setup):
 
 | Server | Purpose | Source |
 |--------|---------|--------|
-| [jCodeMunch](https://github.com/jgravelle/jcodemunch-mcp) | Code indexing, symbol search, context-aware exploration | `uvx jcodemunch-mcp` |
+| [jCodeMunch](https://github.com/jgravelle/jcodemunch-mcp) | Code indexing, symbol search, context-aware edit prep | `uvx jcodemunch-mcp` |
+| [codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp) | Graph-backed architecture, call tracing, Cypher-style code queries | `codebase-memory-mcp` |
 | [Postgres MCP](https://github.com/crystaldba/postgres-mcp) | Read-only PostgreSQL access via Docker | `crystaldba/postgres-mcp` |
 | [MariaDB MCP](https://github.com/MariaDB/mcp) | Read-only MariaDB or MySQL access via `uvx` | `uvx --from iflow-mcp_mariadb-mariadb-server mariadb-server` |
 | [chrome-devtools](https://github.com/nicobailon/chrome-devtools-mcp) | Browser automation via Chrome DevTools Protocol | `npx chrome-devtools-mcp@latest` |

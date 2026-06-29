@@ -10,7 +10,7 @@ directory into the appropriate agent paths. External skills are tracked separate
 
 ```
 dotfiles/
-  extensions/ ............. 27 extensions (.ts files and subdirectories)
+  extensions/ ............. 26 extensions (.ts files and subdirectories)
   agents/ ................. Custom sub-agent roles (-> ~/.pi/agent/agents/)
   agent-skills/ ........... Pi-only skills        (-> ~/.pi/agent/skills/)
   personal-skills/ ........ Personal skills       (-> ~/.agents/skills/<category>/<skill> and ~/.claude/skills/<skill>)
@@ -73,7 +73,7 @@ into the published subagents npm package.
 
 ## Extensions
 
-See the [root README Extensions section](../README.md#extensions-27) for the
+See the [root README Extensions section](../README.md#extensions-26) for the
 full list with descriptions.
 
 ## Safety guardrails (Damage Control)
@@ -94,14 +94,6 @@ safety system that protects against destructive operations:
 - **AWS S3 allowlist**: Only `ls` and `cp` are permitted; all other S3
   operations are blocked.
 
-`ctx-approval-gate.ts` adds a separate guard for context-mode tools because
-those tools can execute nested shell or code payloads outside direct Bash
-interception. It prompts before `ctx_execute`, `ctx_execute_file`,
-`ctx_batch_execute`, `ctx_upgrade`, `ctx_purge`, and `ctx_insight`; denies
-execution when no interactive UI is available; and hard-blocks nested commits,
-pushes, PR create or merge commands, and destructive shell patterns so they
-must go through direct Bash or first-class Pi tools.
-
 ## MCP servers
 
 Configured in `mcp.json` (created from `mcp.json.template` on first run).
@@ -110,7 +102,8 @@ is never committed:
 
 | Server | Purpose | How it runs |
 |--------|---------|-------------|
-| [jCodeMunch](https://github.com/jgravelle/jcodemunch-mcp) | Code indexing, symbol search, context-aware code exploration. Auto-indexes on session start. | `uvx jcodemunch-mcp` |
+| [jCodeMunch](https://github.com/jgravelle/jcodemunch-mcp) | Code indexing, symbol search, context-aware edit prep. Auto-indexes on session start. | `uvx jcodemunch-mcp` |
+| [codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp) | Graph-backed architecture, call tracing, Cypher-style code queries. Runs lazily and indexes on demand. | `codebase-memory-mcp` |
 | [Postgres MCP](https://github.com/crystaldba/postgres-mcp) | Read-only PostgreSQL access. Runs in Docker with `--access-mode=restricted`. Uses `"lifecycle": "lazy"`. | `docker run crystaldba/postgres-mcp` |
 | [MariaDB MCP](https://github.com/MariaDB/mcp) | Read-only MariaDB or MySQL access. Runs via `uvx` with a local connection and optional `MCP_READ_ONLY=true`. | `uvx --from iflow-mcp_mariadb-mariadb-server mariadb-server` |
 | [chrome-devtools](https://github.com/nicobailon/chrome-devtools-mcp) | Browser automation via Chrome DevTools Protocol. | `npx chrome-devtools-mcp@latest` |

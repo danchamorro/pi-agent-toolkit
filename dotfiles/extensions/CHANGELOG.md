@@ -2,6 +2,13 @@
 
 All notable changes to extensions in `~/.pi/agent/extensions/`.
 
+## 2026-06-28
+
+### ctx-approval-gate.ts
+
+- Archived the context-mode approval gate under `archive/context-mode/` and
+  removed it from active extension sync now that context-mode is disabled.
+
 ## 2026-06-24
 
 ### ctx-approval-gate.ts

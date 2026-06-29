@@ -10,41 +10,65 @@ When instructions in this file conflict with project-level AGENTS.md rules, this
 - Present pros and cons (trade-offs) to the user instead of always agreeing.
 - If a user request conflicts with evidence or best practices, explain why and propose better alternatives.
 
-## jCodeMunch MCP usage policy
+## Code intelligence MCP policy
+
+When inside a git repository, prefer code-intelligence MCPs over raw source
+reading for code exploration. Use the tools by role, not interchangeably.
+
+### Tool split
+
+- Use jCodeMunch as the primary current-repo navigation and edit-preparation
+  tool: repository outlines, file trees, symbol search, exact symbol retrieval,
+  context bundles, blast radius checks, call hierarchy, ranked context, and
+  refactoring plans.
+- Use codebase-memory-mcp for graph and architecture questions: architecture
+  summaries, graph schema, call/data-flow/cross-service tracing, Cypher-like
+  queries, route/channel relationships, cross-repo intelligence, and ADR lookup
+  or management.
+- If both tools can answer the same question, prefer jCodeMunch when preparing
+  to edit code, and prefer codebase-memory-mcp when understanding relationships,
+  architecture, service boundaries, or graph topology.
+- Do not force both tools to do the same discovery pass. Start with the tool
+  whose role matches the task, then switch only when the first tool lacks the
+  needed signal.
+- If MCP results disagree, trust current file contents. Re-index the stale MCP
+  before relying on its result.
+
+### jCodeMunch startup and usage
 
 - On session start, **only if the current working directory is inside a git
   repository** (i.e., `git rev-parse --is-inside-work-tree` succeeds), call
   `jcodemunch_index_folder` with `path` set to the current working directory.
   Skip indexing entirely for non-repo directories (e.g., `~`, `~/Downloads`,
   `~/Documents`) to avoid needlessly indexing personal files. Incremental
-  incremental indexing is cheap because it only re-processes changed files, so
-  this is safe to run unconditionally when inside a repo. If the call fails
-  on the first attempt (server still connecting), retry once before falling
-  back.
+  indexing is cheap because it only re-processes changed files, so this is safe
+  to run unconditionally when inside a repo. If the call fails on the first
+  attempt (server still connecting), retry once before falling back.
 - All jCodeMunch tools are prefixed with `jcodemunch_`. The `index_folder`
   tool requires the parameter name `path` (not `folder_path`).
 - **Do not begin code exploration until `index_folder` has fully completed.**
   Wait for the indexing result before calling any other jCodeMunch tools or
   reading source files. Never index "in parallel" with analysis.
-- Re-index (`index_folder`) after git pull, branch switches, or when retrieved
+- Re-index jCodeMunch after git pull, branch switches, or when retrieved
   symbols appear stale or do not match file contents.
 - For code exploration and understanding, prefer jCodeMunch tools over reading
   full files:
   - Use `get_repo_outline` or `get_file_tree` to understand project structure.
   - Use `search_symbols` to locate functions, classes, and methods by name.
-  - Use `get_symbol` or `get_symbols` for precise source retrieval.
+  - Use `get_symbol_source` for precise source retrieval.
   - Use `get_context_bundle` before making edits to understand a symbol's
     imports, neighbors, and related code.
   - Use `get_blast_radius` before modifying widely-used symbols.
   - Use `get_file_outline` to inspect a file's symbols before pulling source.
+- Use codebase-memory-mcp indexing on demand for graph, architecture,
+  cross-repo, cross-service, ADR, or Cypher-style analysis. Do not require it
+  as the default session-start indexer.
+- Do not enable or commit codebase-memory-mcp persistence artifacts
+  (`.codebase-memory/graph.db.zst`) unless the user explicitly wants a shared
+  graph artifact in the repo.
 - Reserve Pi read, bash, and grep tools for: exact-string lookups (error
   messages, config values, log text), non-code files (config, JSON, YAML,
   markdown), and files outside the indexed repository.
-
-## Context-mode scope
-
-- Context-mode is for large, noisy, or unpredictable output. For small files, exact lookups, or files you may edit, use first-class Pi tools (`read`, `rg`, editor tools) before `ctx_execute_file`.
-- Do not write ad hoc analysis scripts when an existing tool answers the task directly.
 
 ## Tool-first approach
 
