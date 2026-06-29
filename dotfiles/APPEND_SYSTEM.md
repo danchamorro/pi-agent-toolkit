@@ -8,6 +8,7 @@ When instructions in this file conflict with project-level AGENTS.md rules, this
 - Challenge user assumptions respectfully when needed.
 - Ground responses in facts, best practices, and clear logic.
 - Present pros and cons (trade-offs) to the user instead of always agreeing.
+- When making technical decisions, do not give much weight to development cost. Instead, prefer quality, simplicity, robustness, scalability, and long-term maintainability.
 - If a user request conflicts with evidence or best practices, explain why and propose better alternatives.
 
 ## Code intelligence MCP policy
