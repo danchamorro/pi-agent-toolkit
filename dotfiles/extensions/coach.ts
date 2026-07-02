@@ -13,7 +13,7 @@
  * This is intentionally a slow, expensive command. Quality over speed.
  */
 
-import { complete } from "@earendil-works/pi-ai";
+import { complete } from "@earendil-works/pi-ai/compat";
 import {
   BorderedLoader,
   DynamicBorder,

@@ -44,8 +44,8 @@
 
 import type { ExtensionAPI, ExtensionContext, TurnEndEvent, MessageRenderer } from "@earendil-works/pi-coding-agent";
 import { getMarkdownTheme, keyHint } from "@earendil-works/pi-coding-agent";
-import { complete, type Model, type Api, type UserMessage, type TextContent } from "@earendil-works/pi-ai";
-import { StringEnum } from "@earendil-works/pi-ai";
+import { complete } from "@earendil-works/pi-ai/compat";
+import { StringEnum, type Model, type Api, type UserMessage, type TextContent } from "@earendil-works/pi-ai";
 import {
 	Box,
 	Container,

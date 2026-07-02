@@ -2,6 +2,12 @@
 
 All notable changes to extensions in `~/.pi/agent/extensions/`.
 
+## 2026-07-01
+
+### coach.ts, control.ts, find-session.ts, loop.ts, qna-interactive.ts
+
+- Updated Pi AI completion imports to the compat entrypoint required by Pi 0.80.
+
 ## 2026-06-28
 
 ### ctx-approval-gate.ts

@@ -13,7 +13,7 @@
  *   Uses whichever model is currently selected in the session (ctx.model).
  */
 
-import { completeSimple } from "@earendil-works/pi-ai";
+import { completeSimple } from "@earendil-works/pi-ai/compat";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { clean } from "./clean.ts";
 
