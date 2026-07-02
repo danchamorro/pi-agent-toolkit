@@ -8,10 +8,14 @@ This project uses [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## [1.0.7] - 2026-07-01
+
 ### Changed
 
 - Migrated Pi peer dependencies and imports from `@mariozechner/*` to
   `@earendil-works/*` for Pi 0.74.0 and newer.
+- Updated the prompt enhancer to use Pi AI's compat completion entrypoint so
+  it works with Pi 0.80.
 
 ## [1.0.6] - 2026-04-22
 
