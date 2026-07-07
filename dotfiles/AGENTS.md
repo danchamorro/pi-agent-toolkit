@@ -372,14 +372,6 @@ ALWAYS prefer MCP graph tools over grep/glob/file-search for code discovery.
 - Do not call repo-scoped tools with empty arguments. Examples include `jcodemunch_get_repo_outline`, `jcodemunch_get_file_tree`, `jcodemunch_search_symbols`, `jcodemunch_search_text`, and `jcodemunch_get_file_outline`.
 - If a repo-scoped call fails because `repo` is missing, retry once with the resolved repo identifier instead of repeating the same invalid call.
 
-### Pi toolkit repo awareness
-
-- Treat `~/Documents/Personal/Code/my-projects/pi-agent-toolkit` as the user's personal and public Pi setup repository.
-- This repo is where the user saves reusable skills, Pi-related features, and setup changes so they can be shared publicly and used as a backup of their Pi environment.
-- When the user asks to create or update Pi skills, Pi features, Pi configuration, or reusable agent tooling, consider this repo a preferred destination when it is relevant.
-- Keep changes in this repo polished and shareable. Avoid adding secrets, private tokens, machine-specific credentials, or undocumented local-only assumptions.
-- If a requested change seems specific to one machine or not suitable for a public repo, call that out and ask before adding it here.
-
 ### Temporary scripts and long-form CLI input
 
 - For non-trivial ad hoc scripts, write them to a temporary file, run them, and remove them afterward. Avoid embedding long multi-line scripts directly in shell commands.
