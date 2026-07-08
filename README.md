@@ -7,7 +7,7 @@ public backup and reference for how I organize my own agent environment,
 not a universal starter kit intended to be cloned unchanged by everyone.
 
 Includes 26 extensions, 61 skills, 1 prompt template, 1 theme,
-7 installable Pi packages, MCP server configurations, and safety guardrails.
+9 installable Pi packages, MCP server configurations, and safety guardrails.
 It also tracks 2 custom sub-agent roles for local use with the subagents
 package.
 
@@ -137,7 +137,7 @@ npm run update:packages   # Pi packages from manifest.json
 
 ### Packages (installable via pi)
 
-This setup installs seven Pi packages via `manifest.json`:
+This setup installs nine Pi packages via `manifest.json`:
 
 ```bash
 pi install npm:@danchamorro/pi-subagents
@@ -145,6 +145,8 @@ pi install npm:@danchamorro/pi-agent-modes
 pi install npm:@danchamorro/pi-prompt-enhancer
 pi install npm:pi-design-deck
 pi install npm:pi-annotate
+pi install npm:@narumitw/pi-goal
+pi install npm:@narumitw/pi-plan-mode
 pi install git:https://github.com/badlogic/pi-diff-review
 pi install git:github.com/DietrichGebert/ponytail
 ```
@@ -163,6 +165,8 @@ pi install git:github.com/DietrichGebert/ponytail
 |---|---|---|
 | `pi-design-deck` | Present multi-slide visual decision decks with high-fidelity previews. Bundles the `design-deck` skill used in this setup. | [nicobailon/pi-design-deck](https://github.com/nicobailon/pi-design-deck) |
 | `pi-annotate` | Visual browser annotation for AI-assisted UI debugging. Adds `/annotate` plus companion Chrome extension tooling. | [nicobailon/pi-annotate](https://github.com/nicobailon/pi-annotate) |
+| `@narumitw/pi-goal` | Goal-driven task completion for Pi. Adds `/goal` mode plus `goal_complete` for verifiable long-running work. | [narumiruna/pi-extensions](https://github.com/narumiruna/pi-extensions) |
+| `@narumitw/pi-plan-mode` | Codex-like read-only planning mode for Pi. Adds `/plan` for safe exploration before implementation. | [narumiruna/pi-extensions](https://github.com/narumiruna/pi-extensions) |
 | `pi-diff-review` | Native diff review window for Pi. Adds a `/diff-review` command that opens changed files in a Monaco diff editor and turns review notes into a prompt back in Pi. | [badlogic/pi-diff-review](https://github.com/badlogic/pi-diff-review) |
 | `ponytail` | Lazy senior developer mode for Pi. Adds `/ponytail` controls, prompt injection, and simplification-focused skills. | [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail) |
 
@@ -437,6 +441,7 @@ modified to suit my needs:
 - [Nico Bailon](https://github.com/nicobailon)
 - [thananon/9arm-skills](https://github.com/thananon/9arm-skills)
 - [pawel-cell/micky-podcast-agentic-engineering](https://github.com/pawel-cell/micky-podcast-agentic-engineering)
+- [narumiruna/pi-extensions](https://github.com/narumiruna/pi-extensions)
 
 ## License
 

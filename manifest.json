@@ -49,6 +49,8 @@
     "npm:@danchamorro/pi-prompt-enhancer",
     "npm:pi-design-deck",
     "npm:pi-annotate",
+    "npm:@narumitw/pi-goal",
+    "npm:@narumitw/pi-plan-mode",
     "git:https://github.com/badlogic/pi-diff-review",
     "git:github.com/DietrichGebert/ponytail"
   ]
