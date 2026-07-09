@@ -11,8 +11,8 @@ function role(overrides: Partial<SubagentRole> & Pick<SubagentRole, "name">): Su
     tools: overrides.tools ?? ["read", "bash"],
     model: overrides.model ?? {
       provider: "openai-codex",
-      modelId: "gpt-5.5",
-      label: "openai-codex/gpt-5.5",
+      modelId: "gpt-5.6-sol",
+      label: "openai-codex/gpt-5.6-sol",
     },
     thinking: overrides.thinking ?? "off",
     systemPrompt: overrides.systemPrompt ?? "You are a test sub-agent.",
@@ -66,7 +66,7 @@ describe("subagent views", () => {
     assert.match(output, /│ Role\s+│ Best for\s+│ Capabilities/);
     assert.match(output, /scout[\s\S]*scout role description\./);
     assert.match(output, /Use first when you need fast read-only codebase/);
-    assert.match(output, /read feedback[\s\S]*openai-codex\/gpt-5\.5[\s\S]*thinking: off/);
+    assert.match(output, /read feedback[\s\S]*openai-codex\/gpt-5\.6-sol[\s\S]*thinking: off/);
     assert.match(output, /worker[\s\S]*read shell write feedback/);
     assert.ok(output.indexOf("scout") < output.indexOf("planner"));
     assert.ok(output.indexOf("planner") < output.indexOf("worker"));

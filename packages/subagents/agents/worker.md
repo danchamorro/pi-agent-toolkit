@@ -2,7 +2,7 @@
 name: worker
 description: Implements a well-scoped task, runs narrow validation, and reports the diff.
 tools: read, bash, write, edit
-model: openai-codex/gpt-5.5
+model: openai-codex/gpt-5.6-sol
 thinking: minimal
 spawning: false
 auto-exit: true

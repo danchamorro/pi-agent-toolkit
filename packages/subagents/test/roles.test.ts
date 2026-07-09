@@ -21,7 +21,7 @@ function roleFixture(name: string, extraFrontmatter = ""): string {
 name: ${name}
 description: Thermos-style review agent.
 tools: read, bash, grep, find, ls
-model: openai-codex/gpt-5.5
+model: openai-codex/gpt-5.6-sol
 thinking: high
 auto-exit: true
 output: thermos-review.md
@@ -60,7 +60,7 @@ describe("loadSubagentRoles", () => {
     assert.ok(roleNames.includes("worker"));
     assert.equal(customRole?.source, "user");
     assert.equal(customRole?.thinking, "high");
-    assert.equal(customRole?.model?.label, "openai-codex/gpt-5.5");
+    assert.equal(customRole?.model?.label, "openai-codex/gpt-5.6-sol");
     assert.deepEqual(customRole?.tools, ["read", "bash", "grep", "find", "ls"]);
     assert.deepEqual(result.diagnostics, []);
   });
@@ -88,7 +88,7 @@ describe("loadSubagentRoles", () => {
       settings: {
         agentOverrides: {
           scout: {
-            model: "openai-codex/gpt-5.5",
+            model: "openai-codex/gpt-5.6-sol",
             thinking: "off",
             tools: ["read", "grep", "find", "ls"],
           },
@@ -103,7 +103,7 @@ describe("loadSubagentRoles", () => {
     const thermosReview = result.roles.find((role) => role.name === "thermos-review");
 
     assert.equal(scout?.overridden, true);
-    assert.equal(scout?.model?.label, "openai-codex/gpt-5.5");
+    assert.equal(scout?.model?.label, "openai-codex/gpt-5.6-sol");
     assert.equal(scout?.thinking, "off");
     assert.deepEqual(scout?.tools, ["read", "grep", "find", "ls"]);
     assert.equal(thermosReview?.overridden, true);

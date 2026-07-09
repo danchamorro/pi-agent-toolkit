@@ -2,7 +2,7 @@
 name: scout
 description: Performs fast read-only codebase reconnaissance and returns facts, file maps, conventions, and gotchas.
 tools: read, bash
-model: openai-codex/gpt-5.5
+model: openai-codex/gpt-5.6-sol
 thinking: off
 spawning: false
 auto-exit: true

@@ -2,7 +2,7 @@
 name: planner
 description: Clarifies the request, explores implementation options, and produces a concrete plan and todos.
 tools: read, bash
-model: openai-codex/gpt-5.5
+model: openai-codex/gpt-5.6-sol
 thinking: high
 spawning: false
 auto-exit: true

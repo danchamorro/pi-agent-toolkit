@@ -219,7 +219,7 @@ Example:
 name: thermos-review
 description: Review a change with a strict correctness and maintainability lens.
 tools: read, bash, grep, find, ls
-model: openai-codex/gpt-5.5
+model: openai-codex/gpt-5.6-sol
 thinking: high
 auto-exit: true
 output: review.md
@@ -261,7 +261,7 @@ Add a `subagents.agentOverrides` object keyed by role name:
   "subagents": {
     "agentOverrides": {
       "scout": {
-        "model": "openai-codex/gpt-5.5",
+        "model": "openai-codex/gpt-5.6-sol",
         "thinking": "off",
         "tools": ["read", "bash", "grep", "find", "ls"]
       },

@@ -2,7 +2,7 @@
 name: reviewer
 description: Reviews code changes for correctness, maintainability, security, and missing validation.
 tools: read, bash
-model: openai-codex/gpt-5.5
+model: openai-codex/gpt-5.6-sol
 thinking: high
 spawning: false
 auto-exit: true
