@@ -1,28 +1,19 @@
 ---
 name: plan-reviewer
-description: Use when creating, refining, or reviewing implementation plans, migration plans, refactoring proposals, feature plans, implementation trackers, or committable phase plans; especially when turning a rough plan into executable phases or checking whether a plan is concrete, testable, safe, dependency-aware, and suitable for parallel work.
+description: Use when reviewing implementation plans, migration plans, refactoring proposals, feature plans, generated implementation trackers, or committable phase plans before execution; especially when asked whether a plan is ready, concrete enough, testable, safe, or dependency-aware.
 ---
 
 # Plan Reviewer
 
 ## Core principle
 
-Make plans executable and use review as a quality gate before implementation. Find ambiguity, unsupported assumptions, unsafe sequencing, missing validation, untracked work, and coordination hazards before implementation starts.
+Review the plan as a quality gate before execution. Your job is to find ambiguity, unsupported assumptions, unsafe sequencing, missing validation, and untracked work before implementation starts.
 
-Do not implement code while preparing or reviewing a plan. Inspect files only when needed to verify plan claims.
+Do not implement the plan while reviewing it. Inspect files only when needed to verify plan claims.
 
-## Workflows
+## Review modes
 
-Choose the workflow from the user's request:
-
-- **Prepare or refine**: Convert rough notes or an existing plan into actionable, independently committable phases. Unless the user requests inline output or names a destination, write the result to a new Markdown file with a clear topic-based filename. Never overwrite an existing file without asking.
-- **Review**: Evaluate an existing plan without editing it. Use the scorecard and verdict workflow below.
-
-If the request is ambiguous and an existing plan is provided, default to review. Do not silently rewrite a plan presented for review.
-
-## Plan types
-
-Classify the plan before preparing or judging it:
+Classify the plan before judging it:
 
 - **Execution plan**: Must be concrete enough to implement and commit from directly.
 - **Design plan**: May be higher level, but must clearly state unresolved decisions and evidence.
@@ -52,19 +43,7 @@ For implementation trackers, check that:
 - Each phase is small enough to review without hiding unrelated changes.
 - Refactoring, behavior changes, tests, migrations, and rollout work are not mixed unless the plan explains why.
 
-### 3. Parallelism and coordination
-
-For every execution-ready plan:
-
-- Identify phases or tasks that can safely run concurrently after their prerequisites complete.
-- State the critical path and any required integration or merge order.
-- Treat shared files, symbols, contracts, migrations, fixtures, infrastructure, and persisted state as potential conflicts.
-- Give each parallel workstream a clear scope and expected output so it could be delegated to a subagent without duplicate investigation.
-- Do not force parallelism. State `No safe parallelism identified` when sequencing is safer.
-
-Identify opportunities only. Do not launch subagents unless the user asks.
-
-### 4. Testability and acceptance criteria
+### 3. Testability and acceptance criteria
 
 Acceptance criteria should be objective. Flag criteria that depend on vague human judgment.
 
@@ -77,7 +56,7 @@ Good criteria specify:
 
 Reject wording like "works correctly" unless the plan defines exactly what correct behavior means.
 
-### 5. Specificity
+### 4. Specificity
 
 Flag vague language when it hides implementation decisions. Common red flags:
 
@@ -96,7 +75,7 @@ Flag vague language when it hides implementation decisions. Common red flags:
 
 These terms are acceptable only when followed by measurable detail.
 
-### 6. Dependencies, risks, and safety
+### 5. Dependencies, risks, and safety
 
 Check whether the plan identifies:
 
@@ -105,15 +84,6 @@ Check whether the plan identifies:
 - Required credentials, services, migrations, feature flags, queues, cron schedules, or background jobs.
 - Rollback or recovery steps for migrations, production config, data mutation, auth, billing, or reliability changes.
 - Observability and incident-response implications when behavior affects production operations.
-
-## Plan preparation process
-
-1. Read all supplied material and classify the plan type.
-2. Verify codebase-specific claims and flag unresolved requirements or blockers.
-3. Split the work into dependency-ordered, independently reviewable phases.
-4. For each phase, include an objective, Markdown task checkboxes, dependencies, acceptance criteria, validation steps, and a suggested commit message.
-5. Add a `Parallel execution` section naming concurrent workstreams, prerequisites, coordination points, and the critical path. State when no safe parallelism exists.
-6. Check the finished plan against the review criteria before presenting it.
 
 ## Review process
 
@@ -137,7 +107,6 @@ Use this table in every review:
 | Scope and intent | Pass/Revise/Fail | ... |
 | Evidence and references | Pass/Revise/Fail | ... |
 | Trackability and phase structure | Pass/Revise/Fail | ... |
-| Parallelism and coordination | Pass/Revise/Fail | ... |
 | Acceptance criteria and tests | Pass/Revise/Fail | ... |
 | Dependencies and sequencing | Pass/Revise/Fail | ... |
 | Risks, rollback, and operations | Pass/Revise/Fail | ... |
@@ -226,7 +195,5 @@ After updating, summarize the changed file path, key fixes, and any remaining op
 - Demanding file:line citations for every statement in an early design plan.
 - Trusting file references without checking that they exist.
 - Treating a checklist as sufficient when dependencies and validation are missing.
-- Calling work parallelizable without checking shared files, contracts, or state.
-- Forcing parallel work when coordination would cost more than sequencing.
 - Editing a plan before the user confirms they want changes.
 - Implementing code while reviewing the plan.
