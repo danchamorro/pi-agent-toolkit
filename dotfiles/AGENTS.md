@@ -322,6 +322,11 @@ When analyzing data flow, trace it all the way to the system boundary before dra
 
 ### Clean up after yourself
 
+For headless browser automation:
+- Use a unique named session and track every session created by the task.
+- Close task-owned sessions on success, failure, or cancellation, then verify they no longer appear in `agent-browser session list`.
+- Never close another task's session. Leave a session running only with explicit user approval.
+
 Never leave debugging or testing artifacts in the codebase:
 - `console.log` / `print` statements added for debugging -- remove once understood.
 - Commented-out code used for testing alternatives -- delete, don't commit.
