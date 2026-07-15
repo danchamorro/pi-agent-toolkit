@@ -8,6 +8,11 @@ dist/
 # Local scratch scripts
 scripts/
 
+# Project-local Pi development override
+!.pi/
+.pi/*
+!.pi/settings.json
+
 # OS artifacts
 .DS_Store
 

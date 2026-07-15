@@ -1,0 +1,22 @@
+{
+  "packages": [
+    {
+      "source": "npm:@danchamorro/pi-agent-modes",
+      "extensions": []
+    },
+    {
+      "source": "npm:@danchamorro/pi-prompt-enhancer",
+      "extensions": []
+    },
+    {
+      "source": "npm:@danchamorro/pi-subagents",
+      "extensions": []
+    }
+  ],
+  "extensions": [
+    "../packages/agent-modes/index.ts",
+    "../packages/prompt-enhancer/index.ts",
+    "../packages/subagents/index.ts",
+    "../dotfiles/extensions/btw.ts"
+  ]
+}
