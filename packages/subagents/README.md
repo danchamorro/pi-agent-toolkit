@@ -336,10 +336,16 @@ the other repo" without typing slash commands.
 
 | Tool | Purpose |
 |---|---|
-| `start_subagent` | Starts a sub-agent for a bounded task and returns after launch. |
+| `start_subagent` | Starts a preset or task-specialized sub-agent for a bounded task and returns after launch. |
 | `stop_subagent` | Stops a running or waiting sub-agent. If exactly one is active, the id can be omitted. |
 | `reply_subagent` | Replies to a waiting feedback request. If exactly one sub-agent is waiting, the id can be omitted. |
 | `ask_main_session` | Child-only tool that lets a sub-agent ask the main session for a decision, missing path, credential, or preference. |
+
+The main agent can omit `role` and pass ephemeral `instructions` that define a
+sub-agent's perspective, scope, and expected output for one run. These
+instructions specialize the child without creating a persistent role or
+changing its tool permissions, model, or thinking level. Configured roles remain
+available as reusable presets.
 
 `start_subagent` is intentionally nonblocking. Natural-language delegation
 should feel like starting any other background job: the tool result shows which
@@ -357,8 +363,8 @@ the child runs, and the full result remains available through
    `ask_main_session` tool, renderers, and lifecycle handlers in
    [index.ts](index.ts#L875).
 2. When a sub-agent starts, the package creates an in-memory record with an id,
-   name, cwd, task, status, activity text, last activity time, context usage,
-   and optional role.
+   name, cwd, task, optional specialization instructions, status, activity text,
+   last activity time, context usage, and optional role.
 3. The child session is created with `SessionManager.inMemory(...)`, so subagent
    conversation history is not persisted to disk. The package only persists
    lightweight run metadata needed for reload recovery.
@@ -367,8 +373,8 @@ the child runs, and the full result remains available through
    completed/stopped/failed records are not restored into new sessions.
 5. The child receives a task-specific system prompt built by
    [resource-loader.ts](resource-loader.ts#L8). That prompt includes the launch
-   cwd, assigned task, role prompt, and the rule that the child does not have
-   the parent transcript.
+   cwd, assigned task, optional role prompt, optional ephemeral specialization,
+   and the rule that the child does not have the parent transcript.
 6. The child runs with a narrow tool set. Role tools are loaded from the role
    file, and `ask_main_session` is added automatically.
 7. The status widget in [status-widget.ts](status-widget.ts#L117) refreshes
@@ -425,7 +431,15 @@ Stop or reply manually:
 /subagent reply sa-1 Use /Users/me/project-a instead; the first cwd was wrong.
 ```
 
-Let the main agent drive the workflow:
+Let the main agent create task-specific specializations:
+
+```text
+Explore the codebase with focused background sub-agents. Choose the useful
+specializations and expected output for each instead of assigning every task
+the same preset role.
+```
+
+Use an explicit preset when its reusable prompt and tool policy fit:
 
 ```text
 Use a scout subagent to map the package source. Launch it in the background,

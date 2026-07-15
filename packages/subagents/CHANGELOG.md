@@ -1,5 +1,19 @@
 # @danchamorro/pi-subagents Changelog
 
+## 0.7.0 - 2026-07-14
+
+### Added
+
+- Added optional ephemeral `instructions` to `start_subagent`, allowing the main
+  agent to define a task-specific specialization and expected output without
+  creating a persistent role or changing child permissions.
+
+### Changed
+
+- Updated main-agent guidance to choose specializations from the delegated work
+  and use configured roles only when their reusable prompt and tool policy
+  directly match the task.
+
 ## 0.6.0 - 2026-05-31
 
 ### Added

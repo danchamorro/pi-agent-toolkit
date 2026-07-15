@@ -21,6 +21,12 @@ export const StartSubagentParams = Type.Object({
   task: Type.String({
     description: "The concrete task the sub-agent should work on.",
   }),
+  instructions: Type.Optional(
+    Type.String({
+      description:
+        "Optional ephemeral specialization for this run. Use this to define the sub-agent's focus and expected output without creating a persistent role.",
+    }),
+  ),
   name: Type.Optional(
     Type.String({
       description: "Optional display name. Defaults to the role name or a task-derived name.",

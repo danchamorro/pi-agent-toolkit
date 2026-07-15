@@ -11,7 +11,7 @@
  * - /subagent reply <id> <feedback> - answer a sub-agent feedback request.
  *
  * Tools:
- * - start_subagent - let the main agent launch a role-specific background sub-agent.
+ * - start_subagent - let the main agent launch a preset or task-specialized background sub-agent.
  *   The tool returns after launch and can target an explicit working directory.
  * - stop_subagent - let the main agent stop a running or waiting sub-agent.
  * - reply_subagent - let the main agent answer a sub-agent feedback request.
@@ -444,6 +444,7 @@ export default function (pi: ExtensionAPI) {
       id: store.nextId(),
       name: parsed.name,
       task: parsed.task,
+      instructions: parsed.instructions,
       cwd,
       role: parsed.role,
       status: "starting",
@@ -588,7 +589,13 @@ export default function (pi: ExtensionAPI) {
   }
 
   function startSubagentFromTool(
-    params: { role?: string; task: string; name?: string; cwd?: string },
+    params: {
+      role?: string;
+      task: string;
+      instructions?: string;
+      name?: string;
+      cwd?: string;
+    },
     ctx: ExtensionContext,
   ): StartSubagentDetails {
     store.ensurePersistedLoaded(ctx.cwd);
@@ -634,6 +641,7 @@ export default function (pi: ExtensionAPI) {
       {
         name: displayName,
         task,
+        instructions: params.instructions?.trim() || undefined,
         role,
         cwd: cwdResult.cwd,
         notifyOnStart: false,
@@ -913,13 +921,14 @@ export default function (pi: ExtensionAPI) {
     label: "Start Subagent",
     description:
       "Start an in-process background Pi sub-agent for delegated work. " +
-      "Use this when a configured sub-agent role can make progress independently. " +
+      "Create a task-specific specialization with instructions, or use an optional configured role preset. " +
       "The tool returns after launch so the main session stays interruptible while the sub-agent runs.",
-    promptSnippet: `Launch a background sub-agent and return control immediately. Available roles: ${availableRoleNames().join(", ")}.`,
+    promptSnippet: `Launch a task-specialized background sub-agent and return control immediately. Optional role presets: ${availableRoleNames().join(", ")}.`,
     promptGuidelines: [
       "Use start_subagent when a clearly bounded task should be delegated.",
-      "Choose role=scout for read-only codebase mapping, role=planner for plans and todos, role=reviewer for review, and role=worker for implementation.",
-      "Use custom roles when the user's request matches a role shown by `/subagent agents`.",
+      "Choose the number and specialization of sub-agents from the task instead of defaulting every launch to the same preset role.",
+      "For task-specific specialization, omit role and provide focused instructions describing the sub-agent's perspective, scope, and expected output.",
+      "Use a configured role only when its reusable prompt and tool policy directly match the task; use `/subagent agents` to inspect available roles.",
       "When using start_subagent, only launch the sub-agent or sub-agents in that turn. Do not call source-reading or analysis tools in the same turn.",
       "After launch, stop and let the user regain control instead of continuing analysis in the main session.",
       "Tool-started sub-agents report completion back into the main session; when a completion report arrives, relay or synthesize it for the user without redoing the sub-agent's investigation.",

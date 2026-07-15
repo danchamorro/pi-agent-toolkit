@@ -112,6 +112,7 @@ export type SubagentRoleLoadResult = {
 export type ParsedStartArgs = {
   name: string;
   task: string;
+  instructions?: string;
   role?: SubagentRole;
   cwd?: string;
   notifyOnStart?: boolean;
@@ -124,6 +125,7 @@ export type SubagentRecord = {
   id: string;
   name: string;
   task: string;
+  instructions?: string;
   cwd: string;
   role?: SubagentRole;
   status: SubagentStatus;

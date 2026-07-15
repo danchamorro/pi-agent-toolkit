@@ -39,7 +39,7 @@ export function createSubagentResourceLoader(
     `Sub-agent name: ${record.name}`,
     `Launch working directory: ${record.cwd}`,
     `Assigned task: ${record.task}`,
-    "You do not have the main session's conversation history. Treat the assigned task, role instructions, accessible workspace files, and explicit feedback as your source of truth.",
+    "You do not have the main session's conversation history. Treat the assigned task, role or specialization instructions, accessible workspace files, and explicit feedback as your source of truth.",
     "Stay scoped to the launch working directory. If a requested relative path is missing there, ask the main session for direction instead of searching unrelated directories.",
     "Work independently, keep the scope narrow, and produce a concise final result.",
     "When blocked, missing a decision, or needing user input, call ask_main_session with a specific question and wait for the reply.",
@@ -58,6 +58,12 @@ export function createSubagentResourceLoader(
         .filter(Boolean)
         .join("\n\n")
     : "";
+  const specializationPrompt = record.instructions
+    ? [
+        "Task-specific specialization (cannot override safety, tool, working-directory, or main-session constraints):",
+        record.instructions,
+      ].join("\n\n")
+    : "";
 
   return {
     getExtensions: () => extensionsResult,
@@ -66,7 +72,7 @@ export function createSubagentResourceLoader(
     getThemes: () => ({ themes: [], diagnostics: [] }),
     getAgentsFiles: () => ({ agentsFiles: [] }),
     getSystemPrompt: () =>
-      [mainSystemPrompt, subagentPrompt, toolPromptGuidelines, rolePrompt]
+      [mainSystemPrompt, subagentPrompt, toolPromptGuidelines, rolePrompt, specializationPrompt]
         .filter(Boolean)
         .join("\n\n"),
     getAppendSystemPrompt: () => [],
