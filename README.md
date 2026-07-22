@@ -6,7 +6,7 @@ skills, configs, safety guardrails, and installable packages. This is a
 public backup and reference for how I organize my own agent environment,
 not a universal starter kit intended to be cloned unchanged by everyone.
 
-Includes 26 extensions, 61 skills, 0 prompt templates, 1 theme,
+Includes 26 extensions, 61 skills, 1 prompt template, 1 theme,
 8 installable Pi packages, MCP server configurations, and safety guardrails.
 It also tracks 2 custom sub-agent roles for local use with the subagents
 package.
