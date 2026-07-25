@@ -2,6 +2,14 @@
 
 All notable changes to extensions in `~/.pi/agent/extensions/`.
 
+## 2026-07-25
+
+### file-search/
+
+- Added first-class `fd` and `rg` tools with typed arguments, safe process
+  execution, bounded output, and prompt guidance that preserves jCodeMunch as
+  the primary source-code navigation tool.
+
 ## 2026-07-24
 
 ### btw.ts

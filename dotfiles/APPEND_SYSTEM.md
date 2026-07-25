@@ -79,8 +79,6 @@ reading for code exploration. Use the tools by role, not interchangeably.
 
 ## Preferred CLI tools
 
-- **ripgrep** (`rg`) is installed. Prefer over `grep` for searching file contents. Faster, respects `.gitignore`, and has sane defaults. Example: `rg "pattern"` instead of `grep -r "pattern"`.
-- **fd** is installed. Prefer over `find` for locating files by name or pattern. Simpler syntax, faster, respects `.gitignore`. Example: `fd "filename"` instead of `find . -name "filename"`.
 - **sd** is installed. Prefer over `sed` for find-and-replace in files. No escaping headaches. Example: `sd 'old' 'new' file.txt` instead of `sed -i '' 's/old/new/g' file.txt`.
 - **jq** is installed. Use for JSON processing in shell pipelines. Example: `curl -s api/endpoint | jq '.data[]'` to extract fields from JSON responses.
 - **yq** is installed. Use for YAML processing with the same syntax as jq. Example: `yq '.services.web.ports' docker-compose.yml` to query YAML configs.
