@@ -126,6 +126,15 @@ gh pr create --title "fix(cache): prevent stale Redis entries" \
 - If the repo is missing or returns 404 while git SSH works, check whether the repository's `.envrc` was supposed to switch `gh` to the correct account, then load it if needed before retrying.
 - If the wrong account is active after `.envrc` loads, switch explicitly with `gh auth switch` and then continue.
 
+### Jira routing
+
+- Before any Jira operation through `acli`, read
+  `~/.pi/agent/JIRA_ROUTING.local.md` and treat it as the source of truth for
+  account, site, and project routing.
+- If the local routing file is missing, unreadable, or does not resolve exactly
+  one destination for a write, stop and ask instead of inferring from ACLI's
+  currently active profile.
+
 ### Code style
 
 - Do **not** use emojis in code (strings, comments, log messages, docstrings).

@@ -71,6 +71,11 @@ into the published subagents npm package.
 | `auth.json.template` | Template for `auth.json` (provider API keys, created on first run) |
 | `mcp.json.template` | Template for `mcp.json` (MCP server configuration, created on first run) |
 
+Machine-specific Jira mappings belong in
+`~/.pi/agent/JIRA_ROUTING.local.md`. This local file is not installed, linked,
+or absorbed by `setup.mjs`; `AGENTS.md` directs agents to read it only for Jira
+operations.
+
 ## Extensions
 
 See the [root README Extensions section](../README.md#extensions-27) for the

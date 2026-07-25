@@ -354,6 +354,11 @@ default; pick one via `/settings` or set `"theme"` in your local
 | `auth.json.template` | Template for `auth.json` (provider API keys). Setup copies to live `~/.pi/agent/auth.json` on first run; never committed. |
 | `mcp.json.template` | Template for `mcp.json` (MCP server configuration). Setup copies to live `~/.pi/agent/mcp.json` on first run; never committed. |
 
+Machine-specific Jira mappings live in `~/.pi/agent/JIRA_ROUTING.local.md`,
+which is intentionally outside this repository and is not installed or synced
+by `setup.mjs`. The global `AGENTS.md` tells agents to read that file only when
+performing Jira operations.
+
 ### MCP servers
 
 Configured in `mcp.json` (created from template during setup):
