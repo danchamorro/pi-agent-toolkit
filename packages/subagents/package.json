@@ -1,6 +1,6 @@
 {
   "name": "@danchamorro/pi-subagents",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Background Pi sub-agents with optional interactive Herdr sessions, feedback handoff, and compact status visibility",
   "keywords": [
     "pi-package",

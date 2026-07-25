@@ -10,6 +10,8 @@ All notable changes to extensions in `~/.pi/agent/extensions/`.
 
 ### subagents package
 
+- Released `@danchamorro/pi-subagents` 0.8.0 with the interactive Herdr
+  backend and lifecycle hardening described below.
 - Replaced the per-child cmux design with one parent-owned Herdr session. On
   cmux, one helper surface hosts every child as a Herdr tab; outside cmux the
   same session runs headlessly.
