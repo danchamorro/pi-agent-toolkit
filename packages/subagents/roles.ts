@@ -324,6 +324,23 @@ function applyRoleOverrides(
   });
 }
 
+function parseOpenInHerdr(
+  settings: SubagentSettings,
+  diagnostics: SubagentRoleDiagnostic[],
+): boolean {
+  if (settings.openInHerdr === undefined) {
+    return false;
+  }
+  if (typeof settings.openInHerdr === "boolean") {
+    return settings.openInHerdr;
+  }
+  diagnostics.push({
+    level: "warning",
+    message: "Ignored invalid subagents.openInHerdr value; using false.",
+  });
+  return false;
+}
+
 function parseLimits(
   settings: SubagentSettings,
   diagnostics: SubagentRoleDiagnostic[],
@@ -380,6 +397,7 @@ export function loadSubagentRoles(options: RoleLoadOptions = {}): SubagentRoleLo
     roles: applyRoleOverrides(roles, settingsResult.settings, diagnostics),
     diagnostics,
     limits: parseLimits(settingsResult.settings, diagnostics),
+    openInHerdr: parseOpenInHerdr(settingsResult.settings, diagnostics),
   };
 }
 

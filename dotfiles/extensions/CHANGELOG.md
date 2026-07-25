@@ -2,6 +2,42 @@
 
 All notable changes to extensions in `~/.pi/agent/extensions/`.
 
+## 2026-07-24
+
+### btw.ts
+
+- Updated side-session creation for Pi 0.82's canonical model runtime API.
+
+### subagents package
+
+- Replaced the per-child cmux design with one parent-owned Herdr session. On
+  cmux, one helper surface hosts every child as a Herdr tab; outside cmux the
+  same session runs headlessly.
+- Close the owned Herdr session and cmux helper surface after the final child
+  finishes so the parent pane returns to full width.
+- Preserve final reports passed through `subagent_done`, preventing completed
+  interactive children from being misreported as missing an assistant response.
+- Harden interactive cleanup against rejected completion promises, disappearing
+  sidecars, failed terminal writes, and partial Herdr teardown failures.
+- Require Pi 0.82.0, preserve parent tool restrictions in every child, reclaim
+  provably owned orphaned Herdr sessions, and cancel pre-dispatch tab creation.
+- Prefer strict JSON-schema sampling for the required-only `subagent_done`
+  completion tool while retaining normal tool calling on unsupported models.
+- Fix shared cmux host relaunch and command submission, partial coordination
+  cleanup, shutdown status preservation, and per-session record retention.
+
+## 2026-07-23
+
+### subagents package
+
+- Added opt-in fully interactive external Pi children while retaining the
+  existing in-process default and parent controls.
+- Added parent-session-scoped persistence so separate Pi sessions in the same
+  cwd no longer load or overwrite each other's subagent records.
+- Preserved nonblocking launch, feedback/reply, stop, grouped completion,
+  concurrency, idle timeout, and graceful shutdown behavior across both
+  backends.
+
 ## 2026-07-01
 
 ### coach.ts, control.ts, find-session.ts, loop.ts, qna-interactive.ts

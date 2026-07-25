@@ -1,7 +1,7 @@
 {
   "name": "@danchamorro/pi-subagents",
   "version": "0.7.0",
-  "description": "In-process background sub-agents for Pi with role prompts, feedback handoff, and compact status visibility",
+  "description": "Background Pi sub-agents with optional interactive Herdr sessions, feedback handoff, and compact status visibility",
   "keywords": [
     "pi-package",
     "pi",
@@ -32,9 +32,9 @@
     ]
   },
   "peerDependencies": {
-    "@earendil-works/pi-ai": "*",
-    "@earendil-works/pi-coding-agent": "*",
-    "@earendil-works/pi-tui": "*",
+    "@earendil-works/pi-ai": ">=0.82.0",
+    "@earendil-works/pi-coding-agent": ">=0.82.0",
+    "@earendil-works/pi-tui": ">=0.82.0",
     "typebox": "*"
   }
 }

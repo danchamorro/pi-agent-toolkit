@@ -199,6 +199,21 @@ describe("loadSubagentRoles", () => {
     assert.deepEqual(result.diagnostics, []);
   });
 
+  it("parses the opt-in Herdr setting and rejects non-boolean values", () => {
+    const enabled = loadSubagentRoles({
+      agentDir,
+      settings: { openInHerdr: true },
+    });
+    assert.equal(enabled.openInHerdr, true);
+
+    const invalid = loadSubagentRoles({
+      agentDir,
+      settings: { openInHerdr: "yes" as unknown as boolean },
+    });
+    assert.equal(invalid.openInHerdr, false);
+    assert.ok(invalid.diagnostics.some((diagnostic) => /openInHerdr/u.test(diagnostic.message)));
+  });
+
   it("ignores invalid limit values with diagnostics and keeps safe defaults", () => {
     const result = loadSubagentRoles({
       agentDir,

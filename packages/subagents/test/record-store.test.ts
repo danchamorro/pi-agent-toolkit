@@ -4,10 +4,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, it } from "node:test";
 
-import { getSubagentRunsDir, persistSubagentRecord } from "../persistence.ts";
+import { getSubagentSessionRunsDir, persistSubagentRecord } from "../persistence.ts";
 import { SubagentStore } from "../record-store.ts";
 import type { SubagentRecord, SubagentRole, SubagentStatus } from "../types.ts";
 
+const PARENT_SESSION_ID = "parent-session-1";
 let testDir = "";
 let previousAgentDir: string | undefined;
 
@@ -16,6 +17,7 @@ function createRecord(
 ): SubagentRecord {
   const now = Date.now();
   return {
+    parentSessionId: overrides.parentSessionId ?? PARENT_SESSION_ID,
     name: overrides.name ?? overrides.id,
     task: overrides.task ?? "Task.",
     cwd: overrides.cwd ?? testDir,
@@ -31,8 +33,13 @@ function createRecord(
   };
 }
 
-function readPersisted(id: string): { activity: string; status: SubagentStatus } {
-  const parsed = JSON.parse(readFileSync(join(getSubagentRunsDir(), `${id}.json`), "utf8"));
+function readPersisted(
+  id: string,
+  parentSessionId = PARENT_SESSION_ID,
+): { activity: string; status: SubagentStatus } {
+  const parsed = JSON.parse(
+    readFileSync(join(getSubagentSessionRunsDir(parentSessionId), `${id}.json`), "utf8"),
+  );
   return { activity: parsed.activity, status: parsed.status };
 }
 
@@ -120,13 +127,13 @@ describe("SubagentStore", () => {
 
     const roles = new Map<string, SubagentRole>();
     const store = new SubagentStore(roles);
-    store.ensurePersistedLoaded(testDir);
+    store.beginParentSession(PARENT_SESSION_ID);
 
     assert.equal(store.get("sa-5")?.status, "interrupted");
     assert.equal(store.nextId(), "sa-6");
 
-    // A second call for the same cwd is a no-op.
-    store.ensurePersistedLoaded(testDir);
+    // A second call for the same parent session is a no-op.
+    assert.equal(store.beginParentSession(PARENT_SESSION_ID), false);
     assert.equal([...store.values()].length, 1);
   });
 
@@ -159,5 +166,28 @@ describe("SubagentStore", () => {
     record.activity = "after-flush";
     store.flushPending();
     assert.equal(readPersisted("sa-1").activity, "immediate");
+  });
+
+  it("clears records and isolates delayed writes when the parent session changes", () => {
+    const store = new SubagentStore(new Map());
+    store.beginParentSession(PARENT_SESSION_ID);
+    const first = createRecord({ id: store.nextId(), activity: "first" });
+    store.add(first);
+    first.activity = "first flushed";
+    store.scheduleActivityPersist(first);
+
+    assert.equal(store.beginParentSession("parent-session-2"), true);
+    assert.equal([...store.values()].length, 0);
+    assert.equal(store.nextId(), "sa-1");
+
+    const second = createRecord({
+      id: "sa-1",
+      parentSessionId: "parent-session-2",
+      activity: "second",
+    });
+    store.add(second);
+
+    assert.equal(readPersisted("sa-1").activity, "first flushed");
+    assert.equal(readPersisted("sa-1", "parent-session-2").activity, "second");
   });
 });

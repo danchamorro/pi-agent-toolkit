@@ -18,21 +18,18 @@
  *
  * Shortcut: none.
  *
- * Adds a small Claude Code-style sub-agent MVP. Sub-agents run as fresh
- * in-process Pi sessions without inheriting the main conversation transcript,
- * track status and activity in memory, can ask the main session for feedback
- * through an explicit tool, can use bundled planner/reviewer/scout/worker role
- * prompts, custom user role prompts, role settings overrides, and expose a
- * compact live status widget near the editor while background work is active.
- * Concurrency is bounded by a configurable soft cap (subagents.maxConcurrent),
- * and an optional idle auto-stop (subagents.idleTimeoutMinutes) can reap
- * sub-agents that stop producing activity.
+ * Runs sub-agents in fresh in-process Pi sessions by default, or optionally as
+ * fully interactive isolated Pi sessions in one parent-owned Herdr session. On
+ * cmux, one helper surface hosts the Herdr client while all children live in
+ * Herdr tabs. Children do not inherit the main conversation transcript, can ask the parent for
+ * feedback, use bundled or custom roles, and report through one compact status
+ * widget and grouped completion path. Concurrency and idle auto-stop remain
+ * shared across both backends.
  */
 
 import {
   createAgentSession,
   SessionManager,
-  type AgentSession,
   type AgentSessionEvent,
   type ExtensionAPI,
   type ExtensionCommandContext,
@@ -44,13 +41,12 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { type Api, type Model } from "@earendil-works/pi-ai";
 import { Text } from "@earendil-works/pi-tui";
+import { CmuxHerdrHostController, detectCmuxEnvironment } from "./cmux.ts";
+import { HerdrSessionController } from "./herdr.ts";
+import { runHerdrSubagent, type HerdrTerminalResult } from "./herdr-runner.ts";
 import { CompletionReporter } from "./completion-reporter.ts";
-import {
-  DEFAULT_TOOLS,
-  FEEDBACK_MESSAGE_TYPE,
-  SUBAGENT_MESSAGE_TYPE,
-  SUBAGENT_TOOL_NAMES,
-} from "./constants.ts";
+import { writeHerdrFeedbackResponse, writeHerdrStopControl } from "./herdr-controls.ts";
+import { FEEDBACK_MESSAGE_TYPE, SUBAGENT_MESSAGE_TYPE, SUBAGENT_TOOL_NAMES } from "./constants.ts";
 import { detailsForControl, detailsForRecord } from "./details.ts";
 import {
   deriveName,
@@ -61,10 +57,15 @@ import {
   singleLine,
   splitCommand,
 } from "./format.ts";
+import { createSubagentLaunchConfig, type SubagentLaunchConfig } from "./launch-config.ts";
 import { formatPathForDisplay, resolveSubagentCwd } from "./paths.ts";
 import { SubagentStore } from "./record-store.ts";
 import { ReloadSafeTimer } from "./reload-safe-timer.ts";
-import { createSubagentResourceLoader, formatToolPromptGuidelines } from "./resource-loader.ts";
+import {
+  buildSubagentSystemPrompt,
+  createSubagentResourceLoader,
+  formatToolPromptGuidelines,
+} from "./resource-loader.ts";
 import { loadSubagentRoles, parseStartArgs } from "./roles.ts";
 import {
   AskMainSessionParams,
@@ -108,6 +109,7 @@ import {
 
 const MIN_WIDGET_UPDATE_MS = 1_000;
 const MAX_WIDGET_UPDATE_MS = 4_000;
+const HERDR_GRACEFUL_STOP_TIMEOUT_MS = 5_000;
 const WIDGET_TIMER_KEY = Symbol.for("pi-agent-toolkit/subagents-widget-interval");
 
 function randomWidgetUpdateDelayMs(): number {
@@ -118,11 +120,17 @@ function randomWidgetUpdateDelayMs(): number {
 }
 
 function updateRecordContextUsage(record: SubagentRecord): void {
-  record.contextUsage = record.session?.getContextUsage();
+  if (record.session) {
+    record.contextUsage = record.session.getContextUsage();
+  }
 }
 
 function messageFromUnknownError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function delay(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
 function disposeSubagentSession(record: SubagentRecord): void {
@@ -132,16 +140,45 @@ function disposeSubagentSession(record: SubagentRecord): void {
   record.session = undefined;
 }
 
+export function resolveSubagentTools(
+  activeTools: readonly string[],
+  roleTools?: readonly string[],
+): string[] {
+  const activeSubagentTools = new Set(
+    activeTools.filter((toolName) => SUBAGENT_TOOL_NAMES.has(toolName)),
+  );
+  const requestedTools = roleTools ?? [...activeSubagentTools];
+  return [
+    ...new Set([
+      ...requestedTools.filter((toolName) => activeSubagentTools.has(toolName)),
+      "ask_main_session",
+    ]),
+  ];
+}
+
+export function shouldCloseIdleHerdrRuntime(
+  records: Iterable<Pick<SubagentRecord, "backend" | "status">>,
+): boolean {
+  return ![...records].some(
+    (record) => record.backend === "herdr" && !isFinishedStatus(record.status),
+  );
+}
+
 export default function (pi: ExtensionAPI) {
   const roleRegistry = loadSubagentRoles();
   const roles = roleRegistry.roles;
   const roleDiagnostics = roleRegistry.diagnostics;
   const limits = roleRegistry.limits;
+  const openInHerdr = roleRegistry.openInHerdr;
   const rolesByName = new Map(roles.map((role) => [role.name.toLowerCase(), role]));
   const store = new SubagentStore(rolesByName);
 
   let latestCtx: ExtensionContext | undefined;
   let latestInputStreamingBehavior: InputEvent["streamingBehavior"];
+  let herdrController: HerdrSessionController | undefined;
+  let cmuxHostController: CmuxHerdrHostController | undefined;
+  let herdrCleanupPromise: Promise<void> | undefined;
+  let attachCommandAnnounced = false;
   let startSubagentCalledThisTurn = false;
   let nonSubagentToolCalledThisTurn = false;
 
@@ -152,6 +189,96 @@ export default function (pi: ExtensionAPI) {
     post: (content, options) => postStatusMessage(content, options),
     getStreamingBehavior: () => latestInputStreamingBehavior,
   });
+
+  function detachHerdrRuntime(): {
+    controller: HerdrSessionController | undefined;
+    host: CmuxHerdrHostController | undefined;
+  } {
+    const runtime = {
+      controller: herdrController,
+      host: cmuxHostController,
+    };
+    herdrController = undefined;
+    cmuxHostController = undefined;
+    attachCommandAnnounced = false;
+    return runtime;
+  }
+
+  function addExternalDiagnostic(record: SubagentRecord, message: string): void {
+    record.externalDiagnostics ??= [];
+    if (record.externalDiagnostics.length < 20) {
+      record.externalDiagnostics.push(message.slice(0, 1_024));
+    }
+  }
+
+  function beginParentSession(ctx: ExtensionContext): void {
+    if (!store.beginParentSession(ctx.sessionManager.getSessionId())) {
+      return;
+    }
+    reporter.reset();
+    const previousHerdr = detachHerdrRuntime();
+    try {
+      previousHerdr.host?.closeHost();
+    } catch (error) {
+      postStatusMessage(
+        `Could not close the previous Herdr host: ${messageFromUnknownError(error)}`,
+      );
+    }
+    if (previousHerdr.controller) {
+      const trackedCleanup = previousHerdr.controller
+        .stopAndDelete()
+        .catch((error: unknown) => {
+          postStatusMessage(
+            `Could not stop the previous owned Herdr session: ${messageFromUnknownError(error)}`,
+          );
+        })
+        .finally(() => {
+          if (herdrCleanupPromise === trackedCleanup) {
+            herdrCleanupPromise = undefined;
+          }
+        });
+      herdrCleanupPromise = trackedCleanup;
+    }
+  }
+
+  function cleanupHerdrRuntimeIfIdle(record?: SubagentRecord): Promise<void> | undefined {
+    if (
+      herdrCleanupPromise ||
+      (!herdrController && !cmuxHostController) ||
+      !shouldCloseIdleHerdrRuntime(store.values())
+    ) {
+      return herdrCleanupPromise;
+    }
+
+    const ownedHerdr = detachHerdrRuntime();
+
+    try {
+      ownedHerdr.host?.closeHost();
+    } catch (error) {
+      const message = `Could not close the idle Herdr host: ${messageFromUnknownError(error)}`;
+      if (record) {
+        addExternalDiagnostic(record, message);
+      }
+      postStatusMessage(message);
+    }
+
+    const cleanup = ownedHerdr.controller?.stopAndDelete() ?? Promise.resolve();
+    const trackedCleanup = cleanup
+      .catch((error: unknown) => {
+        const message = `Could not stop the idle owned Herdr session: ${messageFromUnknownError(error)}`;
+        if (record) {
+          addExternalDiagnostic(record, message);
+        }
+        postStatusMessage(message);
+      })
+      .finally(() => {
+        if (herdrCleanupPromise === trackedCleanup) {
+          herdrCleanupPromise = undefined;
+        }
+      });
+    herdrCleanupPromise = trackedCleanup;
+    return trackedCleanup;
+  }
 
   function markActivity(record: SubagentRecord, activity: string): void {
     record.activity = singleLine(activity);
@@ -408,17 +535,27 @@ export default function (pi: ExtensionAPI) {
   }
 
   function getSubagentTools(record: SubagentRecord): string[] {
-    if (record.role) {
-      return [...new Set([...record.role.tools, "ask_main_session"])];
-    }
-
-    const activeTools = pi.getActiveTools().filter((name) => SUBAGENT_TOOL_NAMES.has(name));
-    const baseTools = activeTools.length > 0 ? activeTools : DEFAULT_TOOLS;
-    return [...new Set([...baseTools, "ask_main_session"])];
+    return resolveSubagentTools(pi.getActiveTools(), record.role?.tools);
   }
 
   function getSubagentToolPromptGuidelines(toolNames: string[]): string {
     return formatToolPromptGuidelines(pi.getAllTools(), toolNames);
+  }
+
+  function resolveSubagentLaunchConfig(
+    ctx: ExtensionContext,
+    record: SubagentRecord,
+  ): SubagentLaunchConfig {
+    const tools = getSubagentTools(record);
+    const toolPromptGuidelines = getSubagentToolPromptGuidelines(tools);
+    return createSubagentLaunchConfig({
+      record,
+      model: resolveSubagentModel(ctx, record.role),
+      thinkingLevel: record.role?.thinking ?? (pi.getThinkingLevel() as SessionThinkingLevel),
+      tools,
+      systemPrompt: buildSubagentSystemPrompt(ctx, record, toolPromptGuidelines),
+      openInHerdr,
+    });
   }
 
   function resolveSubagentModel(ctx: ExtensionContext, role?: SubagentRole): Model<Api> {
@@ -442,6 +579,7 @@ export default function (pi: ExtensionAPI) {
     const cwd = parsed.cwd ?? ctx.cwd;
     const record: SubagentRecord = {
       id: store.nextId(),
+      parentSessionId: ctx.sessionManager.getSessionId(),
       name: parsed.name,
       task: parsed.task,
       instructions: parsed.instructions,
@@ -479,12 +617,157 @@ export default function (pi: ExtensionAPI) {
   }
 
   async function runSubagent(record: SubagentRecord, ctx: ExtensionContext): Promise<void> {
+    let launch: SubagentLaunchConfig;
     try {
-      const model = resolveSubagentModel(ctx, record.role);
-      const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
+      launch = resolveSubagentLaunchConfig(ctx, record);
+      record.launchToken = launch.launchToken;
+    } catch (error) {
+      finishExternalSubagent(record, {
+        kind: "terminal",
+        status: "failed",
+        error: messageFromUnknownError(error),
+      });
+      return;
+    }
+
+    if (!launch.openInHerdr) {
+      await runInProcessSubagent(record, ctx, launch);
+      return;
+    }
+
+    if (herdrCleanupPromise) {
+      await herdrCleanupPromise;
+    }
+    if (isFinishedStatus(record.status)) {
+      return;
+    }
+    record.backend = "herdr";
+    record.externalLaunchAbort = new AbortController();
+    herdrController ??= new HerdrSessionController({
+      parentSessionId: launch.parentSessionId,
+    });
+    const cmuxEnvironment = detectCmuxEnvironment();
+    if (cmuxEnvironment) {
+      cmuxHostController ??= new CmuxHerdrHostController(cmuxEnvironment);
+    }
+    const terminal = await runHerdrSubagent({
+      launch,
+      controller: herdrController,
+      beforeDispatchSignal: record.externalLaunchAbort.signal,
+      async onServerReady(sessionName) {
+        if (cmuxHostController) {
+          await cmuxHostController.launchHost(sessionName);
+        } else if (!attachCommandAnnounced) {
+          attachCommandAnnounced = true;
+          postStatusMessage(
+            `Interactive sub-agents are running in Herdr. Attach with:\n\n${herdrController?.attachCommand()}`,
+          );
+        }
+      },
+      onPrepared(paths, child) {
+        record.runDirectory = paths.runDirectory;
+        record.childSessionPath = paths.session;
+        record.herdrSessionName = herdrController?.sessionName;
+        record.herdrWorkspaceId = child.workspaceId;
+        record.herdrTabId = child.tabId;
+        record.herdrPaneId = child.paneId;
+        record.dispatchState = "pending";
+        markActivity(record, "Created interactive Herdr child tab.");
+        store.persistNow(record);
+        updateStatusWidget();
+      },
+      onDispatch() {
+        record.dispatchState = "dispatched";
+        markActivity(record, "Launching interactive Pi child in Herdr.");
+        store.persistNow(record);
+        updateStatusWidget();
+      },
+      onActivity(activity) {
+        if (activity.contextUsage) {
+          record.contextUsage = activity.contextUsage;
+        }
+        if (activity.event === "session_start" || record.status === "starting") {
+          record.status = "running";
+          markActivity(record, "Interactive Pi child started in Herdr.");
+        } else if (activity.phase === "waiting") {
+          markActivity(record, "Interactive child is waiting for input.");
+        } else if (activity.message) {
+          markActivity(record, activity.message);
+        } else {
+          markActivity(record, `Interactive child: ${activity.event}.`);
+        }
+        updateStatusWidget();
+      },
+      onFeedbackRequest(request, paths) {
+        if (record.pendingFeedback?.id === request.requestId) {
+          return;
+        }
+        record.status = "waiting for feedback";
+        markActivity(record, `Waiting for feedback: ${request.question}`);
+        record.pendingFeedback = {
+          id: request.requestId,
+          question: request.question,
+          context: request.context,
+          requestedAt: request.requestedAt,
+          resolve(feedback) {
+            record.coordinationSequence = writeHerdrFeedbackResponse(
+              {
+                recordId: record.id,
+                launchToken: launch.launchToken,
+                runDirectory: paths.runDirectory,
+                sequence: record.coordinationSequence ?? 0,
+              },
+              request.requestId,
+              feedback,
+            );
+            record.pendingFeedback = undefined;
+            record.status = "running";
+            markActivity(record, "Received feedback from main session.");
+            store.persistNow(record);
+            updateStatusWidget();
+          },
+          cancel(reason) {
+            record.pendingFeedback = undefined;
+            markActivity(record, reason);
+            store.persistNow(record);
+            updateStatusWidget();
+          },
+        };
+        store.persistNow(record);
+        postFeedbackRequest(record, record.pendingFeedback);
+        updateStatusWidget();
+      },
+      onDiagnostic(message) {
+        addExternalDiagnostic(record, message);
+      },
+    });
+
+    record.externalLaunchAbort = undefined;
+    if (terminal.kind === "fallback") {
+      postStatusMessage(
+        `Could not open an interactive Herdr child for ${record.name} (${record.id}); using the in-process runner.\n\n${terminal.reason}`,
+      );
+      record.backend = undefined;
+      clearExternalRecordState(record);
+      await cleanupHerdrRuntimeIfIdle(record);
+      await runInProcessSubagent(record, ctx, launch);
+      return;
+    }
+
+    finishExternalSubagent(record, terminal);
+  }
+
+  async function runInProcessSubagent(
+    record: SubagentRecord,
+    ctx: ExtensionContext,
+    launch: SubagentLaunchConfig,
+  ): Promise<void> {
+    try {
+      record.backend = "in-process";
+      const auth = await ctx.modelRegistry.getApiKeyAndHeaders(launch.model);
       if (!auth.ok) {
         throw new Error(
-          auth.error || `No credentials available for ${model.provider}/${model.id}.`,
+          auth.error || `No credentials available for ${launch.model.provider}/${launch.model.id}.`,
         );
       }
 
@@ -494,20 +777,16 @@ export default function (pi: ExtensionAPI) {
           ? `Creating ${record.role.name} background Pi session.`
           : "Creating background Pi session.",
       );
-      const subagentTools = getSubagentTools(record);
       const { session } = await createAgentSession({
-        cwd: record.cwd,
-        sessionManager: SessionManager.inMemory(record.cwd),
-        model,
-        modelRegistry: ctx.modelRegistry as AgentSession["modelRegistry"],
-        thinkingLevel: record.role?.thinking ?? (pi.getThinkingLevel() as SessionThinkingLevel),
-        tools: subagentTools,
+        cwd: launch.cwd,
+        sessionManager: SessionManager.inMemory(launch.cwd),
+        model: launch.model,
+        thinkingLevel: launch.thinkingLevel,
+        tools: launch.tools,
         customTools: [createAskMainSessionTool(record) as unknown as ToolDefinition],
-        resourceLoader: createSubagentResourceLoader(
-          ctx,
-          record,
-          getSubagentToolPromptGuidelines(subagentTools),
-        ),
+        resourceLoader: createSubagentResourceLoader(ctx, record, {
+          systemPrompt: launch.systemPrompt,
+        }),
       });
 
       record.session = session;
@@ -518,7 +797,7 @@ export default function (pi: ExtensionAPI) {
       store.persistNow(record);
       updateStatusWidget();
 
-      await session.prompt(record.task, { source: "extension" });
+      await session.prompt(launch.task, { source: "extension" });
 
       if (isFinishedStatus(record.status)) {
         return;
@@ -565,8 +844,64 @@ export default function (pi: ExtensionAPI) {
     }
   }
 
+  function clearExternalRecordState(record: SubagentRecord): void {
+    record.runDirectory = undefined;
+    record.childSessionPath = undefined;
+    record.herdrSessionName = undefined;
+    record.herdrWorkspaceId = undefined;
+    record.herdrTabId = undefined;
+    record.herdrPaneId = undefined;
+    record.dispatchState = undefined;
+  }
+
+  function finishExternalSubagent(record: SubagentRecord, terminal: HerdrTerminalResult): void {
+    if (terminal.kind !== "terminal") {
+      return;
+    }
+    record.contextUsage = terminal.contextUsage ?? record.contextUsage;
+    if (isFinishedStatus(record.status)) {
+      clearExternalRecordState(record);
+      store.persistNow(record);
+      updateStatusWidget();
+      void cleanupHerdrRuntimeIfIdle(record);
+      return;
+    }
+    record.status = terminal.status;
+    record.terminalState = terminal.status;
+    record.result = terminal.result;
+    record.error = terminal.error;
+    record.finishedAt = Date.now();
+    record.pendingFeedback?.cancel("The sub-agent is no longer running.");
+    clearExternalRecordState(record);
+    markActivity(
+      record,
+      terminal.status === "completed"
+        ? "Completed."
+        : terminal.status === "failed"
+          ? "Failed."
+          : terminal.status === "stopped"
+            ? "Stopped."
+            : "Interrupted because the Herdr child tab closed.",
+    );
+    store.persistNow(record);
+    updateStatusWidget();
+
+    if (terminal.status === "completed") {
+      if (!reporter.queue(record) && record.notifyOnCompletion) {
+        postStatusMessage(`Sub-agent ${record.name} (${record.id}) completed.\n\n${record.result}`);
+      }
+    } else if (terminal.status === "failed") {
+      if (!reporter.queue(record) && record.notifyOnCompletion) {
+        postStatusMessage(`Sub-agent ${record.name} (${record.id}) failed.\n\n${record.error}`);
+      }
+    } else {
+      reporter.flush();
+    }
+    void cleanupHerdrRuntimeIfIdle(record);
+  }
+
   async function startSubagent(args: string, ctx: ExtensionCommandContext): Promise<void> {
-    store.ensurePersistedLoaded(ctx.cwd);
+    beginParentSession(ctx);
     const parsed = parseStartArgs(args, rolesByName);
     if (!parsed) {
       ctx.ui.notify("Usage: /subagent start <task> or /subagent start <role> <task>", "warning");
@@ -598,7 +933,7 @@ export default function (pi: ExtensionAPI) {
     },
     ctx: ExtensionContext,
   ): StartSubagentDetails {
-    store.ensurePersistedLoaded(ctx.cwd);
+    beginParentSession(ctx);
     const task = params.task.trim();
     if (!task) {
       return {
@@ -664,6 +999,10 @@ export default function (pi: ExtensionAPI) {
     }
 
     const stopReason = reason?.trim() || "Stopped by main session.";
+    if (record.backend === "herdr") {
+      return stopHerdrSubagentRecord(record, stopReason);
+    }
+
     record.status = "stopped";
     record.finishedAt = Date.now();
     record.pendingFeedback?.cancel(stopReason);
@@ -677,6 +1016,77 @@ export default function (pi: ExtensionAPI) {
       record.error = messageFromUnknownError(error);
     } finally {
       disposeSubagentSession(record);
+    }
+    reporter.flush();
+
+    return detailsForControl(
+      "stop",
+      "stopped",
+      record,
+      `Stopped sub-agent ${record.name} (${record.id}).`,
+    );
+  }
+
+  async function stopHerdrSubagentRecord(
+    record: SubagentRecord,
+    stopReason: string,
+  ): Promise<SubagentControlDetails> {
+    markActivity(record, `Stopping interactive child: ${stopReason}`);
+    store.persistNow(record);
+    updateStatusWidget();
+
+    let stopControlFailed = false;
+    if (record.dispatchState !== "dispatched") {
+      record.externalLaunchAbort?.abort();
+    } else if (record.runDirectory && record.launchToken) {
+      try {
+        record.coordinationSequence = writeHerdrStopControl(
+          {
+            recordId: record.id,
+            launchToken: record.launchToken,
+            runDirectory: record.runDirectory,
+            sequence: record.coordinationSequence ?? 0,
+          },
+          stopReason,
+        );
+      } catch (error) {
+        stopControlFailed = true;
+        record.externalDiagnostics ??= [];
+        record.externalDiagnostics.push(
+          `Could not send child stop control: ${messageFromUnknownError(error)}`,
+        );
+      }
+    }
+
+    const stoppedGracefully = stopControlFailed
+      ? false
+      : await Promise.race([
+          record.completion?.then(
+            () => true,
+            () => false,
+          ) ?? Promise.resolve(true),
+          delay(HERDR_GRACEFUL_STOP_TIMEOUT_MS).then(() => false),
+        ]);
+    if (!stoppedGracefully) {
+      record.status = "stopped";
+      record.terminalState = "stopped";
+      record.finishedAt = Date.now();
+      record.pendingFeedback?.cancel(stopReason);
+      markActivity(record, `${stopReason} Forced Herdr tab closure after timeout.`);
+      store.persistNow(record);
+      updateStatusWidget();
+      if (herdrController) {
+        try {
+          await herdrController.closeChild(record.id);
+        } catch (error) {
+          record.error = messageFromUnknownError(error);
+          store.persistNow(record);
+        }
+        await Promise.race([
+          record.completion?.catch(() => undefined) ?? Promise.resolve(),
+          delay(500),
+        ]);
+      }
     }
     reporter.flush();
 
@@ -703,7 +1113,11 @@ export default function (pi: ExtensionAPI) {
       );
     }
 
-    record.pendingFeedback.resolve(trimmedFeedback);
+    try {
+      record.pendingFeedback.resolve(trimmedFeedback);
+    } catch (error) {
+      return detailsForControl("reply", "error", record, undefined, messageFromUnknownError(error));
+    }
     return detailsForControl(
       "reply",
       "replied",
@@ -809,7 +1223,7 @@ export default function (pi: ExtensionAPI) {
   }
 
   function showStatusView(args: string, ctx: ExtensionCommandContext): void {
-    store.ensurePersistedLoaded(ctx.cwd);
+    beginParentSession(ctx);
     updateStatusWidget(ctx);
     const id = args.trim();
     if (!id) {
@@ -869,7 +1283,7 @@ export default function (pi: ExtensionAPI) {
       "Manage simple background sub-agents. Use `/subagent start <task>`, `/subagent start <role> <task>`, `/subagent agents`, `/subagent list`, `/subagent view [id]`, `/subagent stop <id>`, or `/subagent reply <id> <feedback>`.",
     handler: async (args, ctx) => {
       latestCtx = ctx;
-      store.ensurePersistedLoaded(ctx.cwd);
+      beginParentSession(ctx);
       const { command, rest } = splitCommand(args);
       switch (command) {
         case "start":
@@ -1111,7 +1525,7 @@ export default function (pi: ExtensionAPI) {
 
   pi.on("session_start", async (_event, ctx) => {
     latestCtx = ctx;
-    store.ensurePersistedLoaded(ctx.cwd);
+    beginParentSession(ctx);
     updateStatusWidget(ctx);
   });
 
@@ -1123,21 +1537,52 @@ export default function (pi: ExtensionAPI) {
     }
     widgetTimer.clear();
     reporter.reset();
-    for (const record of store.values()) {
-      if (isFinishedStatus(record.status)) {
-        continue;
+    const activeRecords = [...store.values()].filter((record) => !isFinishedStatus(record.status));
+    await Promise.all(
+      activeRecords.map(async (record) => {
+        if (record.backend === "herdr") {
+          await stopHerdrSubagentRecord(record, "The main Pi session shut down.");
+        } else {
+          try {
+            await record.session?.abort();
+          } catch (error) {
+            record.error = messageFromUnknownError(error);
+          }
+          disposeSubagentSession(record);
+        }
+        if (!isFinishedStatus(record.status)) {
+          record.status = "interrupted";
+          record.terminalState = "interrupted";
+          record.finishedAt = Date.now();
+          record.pendingFeedback?.cancel("The Pi session shut down before feedback arrived.");
+          markActivity(record, "Interrupted because the main session shut down.");
+          store.persistNow(record);
+        }
+      }),
+    );
+    const ownedHerdr = detachHerdrRuntime();
+    try {
+      await ownedHerdr.controller?.stopAndDelete();
+    } catch (error) {
+      if (ctx.hasUI) {
+        ctx.ui.notify(
+          `Could not stop the owned Herdr session: ${messageFromUnknownError(error)}`,
+          "error",
+        );
       }
-      record.status = "interrupted";
-      record.finishedAt = Date.now();
-      record.pendingFeedback?.cancel("The Pi session shut down before feedback arrived.");
-      markActivity(record, "Interrupted because the main session shut down.");
-      store.persistNow(record);
-      try {
-        await record.session?.abort();
-      } catch (error) {
-        record.error = messageFromUnknownError(error);
+    }
+    try {
+      ownedHerdr.host?.closeHost();
+    } catch (error) {
+      if (ctx.hasUI) {
+        ctx.ui.notify(
+          `Could not close the Herdr host surface: ${messageFromUnknownError(error)}`,
+          "error",
+        );
       }
-      disposeSubagentSession(record);
+    }
+    if (herdrCleanupPromise) {
+      await herdrCleanupPromise;
     }
     store.flushPending();
   });

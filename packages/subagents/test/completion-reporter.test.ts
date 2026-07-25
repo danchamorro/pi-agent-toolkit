@@ -26,6 +26,7 @@ function harness(initialBehavior: string | undefined = undefined) {
     overrides: Partial<SubagentRecord> & Pick<SubagentRecord, "id">,
   ): SubagentRecord {
     const record = {
+      parentSessionId: "parent-session",
       name: overrides.id,
       task: "Task.",
       cwd: "/repo",
@@ -72,6 +73,7 @@ describe("CompletionReporter", () => {
     await wait(150);
     assert.equal(posted.length, 1);
     assert.match(posted[0].content, /2 delegated sub-agents have finished/);
+    assert.match(posted[0].content, /Remove duplication, not detail\./);
     assert.match(posted[0].content, /BEGIN UNTRUSTED SUB-AGENT JSON DATA/);
     assert.match(posted[0].content, /Mapped\./);
     assert.match(posted[0].content, /Boom\./);
