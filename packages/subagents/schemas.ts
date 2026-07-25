@@ -1,5 +1,10 @@
 import { Type } from "typebox";
 
+export const PREFERRED_JSON_SCHEMA_SAMPLING = {
+  type: "json_schema",
+  strict: "prefer",
+} as const;
+
 export const AskMainSessionParams = Type.Object({
   question: Type.String({
     description: "The specific question or decision needed from the main session.",

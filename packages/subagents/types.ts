@@ -84,6 +84,7 @@ export type SubagentSettings = {
   agentOverrides?: Record<string, SubagentRoleOverride>;
   maxConcurrent?: number;
   idleTimeoutMinutes?: number;
+  openInHerdr?: boolean;
 };
 
 export type SubagentLimits = {
@@ -107,6 +108,7 @@ export type SubagentRoleLoadResult = {
   roles: SubagentRole[];
   diagnostics: SubagentRoleDiagnostic[];
   limits: SubagentLimits;
+  openInHerdr: boolean;
 };
 
 export type ParsedStartArgs = {
@@ -123,6 +125,7 @@ export type ParsedStartArgs = {
 
 export type SubagentRecord = {
   id: string;
+  parentSessionId: string;
   name: string;
   task: string;
   instructions?: string;
@@ -148,4 +151,17 @@ export type SubagentRecord = {
   notifyOnCompletion: boolean;
   reportCompletionToMain: boolean;
   completionGroupId?: string;
+  backend?: "in-process" | "herdr";
+  launchToken?: string;
+  herdrSessionName?: string;
+  herdrWorkspaceId?: string;
+  herdrTabId?: string;
+  herdrPaneId?: string;
+  runDirectory?: string;
+  childSessionPath?: string;
+  dispatchState?: "pending" | "dispatched";
+  terminalState?: "completed" | "failed" | "stopped" | "interrupted";
+  externalDiagnostics?: string[];
+  coordinationSequence?: number;
+  externalLaunchAbort?: AbortController;
 };

@@ -22,9 +22,10 @@ export type RecordLookup = { record?: SubagentRecord; error?: string };
  */
 export class SubagentStore {
   private readonly records = new Map<string, SubagentRecord>();
-  private readonly loadedPersistedCwds = new Set<string>();
   private readonly rolesByName: Map<string, SubagentRole>;
-  private readonly pendingPersist = new Set<string>();
+  private readonly pendingPersist = new Map<string, SubagentRecord>();
+  private currentParentSessionId: string | undefined;
+  private loadedCurrentSession = false;
   private nextSubagentNumber = 1;
   private persistTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -61,6 +62,10 @@ export class SubagentStore {
   }
 
   add(record: SubagentRecord): void {
+    if (this.currentParentSessionId && record.parentSessionId !== this.currentParentSessionId) {
+      throw new Error("Cannot add a sub-agent owned by another parent session.");
+    }
+    this.currentParentSessionId ??= record.parentSessionId;
     this.records.set(record.id, record);
     this.persistNow(record);
     // The run count only grows when a record is created, so prune here rather
@@ -68,15 +73,29 @@ export class SubagentStore {
     prunePersistedRecords();
   }
 
-  ensurePersistedLoaded(cwd: string): void {
-    if (this.loadedPersistedCwds.has(cwd)) {
-      return;
+  beginParentSession(parentSessionId: string): boolean {
+    if (!parentSessionId) {
+      throw new Error("Parent session id is required.");
     }
-    this.loadedPersistedCwds.add(cwd);
-    for (const record of loadPersistedSubagentRecords(this.rolesByName, { cwd })) {
+
+    const ownerChanged = this.currentParentSessionId !== parentSessionId;
+    if (ownerChanged) {
+      this.flushPending();
+      this.records.clear();
+      this.nextSubagentNumber = 1;
+      this.currentParentSessionId = parentSessionId;
+      this.loadedCurrentSession = false;
+    }
+    if (this.loadedCurrentSession) {
+      return ownerChanged;
+    }
+
+    for (const record of loadPersistedSubagentRecords(this.rolesByName, { parentSessionId })) {
       this.records.set(record.id, record);
       this.trackNextNumber(record.id);
     }
+    this.loadedCurrentSession = true;
+    return ownerChanged;
   }
 
   find(query: string): RecordLookup {
@@ -121,13 +140,13 @@ export class SubagentStore {
 
   /** Writes the record immediately and clears any debounced write for it. */
   persistNow(record: SubagentRecord): void {
-    this.pendingPersist.delete(record.id);
+    this.pendingPersist.delete(this.persistKey(record));
     persistSubagentRecord(record);
   }
 
   /** Coalesces frequent activity updates into one delayed write. */
   scheduleActivityPersist(record: SubagentRecord): void {
-    this.pendingPersist.add(record.id);
+    this.pendingPersist.set(this.persistKey(record), record);
     if (this.persistTimer) {
       return;
     }
@@ -143,13 +162,14 @@ export class SubagentStore {
       clearTimeout(this.persistTimer);
       this.persistTimer = null;
     }
-    for (const id of this.pendingPersist) {
-      const record = this.records.get(id);
-      if (record) {
-        persistSubagentRecord(record);
-      }
+    for (const record of this.pendingPersist.values()) {
+      persistSubagentRecord(record);
     }
     this.pendingPersist.clear();
+  }
+
+  private persistKey(record: SubagentRecord): string {
+    return `${record.parentSessionId}\0${record.id}`;
   }
 
   private trackNextNumber(id: string): void {

@@ -27,6 +27,7 @@ function record(
 ): SubagentRecord {
   return {
     id: overrides.id,
+    parentSessionId: overrides.parentSessionId ?? "parent-session",
     name: overrides.name,
     task: overrides.task ?? "Map the package source.",
     cwd: overrides.cwd ?? "/repo",

@@ -1,5 +1,53 @@
 # @danchamorro/pi-subagents Changelog
 
+## Unreleased
+
+### Added
+
+- Added opt-in `subagents.openInHerdr` support for fully interactive child Pi
+  sessions in one parent-owned named Herdr session.
+- Added an isolated child runtime and private atomic file protocol for activity,
+  feedback, stop, completion, and deterministic session result extraction.
+- Added unit and opt-in real-Herdr coverage for named parallel tabs, direct
+  child input, parent feedback, graceful stop, ID compaction, and cleanup.
+- Added one optional focus-safe cmux host surface for the complete Herdr UI;
+  outside cmux the same Herdr session runs headlessly with an attach command.
+- Added preferred provider-side strict JSON-schema sampling for the
+  strict-compatible `subagent_done` completion tool, with automatic fallback for
+  unsupported models.
+
+### Changed
+
+- Require Pi 0.82.0 or newer for the typed `agent_settled` lifecycle event.
+- Intersect role and ad-hoc child tools with the parent's active tool policy so
+  disabled parent tools cannot be re-enabled by delegation.
+- Shared launch resolution, limits, status, controls, persistence, and grouped
+  completion reporting across in-process and Herdr execution.
+- Close the owned Herdr session and optional cmux host after the final
+  interactive child reaches a terminal state, restoring the parent pane.
+- Scoped persisted records to the exact parent Pi session instead of cwd alone.
+  Concurrent sessions can now use the same cwd and `sa-N` ids without seeing or
+  overwriting one another.
+
+### Fixed
+
+- Fixed new same-cwd Pi sessions incorrectly displaying another session's
+  subagents as interrupted.
+- Retried cmux host and Herdr tab shell readiness so slow shell and direnv
+  startup cannot drop launch input or force an unnecessary fallback.
+- Suppressed isolated-child project trust prompts and preserved external-child
+  context usage through completion and stop reporting.
+- Preserve the required final result submitted through `subagent_done` so an
+  immediate child shutdown cannot produce a false missing-response failure.
+- Track session-switch cleanup, tolerate rejected completion promises during
+  forced stop, and continue Herdr deletion when server shutdown fails.
+- Treat sidecars removed between filesystem checks as missing and ensure child
+  completion write failures still dispose resources and shut down.
+- Recover a crashed parent's named Herdr session only when a private ownership
+  marker proves its owning process exited, without adopting foreign sessions.
+- Propagate pre-dispatch cancellation through Herdr child creation and release
+  child ownership even when topology cleanup fails.
+
 ## 0.7.0 - 2026-07-14
 
 ### Added

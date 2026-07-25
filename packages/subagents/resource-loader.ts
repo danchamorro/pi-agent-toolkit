@@ -26,12 +26,11 @@ export function formatToolPromptGuidelines(tools: ToolInfo[], enabledToolNames: 
   ].join("\n\n");
 }
 
-export function createSubagentResourceLoader(
-  ctx: ExtensionContext,
+export function buildSubagentSystemPrompt(
+  ctx: Pick<ExtensionContext, "getSystemPrompt">,
   record: SubagentRecord,
   toolPromptGuidelines = "",
-): ResourceLoader {
-  const extensionsResult = { extensions: [], errors: [], runtime: createExtensionRuntime() };
+): string {
   const mainSystemPrompt = stripDynamicSystemPromptFooter(ctx.getSystemPrompt());
   const subagentPrompt = [
     "You are a focused Pi sub-agent running in the background for the main session.",
@@ -65,16 +64,26 @@ export function createSubagentResourceLoader(
       ].join("\n\n")
     : "";
 
+  return [mainSystemPrompt, subagentPrompt, toolPromptGuidelines, rolePrompt, specializationPrompt]
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+export function createSubagentResourceLoader(
+  ctx: ExtensionContext,
+  record: SubagentRecord,
+  toolPromptGuidelines = "",
+  systemPrompt = buildSubagentSystemPrompt(ctx, record, toolPromptGuidelines),
+): ResourceLoader {
+  const extensionsResult = { extensions: [], errors: [], runtime: createExtensionRuntime() };
+
   return {
     getExtensions: () => extensionsResult,
     getSkills: () => ({ skills: [], diagnostics: [] }),
     getPrompts: () => ({ prompts: [], diagnostics: [] }),
     getThemes: () => ({ themes: [], diagnostics: [] }),
     getAgentsFiles: () => ({ agentsFiles: [] }),
-    getSystemPrompt: () =>
-      [mainSystemPrompt, subagentPrompt, toolPromptGuidelines, rolePrompt, specializationPrompt]
-        .filter(Boolean)
-        .join("\n\n"),
+    getSystemPrompt: () => systemPrompt,
     getAppendSystemPrompt: () => [],
     extendResources: () => {},
     reload: async () => {},

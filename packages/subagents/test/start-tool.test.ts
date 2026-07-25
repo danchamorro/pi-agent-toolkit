@@ -8,6 +8,7 @@ import subagentsExtension from "../index.ts";
 
 type RegisteredTool = {
   name: string;
+  constrainedSampling?: unknown;
   execute: (...args: unknown[]) => unknown;
 };
 
@@ -28,6 +29,8 @@ type ToolResult = {
 
 let testDir = "";
 let previousAgentDir: string | undefined;
+const sessionManager = { getSessionId: () => "parent-session" };
+const getSystemPrompt = () => "Main system prompt.";
 
 function neverResolve(): Promise<never> {
   return new Promise(() => undefined);
@@ -92,8 +95,17 @@ describe("start_subagent tool", () => {
     const startTool = tools.get("start_subagent");
     assert.ok(startTool);
 
-    return { events, startTool, sentMessages };
+    return { events, startTool, sentMessages, tools };
   }
+
+  it("keeps optional parent control parameters compatible with non-strict providers", () => {
+    const { tools } = createPiHarness();
+    for (const toolName of ["start_subagent", "stop_subagent", "reply_subagent"]) {
+      const tool = tools.get(toolName);
+      assert.ok(tool, `${toolName} is not registered`);
+      assert.equal(tool.constrainedSampling, undefined);
+    }
+  });
 
   it("returns immediately after launching the background record", async () => {
     let authRequested = false;
@@ -102,6 +114,8 @@ describe("start_subagent tool", () => {
     const ctx = {
       cwd: testDir,
       hasUI: false,
+      sessionManager,
+      getSystemPrompt,
       model,
       modelRegistry: {
         getApiKeyAndHeaders() {
@@ -142,6 +156,43 @@ describe("start_subagent tool", () => {
         clearTimeout(timeout);
       }
     }
+  });
+
+  it("resets records and ids when the parent Pi session changes", async () => {
+    const model = { provider: "test-provider", id: "test-model" };
+    const { events, startTool } = createPiHarness();
+    const sessionStartHandler = events.find((event) => event.type === "session_start")?.handler;
+    assert.ok(sessionStartHandler);
+
+    const createContext = (parentSessionId: string) => ({
+      cwd: testDir,
+      hasUI: false,
+      sessionManager: { getSessionId: () => parentSessionId },
+      getSystemPrompt,
+      model,
+      modelRegistry: {
+        getApiKeyAndHeaders: neverResolve,
+      },
+    });
+
+    const first = (await startTool.execute(
+      "tool-call-1",
+      { task: "First task." },
+      undefined,
+      undefined,
+      createContext("parent-session-1"),
+    )) as ToolResult;
+    await sessionStartHandler({ type: "session_start" }, createContext("parent-session-2"));
+    const second = (await startTool.execute(
+      "tool-call-2",
+      { task: "Second task." },
+      undefined,
+      undefined,
+      createContext("parent-session-2"),
+    )) as ToolResult;
+
+    assert.equal(first.details?.subagentId, "sa-1");
+    assert.equal(second.details?.subagentId, "sa-1");
   });
 
   it("blocks later sibling tools after start_subagent is called in the same turn", async () => {
@@ -204,6 +255,8 @@ describe("start_subagent tool", () => {
     const ctx = {
       cwd: testDir,
       hasUI: false,
+      sessionManager,
+      getSystemPrompt,
       model,
       modelRegistry: {
         getApiKeyAndHeaders() {
@@ -239,6 +292,8 @@ describe("start_subagent tool", () => {
     const ctx = {
       cwd: testDir,
       hasUI: false,
+      sessionManager,
+      getSystemPrompt,
       model,
       modelRegistry: {
         getApiKeyAndHeaders() {
@@ -282,6 +337,8 @@ describe("start_subagent tool", () => {
     const ctx = {
       cwd: testDir,
       hasUI: false,
+      sessionManager,
+      getSystemPrompt,
       model,
       modelRegistry: {
         getApiKeyAndHeaders() {
@@ -325,6 +382,8 @@ describe("start_subagent tool", () => {
     const ctx = {
       cwd: testDir,
       hasUI: false,
+      sessionManager,
+      getSystemPrompt,
       model,
       modelRegistry: {
         getApiKeyAndHeaders() {
@@ -368,6 +427,8 @@ describe("start_subagent tool", () => {
     const ctx = {
       cwd: testDir,
       hasUI: false,
+      sessionManager,
+      getSystemPrompt,
       model,
       modelRegistry: {
         getApiKeyAndHeaders() {

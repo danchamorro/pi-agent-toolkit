@@ -1,7 +1,9 @@
 # @danchamorro/pi-subagents
 
-Background sub-agents for Pi that run focused tasks in fresh in-process Pi
-sessions while the main session stays in control.
+Background sub-agents for Pi that run focused tasks while the main session
+stays in control. They use fresh in-process sessions by default and can
+optionally run fully interactive child Pi sessions in one isolated Herdr
+session.
 
 This package adds a practical delegation layer to Pi. You can start a scout to
 map unfamiliar code, ask a planner for an implementation plan, run a reviewer
@@ -24,6 +26,7 @@ burning the main session's remaining context.
 - [Custom Agents](#custom-agents)
 - [Role Settings](#role-settings)
 - [Session Limits](#session-limits)
+- [Interactive Herdr Session](#interactive-herdr-session)
 - [User Commands](#user-commands)
 - [Main-Agent Tools](#main-agent-tools)
 - [How It Works](#how-it-works)
@@ -37,9 +40,10 @@ burning the main session's remaining context.
 - **Fresh context for every child session.** Sub-agents run as new Pi sessions
   with a task-specific system prompt instead of inheriting the full parent
   transcript.
-- **In-process background execution.** Sub-agents run inside the current Pi
-  process. There are no extra terminal panes, shell jobs, or external services
-  to manage.
+- **Safe default plus interactive Herdr mode.** Sub-agents run in-process by
+  default. Opt-in Herdr mode launches real isolated Pi TUIs in one owned Herdr
+  session while preserving the same parent controls and completion reporting.
+  On cmux, one helper surface shows the complete Herdr UI.
 - **Visible but compact status.** A small below-editor widget shows active and
   recently finished sub-agents, elapsed time, cwd, latest activity, status, and
   context usage.
@@ -107,8 +111,9 @@ background and do not duplicate the scout's investigation yourself.
 
 ### Standalone Install
 
-Most users should install the package directly from npm. You do not need to
-clone `pi-agent-toolkit` or copy any files into your Pi config.
+Most users should install the package directly from npm. Pi 0.82.0 or newer is
+required. You do not need to clone `pi-agent-toolkit` or copy any files into
+your Pi config.
 
 ```bash
 pi install npm:@danchamorro/pi-subagents
@@ -193,7 +198,7 @@ Role files support these fields:
 |---|---|
 | `name` | Role name used by `/subagent start <role> <task>` and `start_subagent.role`. |
 | `description` | Short role description shown in `/subagent agents`. |
-| `tools` | Allowed Pi tools for that role. `ask_main_session` is added automatically. |
+| `tools` | Maximum Pi tools requested by that role. The child receives only tools also active in the parent; `ask_main_session` is added automatically. |
 | `model` | Optional `provider/model` override. If omitted, the child uses the active model. |
 | `thinking` | Optional thinking level override, including `off`. |
 | `auto-exit` | Tells the role to return a final result when the task is done. |
@@ -308,6 +313,54 @@ guards against runaway cost and provider rate limits. Idle auto-stop is opt-in
 so background work is never killed unless you ask for it. Invalid values are
 ignored with a warning in `/subagent agents` and the default is used.
 
+## Interactive Herdr Session
+
+Interactive children are opt-in and require [Herdr](https://herdr.dev/) 0.7.5
+or newer on `PATH`. Enable them in `~/.pi/agent/settings.json`:
+
+```json
+{
+  "subagents": {
+    "openInHerdr": true
+  }
+}
+```
+
+The extension creates one named Herdr session owned by the exact parent Pi
+session. Each cwd receives a Herdr workspace, and each child receives a named
+tab such as `sa-1: scout`. The child tab is a normal Pi TUI, so you can watch it,
+type follow-up prompts directly, or use `stop_subagent` and `reply_subagent`
+from the parent.
+
+When the parent runs inside cmux, the first child creates one non-focused helper
+surface containing the Herdr client. Every later child appears inside that same
+Herdr UI; the extension does not create another cmux tab per child. It never
+equalizes splits or resizes unrelated panes. Outside cmux, the owned Herdr
+server runs headlessly and the parent prints its `herdr session attach <name>`
+command. This keeps child orchestration cross-platform while retaining the
+single-surface cmux experience on macOS.
+
+The external child is intentionally isolated. Pi resource discovery is disabled
+for extensions, skills, prompt templates, themes, context files, and project
+trust prompts. The parent passes the resolved model, thinking level, tool
+allowlist, private task file, and exact private system prompt. Herdr receives
+only explicit argv, environment values, and private artifact paths; task and
+system-prompt contents are not interpolated into a shell command.
+
+If Herdr or terminal setup fails before the first `agent start` attempt, the
+package falls back once to the in-process runner. It never starts a duplicate
+fallback after agent dispatch may have occurred. Disabling `openInHerdr`
+restores the default in-process path.
+
+When the final interactive child finishes, fails, or stops, the extension stops
+and deletes its owned Herdr session and closes the optional cmux host so the
+parent pane returns to full width. A later child recreates both automatically.
+`/reload` and parent shutdown perform the same cleanup. An abrupt parent-process
+crash can leave the cmux host behind. The next launch reclaims a named Herdr
+session only when its private ownership marker proves that the previous owning
+process exited. The extension never adopts foreign sessions or deletes Herdr's
+default session.
+
 ## User Commands
 
 The package registers one slash command namespace: `/subagent`.
@@ -325,8 +378,9 @@ The package registers one slash command namespace: `/subagent`.
 | `/subagent stop <id>` | Stops a running or waiting sub-agent. |
 | `/subagent reply <id> <feedback>` | Sends feedback to a sub-agent waiting on `ask_main_session`. |
 
-Sub-agent ids are process-local and look like `sa-1`, `sa-2`, and so on. The
-command handlers accept exact ids and unambiguous prefixes.
+Sub-agent ids are parent-session-local and look like `sa-1`, `sa-2`, and so on.
+The command handlers accept exact ids and unambiguous prefixes. Records from a
+separate Pi session are never loaded merely because it uses the same cwd.
 
 ## Main-Agent Tools
 
@@ -359,34 +413,35 @@ the child runs, and the full result remains available through
 
 ## How It Works
 
-1. The package registers `/subagent`, the main-session tools, the child-only
-   `ask_main_session` tool, renderers, and lifecycle handlers in
-   [index.ts](index.ts#L875).
-2. When a sub-agent starts, the package creates an in-memory record with an id,
-   name, cwd, task, optional specialization instructions, status, activity text,
-   last activity time, context usage, and optional role.
-3. The child session is created with `SessionManager.inMemory(...)`, so subagent
-   conversation history is not persisted to disk. The package only persists
-   lightweight run metadata needed for reload recovery.
-4. On startup, the package reloads recent recoverable metadata for the current
-   cwd only. Active records from before reload are shown as `interrupted`; old
-   completed/stopped/failed records are not restored into new sessions.
-5. The child receives a task-specific system prompt built by
-   [resource-loader.ts](resource-loader.ts#L8). That prompt includes the launch
-   cwd, assigned task, optional role prompt, optional ephemeral specialization,
-   and the rule that the child does not have the parent transcript.
+1. The package registers `/subagent`, parent controls, renderers, and lifecycle
+   handlers in [index.ts](index.ts#L1).
+2. Each record is owned by the exact parent Pi session id. Lightweight recovery
+   metadata lives under that session's directory, so concurrent same-cwd
+   sessions cannot see or overwrite each other's `sa-N` records.
+3. The shared launch configuration resolves cwd, model, thinking, tools, task,
+   and the task-specific system prompt once for both execution backends.
+4. The default backend creates a fresh `SessionManager.inMemory(...)` child in
+   the parent process. It does not persist the child conversation.
+5. With Herdr enabled, the package starts a parent-owned named Herdr server,
+   creates a workspace/tab for the child, and uses Herdr's `agent start` with an
+   explicit Pi argv array. On cmux, one shared helper surface attaches to that
+   Herdr session.
 6. The child runs with a narrow tool set. Role tools are loaded from the role
-   file, and `ask_main_session` is added automatically.
-7. The status widget in [status-widget.ts](status-widget.ts#L117) refreshes
-   while work is active and keeps recently completed sub-agents visible for a
-   short time. Running records with no activity for a while show a `no recent
-   activity` hint.
-8. If the child calls `ask_main_session`, the main session receives a feedback
-   request and the child waits. The user can answer with `/subagent reply`, or
-   the main agent can call `reply_subagent`.
-9. On completion, failure, stop, or shutdown, the package records the final
-   status, captures the last context usage, cancels pending feedback, and
-   disposes the child session.
+   file, while `ask_main_session` and `subagent_done` are supplied by the
+   explicit child runtime extension. The required-only `subagent_done` tool
+   prefers provider-side strict JSON-schema sampling and falls back normally on
+   unsupported models. It requires the complete final result rather than relying
+   on another assistant turn before shutdown.
+7. Atomic, token-scoped files carry activity, feedback, stop, completion, and
+   explicit completion results between parent and child. Malformed, oversized,
+   stale, or mismatched files never mutate another record.
+8. The status widget refreshes while work is active and keeps recent terminal
+   records visible. Tool-launched results still flow through one grouped hidden
+   completion report.
+9. On completion, failure, stop, or interruption, the parent records final
+   status, cancels pending feedback, and removes private run artifacts. After
+   the final interactive child reaches a terminal state, it stops/deletes the
+   named Herdr session and closes its optional cmux host.
 
 ## Examples
 
@@ -473,6 +528,18 @@ pi --offline --mode json --no-session --no-extensions \
   -p "/subagent agents"
 ```
 
+Real Herdr integration tests are opt-in because they create temporary named
+sessions and the model-backed cases make live provider requests:
+
+```bash
+PI_SUBAGENTS_REAL_HERDR=1 \
+PI_SUBAGENTS_REAL_MODEL=xai/grok-4.5 \
+node --test packages/subagents/test/herdr-integration.test.ts
+```
+
+The harness uses a unique named Herdr session, never touches the default
+session, and stops/deletes every session and workspace it creates.
+
 Recommended validation before committing package changes:
 
 ```bash
@@ -489,21 +556,26 @@ developing this package from a checkout.
 
 ## Current Scope
 
-This package is intentionally small and in-process.
-
-- Sub-agent records are process-local and in-memory, with lightweight metadata
-  persisted only for same-cwd reload recovery. Frequent activity updates are
-  written on a short debounce to keep streaming off the synchronous disk path.
-- Full sub-agent conversation history is not persisted across Pi shutdown.
-- Sub-agents do not open separate terminal panes or external workers.
+- In-process execution remains the default. Interactive Herdr mode is opt-in
+  and requires Herdr 0.7.5 or newer.
+- Recovery metadata is scoped to the owning parent Pi session. Full in-process
+  child conversations are not persisted.
+- External child JSONL and coordination files are private and deleted
+  immediately after bounded result extraction. Transcript retention and
+  automatic orphan adoption are not supported.
 - Concurrency is bounded by `subagents.maxConcurrent` (default 5), and idle
-  auto-stop (`subagents.idleTimeoutMinutes`) is opt-in. Idle auto-stop applies
-  to interactive sessions while the status widget is refreshing.
-- Running sub-agents are marked interrupted when the main Pi session shuts down.
-- A reload picks up source changes for newly started sub-agents, but it does
-  not rewrite the code already executing inside an active child session.
-- The package does not try to route sub-agents across arbitrary directories. If
-  the cwd is unclear, the child should ask for direction.
+  auto-stop (`subagents.idleTimeoutMinutes`) is opt-in.
+- The final terminal external child triggers owned Herdr-session and optional
+  cmux-host cleanup. Graceful parent shutdown performs the same cleanup. Abrupt
+  process death has no heartbeat cleanup and can leave an orphaned session.
+- On cmux, layout changes are limited to one right-side Herdr host surface. All
+  child tabs live inside Herdr. The package never equalizes workspace splits.
+- Outside cmux, Herdr runs headlessly and reports an attach command instead of
+  attempting terminal-emulator-specific automation.
+- Dynamic model providers available only through a parent-loaded extension are
+  unavailable to isolated external children; their exact child error is shown.
+- The package does not route sub-agents across arbitrary directories. If the cwd
+  is unclear, the child should ask for direction.
 
 These boundaries keep the feature predictable while the package matures.
 
@@ -511,14 +583,20 @@ These boundaries keep the feature predictable while the package matures.
 
 | File | Responsibility |
 |---|---|
-| [index.ts](index.ts#L1) | Extension entrypoint: command/tool registration, runner lifecycle, status widget, concurrency/idle limits, and session cleanup. |
+| [index.ts](index.ts#L1) | Parent extension entrypoint: command/tool registration, backend selection, controls, status, completion, and shutdown. |
+| [child-runtime.ts](child-runtime.ts#L1) | Explicit isolated-child extension for activity, feedback, stop, completion, and session naming. |
+| [herdr.ts](herdr.ts#L1) | Parent-owned named Herdr server, workspace/tab topology, agent launch, ID re-resolution, and cleanup. |
+| [herdr-runner.ts](herdr-runner.ts#L1) | Child artifacts, dispatch boundary, coordination supervision, result extraction, and cleanup. |
+| [cmux.ts](cmux.ts#L1) | Optional focus-safe single-surface host for the Herdr client. |
+| [coordination.ts](coordination.ts#L1), [herdr-controls.ts](herdr-controls.ts#L1) | Private atomic file protocol and token-scoped parent controls. |
+| [launch-config.ts](launch-config.ts#L1) | Shared resolved launch decisions used by both execution backends. |
 | [agents/](agents/) | Bundled role prompts for planner, scout, reviewer, and worker. |
 | [roles.ts](roles.ts#L1) | Built-in/custom role loading, settings overrides and limits, frontmatter validation, and `/subagent start` argument parsing. |
 | [record-store.ts](record-store.ts#L1) | In-memory sub-agent record store: id allocation, lookups, recovery loading, and debounced/eager persistence scheduling. |
 | [completion-reporter.ts](completion-reporter.ts#L1) | Batches tool-launched completions into one hidden main-session report and captures streaming-aware delivery at launch time. |
 | [reload-safe-timer.ts](reload-safe-timer.ts#L1) | Single live status-widget refresh timer that survives Pi hot reloads. |
 | [resource-loader.ts](resource-loader.ts#L1) | Builds the child session resources and task-specific system prompt. |
-| [persistence.ts](persistence.ts#L1) | Persists lightweight same-cwd recovery metadata and prunes old runs cheaply. |
+| [persistence.ts](persistence.ts#L1) | Persists parent-session-scoped recovery metadata and prunes old runs cheaply. |
 | [status-widget.ts](status-widget.ts#L1) | Compact below-editor status widget for active and recent sub-agents. |
 | [views.ts](views.ts#L1) | `/subagent list`, `/subagent agents`, and `/subagent view` text formatting. |
 | [tool-rendering.ts](tool-rendering.ts#L1) | Compact and expanded rendering for main-agent tool calls/results. |

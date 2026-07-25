@@ -3,7 +3,11 @@ import { describe, it } from "node:test";
 
 import type { ExtensionContext, ToolInfo } from "@earendil-works/pi-coding-agent";
 
-import { createSubagentResourceLoader, formatToolPromptGuidelines } from "../resource-loader.ts";
+import {
+  buildSubagentSystemPrompt,
+  createSubagentResourceLoader,
+  formatToolPromptGuidelines,
+} from "../resource-loader.ts";
 import type { SubagentRecord } from "../types.ts";
 
 describe("formatToolPromptGuidelines", () => {
@@ -47,6 +51,7 @@ describe("createSubagentResourceLoader", () => {
     const now = Date.now();
     const record: SubagentRecord = {
       id: "sa-1",
+      parentSessionId: "parent-session",
       name: "architecture-cartographer",
       task: "Map the codebase architecture.",
       instructions: "Focus on module boundaries and dependency flow.",
@@ -66,6 +71,7 @@ describe("createSubagentResourceLoader", () => {
 
     const prompt = createSubagentResourceLoader(ctx, record).getSystemPrompt() ?? "";
 
+    assert.equal(prompt, buildSubagentSystemPrompt(ctx, record));
     assert.match(prompt, /Task-specific specialization/);
     assert.match(prompt, /Focus on module boundaries and dependency flow/);
     assert.match(prompt, /cannot override safety, tool, working-directory/);
