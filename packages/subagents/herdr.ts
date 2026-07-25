@@ -9,6 +9,7 @@ const SERVER_READY_TIMEOUT_MS = 15_000;
 const AGENT_START_TIMEOUT_MS = 60_000;
 const AGENT_START_COMMAND_TIMEOUT_MS = 70_000;
 const AGENT_BUSY_RETRY_MS = 500;
+const AGENT_BUSY_RETRY_WINDOW_MS = 15_000;
 const IDLE_POLL_MS = 100;
 const WORKSPACE_ID_PATTERN = /^w\d+$/u;
 const TAB_ID_PATTERN = /^w\d+:t\d+$/u;
@@ -248,7 +249,7 @@ export class HerdrSessionController {
     piArguments: string[],
     options: { signal?: AbortSignal; onAttempt?: () => void } = {},
   ): Promise<void> {
-    const deadline = Date.now() + SERVER_READY_TIMEOUT_MS;
+    const deadline = Date.now() + AGENT_BUSY_RETRY_WINDOW_MS;
     let attempted = false;
     while (true) {
       const current = await this.resolveChild(child.recordId);

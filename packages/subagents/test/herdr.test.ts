@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, it } from "node:test";
+import { afterEach, beforeEach, describe, it } from "node:test";
 
 import {
   deriveHerdrSessionName,
@@ -22,8 +22,17 @@ describe("deriveHerdrSessionName", () => {
 });
 
 describe("HerdrSessionController", () => {
+  let ownershipRoot = "";
+
+  beforeEach(() => {
+    ownershipRoot = mkdtempSync(join(tmpdir(), "pi-subagents-herdr-owner-"));
+  });
+
+  afterEach(() => {
+    rmSync(ownershipRoot, { recursive: true, force: true });
+  });
+
   it("starts an unavailable named server and waits for its API", async () => {
-    const ownershipRoot = mkdtempSync(join(tmpdir(), "pi-subagents-herdr-owner-"));
     let running = false;
     let starts = 0;
     let startedSession = "";
@@ -45,17 +54,12 @@ describe("HerdrSessionController", () => {
       ownershipRoot,
     });
 
-    try {
-      await Promise.all([controller.ensureServer(), controller.ensureServer()]);
-      assert.equal(starts, 1);
-      assert.equal(startedSession, controller.sessionName);
-    } finally {
-      rmSync(ownershipRoot, { recursive: true, force: true });
-    }
+    await Promise.all([controller.ensureServer(), controller.ensureServer()]);
+    assert.equal(starts, 1);
+    assert.equal(startedSession, controller.sessionName);
   });
 
   it("recovers only an owned session whose parent process exited", async () => {
-    const ownershipRoot = mkdtempSync(join(tmpdir(), "pi-subagents-herdr-owner-"));
     const sessionName = deriveHerdrSessionName("parent");
     mkdirSync(ownershipRoot, { recursive: true });
     writeFileSync(
@@ -94,17 +98,12 @@ describe("HerdrSessionController", () => {
       ownershipRoot,
     });
 
-    try {
-      await controller.ensureServer();
-      assert.equal(starts, 1);
-      assert.equal(deletes, 1);
-    } finally {
-      rmSync(ownershipRoot, { recursive: true, force: true });
-    }
+    await controller.ensureServer();
+    assert.equal(starts, 1);
+    assert.equal(deletes, 1);
   });
 
   it("refuses to adopt a pre-existing named session", async () => {
-    const ownershipRoot = mkdtempSync(join(tmpdir(), "pi-subagents-herdr-owner-"));
     const controller = new HerdrSessionController({
       parentSessionId: "parent",
       run: async () => response({ type: "workspace_list", workspaces: [] }),
@@ -112,11 +111,7 @@ describe("HerdrSessionController", () => {
       ownershipRoot,
     });
 
-    try {
-      await assert.rejects(controller.ensureServer(), /Refusing to adopt/u);
-    } finally {
-      rmSync(ownershipRoot, { recursive: true, force: true });
-    }
+    await assert.rejects(controller.ensureServer(), /Refusing to adopt/u);
   });
 
   it("does not treat arbitrary Herdr errors as an absent session", async () => {
@@ -126,6 +121,7 @@ describe("HerdrSessionController", () => {
         throw new HerdrCommandError("permission denied");
       },
       startServer: async () => assert.fail("must not start"),
+      ownershipRoot,
     });
 
     await assert.rejects(controller.ensureServer(), /permission denied/u);
@@ -137,6 +133,7 @@ describe("HerdrSessionController", () => {
       parentSessionId: "parent",
       run: fake.run,
       startServer: async () => {},
+      ownershipRoot,
     });
     const environment = { PI_SUBAGENT_RUN_DIR: "/private/run" };
 
@@ -187,6 +184,7 @@ describe("HerdrSessionController", () => {
         });
       },
       startServer: async () => {},
+      ownershipRoot,
     });
 
     const creating = controller.createChild("sa-1", "worker", "/repo", {}, abort.signal);
@@ -211,6 +209,7 @@ describe("HerdrSessionController", () => {
         return await fake.run(args, options);
       },
       startServer: async () => {},
+      ownershipRoot,
     });
     await controller.createChild("sa-1", "worker", "/repo", {});
     failWorkspaceList = true;
@@ -228,6 +227,7 @@ describe("HerdrSessionController", () => {
       parentSessionId: "parent",
       run: fake.run,
       startServer: async () => {},
+      ownershipRoot,
     });
     const child = await controller.createChild("sa-1", "worker", "/repo", {});
     let attempts = 0;
@@ -254,6 +254,7 @@ describe("HerdrSessionController", () => {
         deleteAttempted = true;
         throw new Error("delete failed");
       },
+      ownershipRoot,
     });
 
     await assert.rejects(controller.stopAndDelete(), (error: unknown) => {
@@ -269,6 +270,7 @@ describe("HerdrSessionController", () => {
       parentSessionId: "parent",
       run: async () => assert.fail("must not call Herdr"),
       startServer: async () => {},
+      ownershipRoot,
     });
 
     await assert.rejects(controller.childExists("sa-99"), /unowned/u);

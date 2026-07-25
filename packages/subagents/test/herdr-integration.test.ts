@@ -103,6 +103,7 @@ describe("real Herdr lifecycle", () => {
       launch.task =
         "Call ask_main_session with the exact question 'Need code?'. After the reply, respond with exactly FEEDBACK_ followed by the feedback value. Then wait for direct input.";
       let feedbackRequests = 0;
+      let coordinationSequence = 0;
       const firstRun = runHerdrSubagent({
         launch,
         controller,
@@ -113,11 +114,12 @@ describe("real Herdr lifecycle", () => {
             version: COORDINATION_VERSION,
             recordId: launch.recordId,
             launchToken: launch.launchToken,
-            sequence: 0,
+            sequence: coordinationSequence,
             requestId: request.requestId,
             response: "42",
             respondedAt: Date.now(),
           });
+          coordinationSequence += 1;
         },
       });
       const cli = createHerdrRunner(controller.sessionName);

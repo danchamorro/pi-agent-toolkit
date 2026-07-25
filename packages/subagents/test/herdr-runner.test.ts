@@ -90,6 +90,22 @@ describe("runHerdrSubagent", () => {
     assert.equal(dispatched, false);
   });
 
+  it("cleans a partially written coordination run when setup fails", async () => {
+    const launch = createLaunch();
+    const paths = createPaths(launch);
+    rmSync(paths.runDirectory, { recursive: true, force: true });
+    launch.systemPrompt = Symbol("invalid prompt") as unknown as string;
+
+    const result = await runHerdrSubagent({
+      launch,
+      controller: createController(),
+      agentDir: testDir,
+    });
+
+    assert.equal(result.kind, "fallback");
+    assert.equal(existsSync(paths.runDirectory), false);
+  });
+
   it("never falls back after agent dispatch may have occurred", async () => {
     const controller = createController();
     controller.startAgent = async (_child, _args, options) => {

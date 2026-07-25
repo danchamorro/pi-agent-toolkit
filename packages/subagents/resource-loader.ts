@@ -72,9 +72,11 @@ export function buildSubagentSystemPrompt(
 export function createSubagentResourceLoader(
   ctx: ExtensionContext,
   record: SubagentRecord,
-  toolPromptGuidelines = "",
-  systemPrompt = buildSubagentSystemPrompt(ctx, record, toolPromptGuidelines),
+  options: { toolPromptGuidelines?: string; systemPrompt?: string } = {},
 ): ResourceLoader {
+  const toolPromptGuidelines = options.toolPromptGuidelines ?? "";
+  const systemPrompt =
+    options.systemPrompt ?? buildSubagentSystemPrompt(ctx, record, toolPromptGuidelines);
   const extensionsResult = { extensions: [], errors: [], runtime: createExtensionRuntime() };
 
   return {

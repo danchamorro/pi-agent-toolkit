@@ -1,6 +1,9 @@
-import { join } from "node:path";
-
-import { COORDINATION_VERSION, writeCoordinationJson } from "./coordination.ts";
+import {
+  COORDINATION_VERSION,
+  getControlPath,
+  getFeedbackResponsePath,
+  writeCoordinationJson,
+} from "./coordination.ts";
 
 export type HerdrCoordinationTarget = {
   recordId: string;
@@ -14,10 +17,7 @@ export function writeHerdrFeedbackResponse(
   requestId: string,
   feedback: string,
 ): number {
-  if (!/^[a-zA-Z0-9-]+$/u.test(requestId)) {
-    throw new Error("Invalid feedback request id.");
-  }
-  writeCoordinationJson(join(target.runDirectory, `feedback-response-${requestId}.json`), {
+  writeCoordinationJson(getFeedbackResponsePath(target.runDirectory, requestId), {
     version: COORDINATION_VERSION,
     recordId: target.recordId,
     launchToken: target.launchToken,
@@ -30,7 +30,7 @@ export function writeHerdrFeedbackResponse(
 }
 
 export function writeHerdrStopControl(target: HerdrCoordinationTarget, reason: string): number {
-  writeCoordinationJson(join(target.runDirectory, "control.json"), {
+  writeCoordinationJson(getControlPath(target.runDirectory), {
     version: COORDINATION_VERSION,
     recordId: target.recordId,
     launchToken: target.launchToken,

@@ -72,12 +72,11 @@ export async function runHerdrSubagent(options: HerdrRunOptions): Promise<HerdrT
     launchToken: options.launch.launchToken,
     agentDir: options.agentDir,
   });
-  writePrivateText(paths.task, `${options.launch.task}\n`);
-  writePrivateText(paths.systemPrompt, options.launch.systemPrompt);
-
   let child: HerdrChild | undefined;
   let dispatchAttempted = false;
   try {
+    writePrivateText(paths.task, `${options.launch.task}\n`);
+    writePrivateText(paths.systemPrompt, options.launch.systemPrompt);
     await options.controller.ensureServer(options.beforeDispatchSignal);
     child = await options.controller.createChild(
       options.launch.recordId,
@@ -135,9 +134,6 @@ export async function runHerdrSubagent(options: HerdrRunOptions): Promise<HerdrT
     ]);
     if (first.kind === "terminal") {
       return first.terminal;
-    }
-    if (first.kind === "started") {
-      return await watch;
     }
     return await watch;
   } catch (error) {

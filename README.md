@@ -154,7 +154,7 @@ pi install git:github.com/DietrichGebert/ponytail
 
 | Package | Description | npm |
 |---|---|---|
-| [subagents](packages/subagents) | Run focused background sub-agents in-process or as interactive tabs in one Herdr session, with bundled roles and main-session feedback handoff | [![npm](https://img.shields.io/npm/v/@danchamorro/pi-subagents)](https://www.npmjs.com/package/@danchamorro/pi-subagents) |
+| [subagents](packages/subagents) | Run focused background sub-agents in-process or, when enabled via `subagents.openInHerdr`, as interactive tabs in one Herdr session, with bundled roles and main-session feedback handoff | [![npm](https://img.shields.io/npm/v/@danchamorro/pi-subagents)](https://www.npmjs.com/package/@danchamorro/pi-subagents) |
 | [agent-modes](packages/agent-modes) | Switch between code, architect, debug, ask, and review modes with enforced tool restrictions, bash allowlists, and per-mode model assignment | [![npm](https://img.shields.io/npm/v/@danchamorro/pi-agent-modes)](https://www.npmjs.com/package/@danchamorro/pi-agent-modes) |
 | [prompt-enhancer](packages/prompt-enhancer) | Rewrite prompts to be clearer and more actionable before sending | [![npm](https://img.shields.io/npm/v/@danchamorro/pi-prompt-enhancer)](https://www.npmjs.com/package/@danchamorro/pi-prompt-enhancer) |
 

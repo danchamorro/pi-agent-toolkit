@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, it } from "node:test";
@@ -9,6 +9,7 @@ import {
   getSubagentSessionRunsDir,
   loadPersistedSubagentRecords,
   persistSubagentRecord,
+  prunePersistedRecords,
 } from "../persistence.ts";
 import type { SubagentRecord } from "../types.ts";
 
@@ -121,6 +122,28 @@ describe("sub-agent persistence", () => {
       now,
     });
     assert.equal(loaded.length, 0);
+  });
+
+  it("retains records independently per parent session", () => {
+    const runsDir = getSubagentRunsDir();
+    const firstSessionDir = getSubagentSessionRunsDir(PARENT_SESSION_ID);
+    const secondSessionDir = getSubagentSessionRunsDir("parent-session-2");
+    const emptySessionDir = join(runsDir, "empty-session");
+    for (const directory of [runsDir, firstSessionDir, secondSessionDir, emptySessionDir]) {
+      mkdirSync(directory, { recursive: true });
+    }
+    for (let index = 0; index < 101; index += 1) {
+      writeFileSync(join(runsDir, `legacy-${index}.json`), "{}\n");
+      writeFileSync(join(firstSessionDir, `sa-${index}.json`), "{}\n");
+      writeFileSync(join(secondSessionDir, `sa-${index}.json`), "{}\n");
+    }
+
+    prunePersistedRecords(runsDir);
+
+    assert.equal(readdirSync(runsDir).filter((fileName) => fileName.endsWith(".json")).length, 100);
+    assert.equal(readdirSync(firstSessionDir).length, 100);
+    assert.equal(readdirSync(secondSessionDir).length, 100);
+    assert.equal(existsSync(emptySessionDir), false);
   });
 });
 

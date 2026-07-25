@@ -209,34 +209,40 @@ export function prunePersistedRecords(runsDir = getSubagentRunsDir()): void {
     return;
   }
 
-  const paths: string[] = [];
+  const groups: Array<{ directory?: string; paths: string[] }> = [{ paths: [] }];
   for (const entry of readdirSync(runsDir, { withFileTypes: true })) {
     const path = join(runsDir, entry.name);
     if (entry.isFile() && entry.name.endsWith(".json")) {
-      paths.push(path);
+      groups[0].paths.push(path);
       continue;
     }
     if (!entry.isDirectory()) {
       continue;
     }
-    for (const fileName of readdirSync(path)) {
-      if (fileName.endsWith(".json")) {
-        paths.push(join(path, fileName));
-      }
-    }
+    groups.push({
+      directory: path,
+      paths: readdirSync(path)
+        .filter((fileName) => fileName.endsWith(".json"))
+        .map((fileName) => join(path, fileName)),
+    });
   }
 
-  const entries = paths
-    .map((path) => {
-      try {
-        return { path, mtimeMs: statSync(path).mtimeMs };
-      } catch {
-        return { path, mtimeMs: 0 };
-      }
-    })
-    .sort((a, b) => b.mtimeMs - a.mtimeMs);
+  for (const group of groups) {
+    const entries = group.paths
+      .map((path) => {
+        try {
+          return { path, mtimeMs: statSync(path).mtimeMs };
+        } catch {
+          return { path, mtimeMs: 0 };
+        }
+      })
+      .sort((a, b) => b.mtimeMs - a.mtimeMs);
 
-  for (const entry of entries.slice(RETAIN_RUN_COUNT)) {
-    rmSync(entry.path, { force: true });
+    for (const entry of entries.slice(RETAIN_RUN_COUNT)) {
+      rmSync(entry.path, { force: true });
+    }
+    if (group.directory && readdirSync(group.directory).length === 0) {
+      rmSync(group.directory, { recursive: true, force: true });
+    }
   }
 }

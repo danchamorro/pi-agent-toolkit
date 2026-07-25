@@ -162,7 +162,7 @@ export class CmuxHerdrHostController {
       "--surface",
       host.surfaceRef,
       "--",
-      `${text}\\n`,
+      `${text}\n`,
     ]);
   }
 
@@ -186,7 +186,12 @@ export class CmuxHerdrHostController {
     }
     try {
       const current = this.identify(this.host.workspaceRef, this.host.surfaceRef);
-      return current.surfaceRef === this.host.surfaceRef;
+      if (current.surfaceRef === this.host.surfaceRef) {
+        return true;
+      }
+      this.host = undefined;
+      this.hostLaunched = false;
+      return false;
     } catch {
       this.host = undefined;
       this.hostLaunched = false;

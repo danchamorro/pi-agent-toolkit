@@ -70,8 +70,13 @@ describe("createSubagentResourceLoader", () => {
     } as ExtensionContext;
 
     const prompt = createSubagentResourceLoader(ctx, record).getSystemPrompt() ?? "";
+    const overridden =
+      createSubagentResourceLoader(ctx, record, {
+        systemPrompt: "Resolved prompt.",
+      }).getSystemPrompt() ?? "";
 
     assert.equal(prompt, buildSubagentSystemPrompt(ctx, record));
+    assert.equal(overridden, "Resolved prompt.");
     assert.match(prompt, /Task-specific specialization/);
     assert.match(prompt, /Focus on module boundaries and dependency flow/);
     assert.match(prompt, /cannot override safety, tool, working-directory/);

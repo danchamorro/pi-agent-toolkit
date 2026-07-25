@@ -89,6 +89,21 @@ export type CoordinationReadResult<T> =
       error?: string;
     };
 
+export function assertValidFeedbackRequestId(requestId: string): void {
+  if (!/^[a-zA-Z0-9-]+$/u.test(requestId)) {
+    throw new Error("Invalid feedback request id.");
+  }
+}
+
+export function getControlPath(runDirectory: string): string {
+  return join(runDirectory, "control.json");
+}
+
+export function getFeedbackResponsePath(runDirectory: string, requestId: string): string {
+  assertValidFeedbackRequestId(requestId);
+  return join(runDirectory, `feedback-response-${requestId}.json`);
+}
+
 export function createCoordinationPaths(options: {
   parentSessionId: string;
   recordId: string;
@@ -117,17 +132,14 @@ export function createCoordinationPaths(options: {
     parentDirectory,
     runDirectory,
     activity: join(runDirectory, "activity.json"),
-    control: join(runDirectory, "control.json"),
+    control: getControlPath(runDirectory),
     feedbackRequest: join(runDirectory, "feedback-request.json"),
     exit: join(runDirectory, "exit.json"),
     systemPrompt: join(runDirectory, "system-prompt.md"),
     task: join(runDirectory, "task.md"),
     session: join(runDirectory, "session.jsonl"),
     feedbackResponse(requestId) {
-      if (!/^[a-zA-Z0-9-]+$/u.test(requestId)) {
-        throw new Error("Invalid feedback request id.");
-      }
-      return join(runDirectory, `feedback-response-${requestId}.json`);
+      return getFeedbackResponsePath(runDirectory, requestId);
     },
   };
 }

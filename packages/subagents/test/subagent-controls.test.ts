@@ -25,13 +25,13 @@ afterEach(() => {
 
 describe("Herdr parent controls", () => {
   it("writes feedback for the exact request, record, and launch token", () => {
+    const launchToken = randomUUID();
     const paths = createCoordinationPaths({
       parentSessionId: "parent",
       recordId: "sa-1",
-      launchToken: randomUUID(),
+      launchToken,
       agentDir: testDir,
     });
-    const launchToken = paths.runDirectory.slice(-36);
     const target = {
       recordId: "sa-1",
       launchToken,
@@ -63,13 +63,13 @@ describe("Herdr parent controls", () => {
   });
 
   it("writes a sequenced stop control scoped to one child", () => {
+    const launchToken = randomUUID();
     const paths = createCoordinationPaths({
       parentSessionId: "parent",
       recordId: "sa-1",
-      launchToken: randomUUID(),
+      launchToken,
       agentDir: testDir,
     });
-    const launchToken = paths.runDirectory.slice(-36);
     const nextSequence = writeHerdrStopControl(
       {
         recordId: "sa-1",

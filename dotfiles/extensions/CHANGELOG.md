@@ -23,6 +23,8 @@ All notable changes to extensions in `~/.pi/agent/extensions/`.
   provably owned orphaned Herdr sessions, and cancel pre-dispatch tab creation.
 - Prefer strict JSON-schema sampling for the required-only `subagent_done`
   completion tool while retaining normal tool calling on unsupported models.
+- Fix shared cmux host relaunch and command submission, partial coordination
+  cleanup, shutdown status preservation, and per-session record retention.
 
 ## 2026-07-23
 

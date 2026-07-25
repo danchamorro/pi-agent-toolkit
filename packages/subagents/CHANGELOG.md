@@ -47,6 +47,11 @@
   marker proves its owning process exited, without adopting foreign sessions.
 - Propagate pre-dispatch cancellation through Herdr child creation and release
   child ownership even when topology cleanup fails.
+- Relaunch and attach the shared cmux host after surface replacement and send
+  shell commands with a real line terminator.
+- Clean partial coordination setup, preserve terminal outcomes during shutdown,
+  and finalize timed-out stops even after the Herdr controller is detached.
+- Apply persisted-record retention independently per parent session.
 
 ## 0.7.0 - 2026-07-14
 

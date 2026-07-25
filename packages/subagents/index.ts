@@ -643,7 +643,6 @@ export default function (pi: ExtensionAPI) {
     }
     record.backend = "herdr";
     record.externalLaunchAbort = new AbortController();
-    await Promise.resolve();
     herdrController ??= new HerdrSessionController({
       parentSessionId: launch.parentSessionId,
     });
@@ -785,7 +784,9 @@ export default function (pi: ExtensionAPI) {
         thinkingLevel: launch.thinkingLevel,
         tools: launch.tools,
         customTools: [createAskMainSessionTool(record) as unknown as ToolDefinition],
-        resourceLoader: createSubagentResourceLoader(ctx, record, "", launch.systemPrompt),
+        resourceLoader: createSubagentResourceLoader(ctx, record, {
+          systemPrompt: launch.systemPrompt,
+        }),
       });
 
       record.session = session;
@@ -1066,7 +1067,7 @@ export default function (pi: ExtensionAPI) {
           ) ?? Promise.resolve(true),
           delay(HERDR_GRACEFUL_STOP_TIMEOUT_MS).then(() => false),
         ]);
-    if (!stoppedGracefully && herdrController) {
+    if (!stoppedGracefully) {
       record.status = "stopped";
       record.terminalState = "stopped";
       record.finishedAt = Date.now();
@@ -1074,16 +1075,18 @@ export default function (pi: ExtensionAPI) {
       markActivity(record, `${stopReason} Forced Herdr tab closure after timeout.`);
       store.persistNow(record);
       updateStatusWidget();
-      try {
-        await herdrController.closeChild(record.id);
-      } catch (error) {
-        record.error = messageFromUnknownError(error);
-        store.persistNow(record);
+      if (herdrController) {
+        try {
+          await herdrController.closeChild(record.id);
+        } catch (error) {
+          record.error = messageFromUnknownError(error);
+          store.persistNow(record);
+        }
+        await Promise.race([
+          record.completion?.catch(() => undefined) ?? Promise.resolve(),
+          delay(500),
+        ]);
       }
-      await Promise.race([
-        record.completion?.catch(() => undefined) ?? Promise.resolve(),
-        delay(500),
-      ]);
     }
     reporter.flush();
 
@@ -1547,12 +1550,14 @@ export default function (pi: ExtensionAPI) {
           }
           disposeSubagentSession(record);
         }
-        record.status = "interrupted";
-        record.terminalState = "interrupted";
-        record.finishedAt = Date.now();
-        record.pendingFeedback?.cancel("The Pi session shut down before feedback arrived.");
-        markActivity(record, "Interrupted because the main session shut down.");
-        store.persistNow(record);
+        if (!isFinishedStatus(record.status)) {
+          record.status = "interrupted";
+          record.terminalState = "interrupted";
+          record.finishedAt = Date.now();
+          record.pendingFeedback?.cancel("The Pi session shut down before feedback arrived.");
+          markActivity(record, "Interrupted because the main session shut down.");
+          store.persistNow(record);
+        }
       }),
     );
     const ownedHerdr = detachHerdrRuntime();

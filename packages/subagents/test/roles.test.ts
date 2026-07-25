@@ -211,7 +211,7 @@ describe("loadSubagentRoles", () => {
       settings: { openInHerdr: "yes" as unknown as boolean },
     });
     assert.equal(invalid.openInHerdr, false);
-    assert.match(invalid.diagnostics[0]?.message ?? "", /openInHerdr/);
+    assert.ok(invalid.diagnostics.some((diagnostic) => /openInHerdr/u.test(diagnostic.message)));
   });
 
   it("ignores invalid limit values with diagnostics and keeps safe defaults", () => {
