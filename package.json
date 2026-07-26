@@ -24,10 +24,10 @@
     "prepare": "git config core.hooksPath .hooks"
   },
   "devDependencies": {
-    "@earendil-works/pi-agent-core": "0.82.0",
-    "@earendil-works/pi-ai": "0.82.0",
-    "@earendil-works/pi-coding-agent": "0.82.0",
-    "@earendil-works/pi-tui": "0.82.0",
+    "@earendil-works/pi-agent-core": "0.82.1",
+    "@earendil-works/pi-ai": "0.82.1",
+    "@earendil-works/pi-coding-agent": "0.82.1",
+    "@earendil-works/pi-tui": "0.82.1",
     "@eslint/js": "^10.0.1",
     "eslint": "^10.1.0",
     "eslint-config-prettier": "^10.1.8",
@@ -35,5 +35,8 @@
     "prettier": "^3.8.1",
     "typebox": "^1.1.24",
     "typescript-eslint": "^8.57.2"
+  },
+  "overrides": {
+    "protobufjs": "7.6.5"
   }
 }

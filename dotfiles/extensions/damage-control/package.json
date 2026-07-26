@@ -2,6 +2,6 @@
   "name": "damage-control",
   "private": true,
   "dependencies": {
-    "yaml": "^2.7.0"
+    "yaml": "^2.9.0"
   }
 }

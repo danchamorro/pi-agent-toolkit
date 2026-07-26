@@ -9,6 +9,16 @@ All notable changes to extensions in `~/.pi/agent/extensions/`.
 - Released `@danchamorro/pi-subagents` 0.9.0 with explicit native Claude Code
   and Codex harnesses while preserving Pi as the default.
 
+### dependency security
+
+- Updated the Pi development packages to 0.82.1 and forced the compatible
+  `protobufjs` 7.6.5 security patch throughout the root dependency graph.
+
+### damage-control/
+
+- Updated `yaml` to 2.9.0 to prevent deeply nested project rules from causing a
+  parser stack overflow.
+
 ## 2026-07-25
 
 ### subagents package
