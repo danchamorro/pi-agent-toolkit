@@ -244,7 +244,7 @@ and install path:
 Setup refuses to delete non-symlink files or directories in skill install
 roots. Unmanaged and third-party directories are reported and left in place.
 
-**Personal skills** (21, committed to this repo):
+**Personal skills** (22, committed to this repo):
 
 | Category | Skill | Description |
 |----------|-------|-------------|
@@ -253,6 +253,7 @@ roots. Unmanaged and third-party directories are reported and left in place.
 | `engineering` | `api-contract-validator` | Validate API clients and integrations against contracts, schemas, SDK types, and documented request/response behavior |
 | `developer-workflow` | `cli-detector` | Discover repo SaaS integrations and identify official provider CLIs for setup, debugging, and automation |
 | `engineering` | `code-structure-cleanup` | Behavior-preserving cleanup after working features have duplicated mechanics or messy structure |
+| `engineering` | `coderabbit-review` | Explicitly run a long-running CodeRabbit CLI review without replacing normal review workflows |
 | `engineering` | `debug-mantra` | Four-step debugging discipline for reproducing, tracing, falsifying, and cross-checking bugs |
 | `developer-workflow` | `gh-issue-creator` | Create GitHub issues via `gh` CLI |
 | `docs-communication` | `google-chat-cards-v2` | Google Chat Cards v2 notifications |
@@ -291,7 +292,7 @@ Installed automatically when these packages are present in
 | `ponytail-gain` | [`git:github.com/DietrichGebert/ponytail`](https://github.com/DietrichGebert/ponytail) |
 | `ponytail-help` | [`git:github.com/DietrichGebert/ponytail`](https://github.com/DietrichGebert/ponytail) |
 
-**External skills** (33, installed from source repos):
+**External skills** (32, installed from source repos):
 
 Listed in `manifest.json` and installed automatically by `setup.mjs`.
 Not committed to this repo. Maintained by their original authors.
@@ -303,7 +304,7 @@ Not committed to this repo. Maintained by their original authors.
 | `vercel-composition-patterns`, `deploy-to-vercel`, `vercel-react-best-practices`, `vercel-react-native-skills`, `vercel-react-view-transitions`, `vercel-cli-with-tokens`, `vercel-optimize`, `web-design-guidelines` | [vercel-labs/agent-skills](https://github.com/vercel-labs/agent-skills) |
 | `learn-codebase`, `self-improve` | [HazAT/pi-config](https://github.com/HazAT/pi-config) |
 | `vue-best-practices` | [hyf0/vue-skills](https://github.com/hyf0/vue-skills) |
-| `autofix`, `code-review` | [coderabbitai/skills](https://github.com/coderabbitai/skills) |
+| `autofix` | [coderabbitai/skills](https://github.com/coderabbitai/skills) |
 | `playwright-cli` | [microsoft/playwright-cli](https://github.com/microsoft/playwright-cli) |
 | `firecrawl` | [firecrawl/cli](https://github.com/firecrawl/cli) |
 | `excalidraw-diagram` | [coleam00/excalidraw-diagram-skill](https://github.com/coleam00/excalidraw-diagram-skill) |
