@@ -1,3 +1,4 @@
+import { StringEnum } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
 
 export const PREFERRED_JSON_SCHEMA_SAMPLING = {
@@ -15,6 +16,14 @@ export const AskMainSessionParams = Type.Object({
     }),
   ),
 });
+
+const HarnessSchema = StringEnum(["pi", "claude", "codex"] as const, {
+  description: "Native agent harness. Defaults to pi.",
+});
+const ReasoningEffortSchema = StringEnum(
+  ["off", "minimal", "low", "medium", "high", "xhigh", "max"] as const,
+  { description: "Optional reasoning effort override for the selected harness." },
+);
 
 export const StartSubagentParams = Type.Object({
   role: Type.Optional(
@@ -43,6 +52,11 @@ export const StartSubagentParams = Type.Object({
         "Optional working directory for the sub-agent. Use only when the target repo/folder is explicit or already verified.",
     }),
   ),
+  harness: Type.Optional(HarnessSchema),
+  model: Type.Optional(
+    Type.String({ description: "Optional native model override for the selected harness." }),
+  ),
+  reasoning_effort: Type.Optional(ReasoningEffortSchema),
 });
 
 export const StopSubagentParams = Type.Object({

@@ -140,7 +140,12 @@ export function formatRoleDiagnostics(diagnostics: SubagentRoleDiagnostic[]): st
 export function formatRecordDetails(record: SubagentRecord): string {
   const lines = [
     `Sub-agent ${record.id}: ${record.name}`,
+    `Harness: ${record.harness}`,
     record.role ? `Role: ${record.role.name}` : undefined,
+    record.resolvedModel ? `Model: ${record.resolvedModel}` : undefined,
+    record.nativeRuntimeVersion ? `Native runtime: ${record.nativeRuntimeVersion}` : undefined,
+    record.nativeExecutable ? `Native executable: ${record.nativeExecutable}` : undefined,
+    record.toolPolicy ? `Tool policy: ${record.toolPolicy}` : undefined,
     `Cwd: ${record.cwd}`,
     `Status: ${record.status}`,
     `Elapsed: ${elapsedFor(record)}`,
@@ -160,16 +165,19 @@ export function formatRecordDetails(record: SubagentRecord): string {
   if (record.error) {
     lines.push(`Error: ${record.error}`);
   }
+  for (const diagnostic of record.externalDiagnostics ?? []) {
+    lines.push(`Diagnostic: ${diagnostic}`);
+  }
 
   return lines.join("\n");
 }
 
 function formatStatusRows(records: SubagentRecord[], theme?: Theme): string[] {
-  const header = ["Age", "ID", "Role", "Status", "Context", "Task"];
+  const header = ["Age", "ID", "Harness / role", "Status", "Context", "Task"];
   const rows = records.map((record) => [
     elapsedFor(record),
     strong(record.id, theme),
-    muted(record.role?.name ?? "ad hoc", theme),
+    muted(`${record.harness}\n${record.role?.name ?? "ad hoc"}`, theme),
     statusTextForRecord(record, theme),
     muted(formatContextUsage(record), theme),
     statusTask(record, theme),
@@ -188,7 +196,8 @@ function statusTask(record: SubagentRecord, theme?: Theme): string {
   if (record.pendingFeedback) {
     return `${theme ? theme.fg("warning", "needs reply") : "needs reply"}: ${record.pendingFeedback.question}\n${command(`/subagent reply ${record.id} <feedback>`, theme)}`;
   }
-  return `${record.name}\n${muted(singleLine(record.activity, 80), theme)}`;
+  const model = record.resolvedModel ? `\n${muted(record.resolvedModel, theme)}` : "";
+  return `${record.name}${model}\n${muted(singleLine(record.activity, 80), theme)}`;
 }
 
 function summarizeRole(role: SubagentRole): RoleSummary {

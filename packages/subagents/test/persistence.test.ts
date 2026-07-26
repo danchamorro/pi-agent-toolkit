@@ -1,5 +1,13 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, it } from "node:test";
@@ -62,9 +70,46 @@ describe("sub-agent persistence", () => {
     });
     assert.equal(loaded.length, 1);
     assert.equal(loaded[0].parentSessionId, PARENT_SESSION_ID);
+    assert.equal(loaded[0].harness, "pi");
     assert.equal(loaded[0].status, "interrupted");
     assert.equal(loaded[0].activity, "Interrupted by Pi reload or restart.");
     assert.equal(typeof loaded[0].finishedAt, "number");
+  });
+
+  it("defaults legacy records to Pi and preserves native display metadata", () => {
+    persistSubagentRecord(
+      createRecord({
+        harness: "codex",
+        resolvedModel: "gpt-5.6-sol",
+        nativeRuntimeVersion: "0.145.0",
+        nativeExecutable: "/usr/local/bin/codex",
+        nativeSessionId: "thread-1",
+      }),
+    );
+    const path = join(getSubagentSessionRunsDir(PARENT_SESSION_ID), "sa-1.json");
+    const native = JSON.parse(readFileSync(path, "utf8"));
+    assert.equal(native.nativeExecutable, "/usr/local/bin/codex");
+    assert.equal(native.nativeSessionId, "thread-1");
+
+    const {
+      harness: _harness,
+      nativeExecutable: _executable,
+      nativeSessionId: _session,
+      ...legacy
+    } = native;
+    writeFileSync(path, JSON.stringify(legacy));
+    let loaded = loadPersistedSubagentRecords(new Map(), { parentSessionId: PARENT_SESSION_ID });
+    assert.equal(loaded[0]?.harness, "pi");
+    assert.equal(loaded[0]?.resolvedModel, "gpt-5.6-sol");
+    assert.equal(loaded[0]?.nativeRuntimeVersion, "0.145.0");
+    assert.equal(loaded[0]?.nativeExecutable, undefined);
+    assert.equal(loaded[0]?.nativeSessionId, undefined);
+
+    writeFileSync(path, JSON.stringify(native));
+    loaded = loadPersistedSubagentRecords(new Map(), { parentSessionId: PARENT_SESSION_ID });
+    assert.equal(loaded[0]?.harness, "codex");
+    assert.equal(loaded[0]?.nativeExecutable, "/usr/local/bin/codex");
+    assert.equal(loaded[0]?.nativeSessionId, "thread-1");
   });
 
   it("does not load records from another parent session in the same cwd", () => {
@@ -152,6 +197,7 @@ function createRecord(overrides: Partial<SubagentRecord> = {}): SubagentRecord {
   return {
     id: "sa-1",
     parentSessionId: PARENT_SESSION_ID,
+    harness: "pi",
     name: "Test sub-agent",
     task: "Test task.",
     cwd: testDir,

@@ -188,7 +188,7 @@ function renderSubagentWidgetLines(
   const lines = [widgetTopLine("Subagents", info, width, theme)];
   lines.push(
     widgetContentLine(
-      widgetRow("AGE", "ID", "ROLE", "TASK", "STREAM", "STATUS", "CTX", width),
+      widgetRow("AGE", "ID", "HARNESS/ROLE", "TASK", "STREAM", "STATUS", "CTX", width),
       "",
       width,
       theme,
@@ -197,12 +197,16 @@ function renderSubagentWidgetLines(
   const displayRecords = visibleRecords.slice(0, 3);
 
   for (const record of displayRecords) {
-    const role = record.role?.name ?? "ad hoc";
+    const role = `${record.harness}/${record.role?.name ?? "ad hoc"}`;
+    const task =
+      width >= 140 && record.resolvedModel
+        ? `${record.name} (${record.resolvedModel})`
+        : record.name;
     const row = widgetRow(
       formatters.elapsedFor(record),
       record.id,
       role,
-      record.name,
+      task,
       streamText(record),
       statusText(record, theme),
       theme.fg("dim", compactContextUsage(record)),

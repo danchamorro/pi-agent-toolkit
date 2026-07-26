@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 
 import type { Api, Model } from "@earendil-works/pi-ai";
 
-import { createSubagentLaunchConfig } from "../launch-config.ts";
+import { createNativeLaunchConfig, createSubagentLaunchConfig } from "../launch-config.ts";
 import type { SubagentRecord } from "../types.ts";
 
 const model = { provider: "test", id: "model" } as Model<Api>;
@@ -53,6 +53,30 @@ describe("createSubagentLaunchConfig", () => {
     );
     assert.notEqual(first.launchToken, second.launchToken);
     assert.match(first.launchToken, /^[0-9a-f-]{36}$/u);
+    assert.equal(first.harness, "pi");
+    assert.equal(first.backend, "herdr");
+  });
+
+  it("creates native launch variants without Pi-only fields", () => {
+    const record = {
+      ...createRecord(),
+      harness: "claude" as const,
+      requestedModel: "claude-opus-5",
+    };
+    const launch = createNativeLaunchConfig({
+      record,
+      settings: { model: "ignored-default", reasoningEffort: "high" },
+      effort: "max",
+      neutralInstructions: "Review independently.",
+    });
+
+    assert.equal(launch.harness, "claude");
+    assert.equal(launch.backend, "claude-sdk");
+    assert.equal(launch.model, "claude-opus-5");
+    assert.equal(launch.resolvedEffort, "max");
+    assert.equal(launch.neutralInstructions, "Review independently.");
+    assert.equal("systemPrompt" in launch, false);
+    assert.equal("tools" in launch, false);
   });
 });
 
@@ -60,6 +84,7 @@ function createRecord(): SubagentRecord {
   return {
     id: "sa-1",
     parentSessionId: "parent-session",
+    harness: "pi",
     name: "scout",
     task: "Map the repository.",
     role: {

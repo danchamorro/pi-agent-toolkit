@@ -6,7 +6,7 @@ skills, configs, safety guardrails, and installable packages. This is a
 public backup and reference for how I organize my own agent environment,
 not a universal starter kit intended to be cloned unchanged by everyone.
 
-Includes 27 extensions, 61 skills, 1 prompt template, 1 theme,
+Includes 27 extensions, 62 skills, 1 prompt template, 1 theme,
 8 installable Pi packages, MCP server configurations, and safety guardrails.
 It also tracks 2 custom sub-agent roles for local use with the subagents
 package.
@@ -154,7 +154,7 @@ pi install git:github.com/DietrichGebert/ponytail
 
 | Package | Description | npm |
 |---|---|---|
-| [subagents](packages/subagents) | Run focused background sub-agents in-process or, when enabled via `subagents.openInHerdr`, as interactive tabs in one Herdr session, with bundled roles and main-session feedback handoff | [![npm](https://img.shields.io/npm/v/@danchamorro/pi-subagents)](https://www.npmjs.com/package/@danchamorro/pi-subagents) |
+| [subagents](packages/subagents) | Run focused Pi sub-agents in-process or through Herdr, plus explicit native Claude Code and Codex children, with bundled roles and main-session feedback handoff | [![npm](https://img.shields.io/npm/v/@danchamorro/pi-subagents)](https://www.npmjs.com/package/@danchamorro/pi-subagents) |
 | [agent-modes](packages/agent-modes) | Switch between code, architect, debug, ask, and review modes with enforced tool restrictions, bash allowlists, and per-mode model assignment | [![npm](https://img.shields.io/npm/v/@danchamorro/pi-agent-modes)](https://www.npmjs.com/package/@danchamorro/pi-agent-modes) |
 | [prompt-enhancer](packages/prompt-enhancer) | Rewrite prompts to be clearer and more actionable before sending | [![npm](https://img.shields.io/npm/v/@danchamorro/pi-prompt-enhancer)](https://www.npmjs.com/package/@danchamorro/pi-prompt-enhancer) |
 
@@ -244,7 +244,7 @@ and install path:
 Setup refuses to delete non-symlink files or directories in skill install
 roots. Unmanaged and third-party directories are reported and left in place.
 
-**Personal skills** (20, committed to this repo):
+**Personal skills** (21, committed to this repo):
 
 | Category | Skill | Description |
 |----------|-------|-------------|
@@ -260,6 +260,7 @@ roots. Unmanaged and third-party directories are reported and left in place.
 | `engineering` | `post-mortem` | Produce engineering root-cause writeups after fixed and validated bugs |
 | `planning` | `plan-reviewer` | Review implementation plans for evidence, trackability, dependencies, risks, and validation before execution |
 | `engineering` | `scrutinize` | Outsider-perspective review of plans, PRs, diffs, and code changes |
+| `engineering` | `subagents` | Route delegation through host-supported mechanisms; in Pi, keep generic requests on Pi and honor explicit Claude Code or Codex harness requests |
 | `developer-workflow` | `sql-specialist` | Write, review, explain, and optimize SQL queries, schemas, DDL, ERDs, and execution plans |
 | `docs-communication` | `technical-docs` | Technical documentation standards |
 | `engineering` | `test-author` | Create or update targeted tests using project-native conventions and validation |

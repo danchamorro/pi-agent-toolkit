@@ -7,6 +7,13 @@ export function detailsForRecord(record: SubagentRecord): StartSubagentDetails {
     subagentId: record.id,
     name: record.name,
     role: record.role?.name,
+    harness: record.harness,
+    resolvedModel: record.resolvedModel,
+    nativeRuntimeVersion: record.nativeRuntimeVersion,
+    toolPolicy: record.toolPolicy,
+    toolPolicyDiagnostic: record.externalDiagnostics?.find((message) =>
+      message.includes("native runs use broad tool authority"),
+    ),
     cwd: record.cwd,
     task: record.task,
     command: `/subagent view ${record.id}`,

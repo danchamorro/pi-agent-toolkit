@@ -4,6 +4,25 @@ All notable changes to extensions in `~/.pi/agent/extensions/`.
 
 ## 2026-07-25
 
+### subagents package
+
+- Added explicit native Claude Code and Codex harnesses while preserving the
+  existing Pi and Herdr default path.
+- Added native authentication/model/effort preflight, parent feedback bridges,
+  shared cancellation and completion reporting, bounded process cleanup, and
+  harness/model status visibility.
+- Added a host-aware routing skill so generic delegation stays on Pi within Pi,
+  explicit Claude or Codex wording selects the requested native harness, and
+  Claude Code does not receive instructions to call Pi-only tools.
+- Documented that native role tool allowlists are Pi-only, cwd is not a sandbox
+  or trust check, and the optional Agent SDK carries non-MIT license metadata
+  and platform-size caveats.
+- Fixed native status context percentages to use current Claude and latest
+  Codex model-call usage rather than cumulative tokens, retained native
+  executable/session diagnostics across reload records, hardened Claude
+  launches against non-first-party provider-routing overrides, and ensured
+  Codex notification failures cannot escape callbacks or skip process cleanup.
+
 ### file-search/
 
 - Added first-class `fd` and `rg` tools with typed arguments, safe process

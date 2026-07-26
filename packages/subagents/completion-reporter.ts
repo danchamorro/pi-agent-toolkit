@@ -28,6 +28,9 @@ export function formatCompletionReport(groupRecords: SubagentRecord[]): string {
   const payload = groupRecords.map((record) => ({
     id: record.id,
     name: record.name,
+    harness: record.harness,
+    model: record.resolvedModel,
+    nativeRuntimeVersion: record.nativeRuntimeVersion,
     status: record.status,
     cwd: record.cwd,
     task: record.task,

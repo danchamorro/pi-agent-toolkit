@@ -18,6 +18,7 @@ function createRecord(
   const now = Date.now();
   return {
     parentSessionId: overrides.parentSessionId ?? PARENT_SESSION_ID,
+    harness: overrides.harness ?? "pi",
     name: overrides.name ?? overrides.id,
     task: overrides.task ?? "Task.",
     cwd: overrides.cwd ?? testDir,
