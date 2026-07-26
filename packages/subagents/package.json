@@ -1,6 +1,6 @@
 {
   "name": "@danchamorro/pi-subagents",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "Background Pi, Claude Code, and Codex sub-agents with shared lifecycle and feedback controls",
   "keywords": [
     "pi-package",

@@ -2,6 +2,13 @@
 
 All notable changes to extensions in `~/.pi/agent/extensions/`.
 
+## 2026-07-26
+
+### subagents package
+
+- Released `@danchamorro/pi-subagents` 0.9.0 with explicit native Claude Code
+  and Codex harnesses while preserving Pi as the default.
+
 ## 2026-07-25
 
 ### subagents package
