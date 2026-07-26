@@ -2,6 +2,10 @@ import type { ThinkingLevel as AiThinkingLevel } from "@earendil-works/pi-ai";
 import type { AgentSession, ContextUsage } from "@earendil-works/pi-coding-agent";
 
 export type SessionThinkingLevel = "off" | AiThinkingLevel;
+export type SubagentHarness = "pi" | "claude" | "codex";
+export type SubagentBackend = "in-process" | "herdr" | "claude-sdk" | "codex-app-server";
+export type ReasoningEffort = SessionThinkingLevel;
+export type SubagentToolPolicy = "pi-allowlist" | "native-broad-authority";
 export type SubagentStatus =
   | "starting"
   | "running"
@@ -30,6 +34,11 @@ export type StartSubagentDetails = {
   subagentId?: string;
   name?: string;
   role?: string;
+  harness?: SubagentHarness;
+  resolvedModel?: string;
+  nativeRuntimeVersion?: string;
+  toolPolicy?: SubagentToolPolicy;
+  toolPolicyDiagnostic?: string;
   cwd?: string;
   task?: string;
   status: SubagentStatus | "error";
@@ -80,11 +89,18 @@ export type SubagentRoleOverride = {
   tools?: string[] | string;
 };
 
+export type NativeHarnessSettings = {
+  executable?: string;
+  model: string;
+  reasoningEffort: ReasoningEffort;
+};
+
 export type SubagentSettings = {
   agentOverrides?: Record<string, SubagentRoleOverride>;
   maxConcurrent?: number;
   idleTimeoutMinutes?: number;
   openInHerdr?: boolean;
+  harnesses?: Partial<Record<Exclude<SubagentHarness, "pi">, Partial<NativeHarnessSettings>>>;
 };
 
 export type SubagentLimits = {
@@ -109,6 +125,7 @@ export type SubagentRoleLoadResult = {
   diagnostics: SubagentRoleDiagnostic[];
   limits: SubagentLimits;
   openInHerdr: boolean;
+  harnesses: Record<Exclude<SubagentHarness, "pi">, NativeHarnessSettings>;
 };
 
 export type ParsedStartArgs = {
@@ -117,6 +134,9 @@ export type ParsedStartArgs = {
   instructions?: string;
   role?: SubagentRole;
   cwd?: string;
+  harness?: SubagentHarness;
+  model?: string;
+  reasoningEffort?: ReasoningEffort;
   notifyOnStart?: boolean;
   notifyOnCompletion?: boolean;
   reportCompletionToMain?: boolean;
@@ -126,6 +146,7 @@ export type ParsedStartArgs = {
 export type SubagentRecord = {
   id: string;
   parentSessionId: string;
+  harness: SubagentHarness;
   name: string;
   task: string;
   instructions?: string;
@@ -151,7 +172,14 @@ export type SubagentRecord = {
   notifyOnCompletion: boolean;
   reportCompletionToMain: boolean;
   completionGroupId?: string;
-  backend?: "in-process" | "herdr";
+  backend?: SubagentBackend;
+  requestedModel?: string;
+  requestedReasoningEffort?: ReasoningEffort;
+  resolvedModel?: string;
+  nativeRuntimeVersion?: string;
+  nativeExecutable?: string;
+  nativeSessionId?: string;
+  toolPolicy?: SubagentToolPolicy;
   launchToken?: string;
   herdrSessionName?: string;
   herdrWorkspaceId?: string;

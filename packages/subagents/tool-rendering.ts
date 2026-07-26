@@ -8,11 +8,12 @@ export function formatStartSubagentCall(args: {
   task?: string;
   name?: string;
   cwd?: string;
+  harness?: string;
 }): string {
   const role = args.role?.trim() || "default";
   const name = args.name?.trim();
   const displayName = name ? ` · ${singleLine(name, 42)}` : "";
-  return `start_subagent ${role}${displayName}`;
+  return `start_subagent ${args.harness ?? "pi"}/${role}${displayName}`;
 }
 
 export function formatStartSubagentSummary(details: StartSubagentDetails): string {
@@ -92,8 +93,9 @@ function launchTable(title: string, rows: string[][]): string {
 
 function launchRow(details: StartSubagentDetails): string[] {
   const id = details.subagentId ?? "?";
-  const role = details.role ?? "ad hoc";
+  const role = `${details.harness ?? "pi"}/${details.role ?? "ad hoc"}`;
   const command = details.command ?? "";
+  const model = details.resolvedModel ? `\n${details.resolvedModel}` : "";
   const task = details.task ? singleLine(details.task, 120) : (details.name ?? "sub-agent");
-  return [id, role, details.status, command ? `${task}\n${command}` : task];
+  return [id, role, details.status, command ? `${task}${model}\n${command}` : `${task}${model}`];
 }

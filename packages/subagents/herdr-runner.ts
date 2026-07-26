@@ -17,7 +17,7 @@ import {
 } from "./coordination.ts";
 import { extractText } from "./format.ts";
 import type { HerdrChild, HerdrSessionController } from "./herdr.ts";
-import type { SubagentLaunchConfig } from "./launch-config.ts";
+import type { PiLaunchConfig } from "./launch-config.ts";
 
 const DEFAULT_STARTUP_TIMEOUT_MS = 30_000;
 const DEFAULT_POLL_MS = 250;
@@ -38,7 +38,7 @@ export type HerdrController = Pick<
 >;
 
 export type HerdrRunOptions = {
-  launch: SubagentLaunchConfig;
+  launch: PiLaunchConfig;
   controller: HerdrController;
   agentDir?: string;
   childRuntimePath?: string;
@@ -163,7 +163,7 @@ export async function runHerdrSubagent(options: HerdrRunOptions): Promise<HerdrT
 }
 
 export function buildChildPiArguments(options: {
-  launch: SubagentLaunchConfig;
+  launch: PiLaunchConfig;
   paths: CoordinationPaths;
   childRuntimePath: string;
 }): string[] {
@@ -189,7 +189,7 @@ export function buildChildPiArguments(options: {
 }
 
 export function buildChildEnvironment(
-  launch: SubagentLaunchConfig,
+  launch: PiLaunchConfig,
   paths: CoordinationPaths,
 ): Record<string, string> {
   return {

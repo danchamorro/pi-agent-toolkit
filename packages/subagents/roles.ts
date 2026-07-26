@@ -1,21 +1,29 @@
 import { getAgentDir, parseFrontmatter } from "@earendil-works/pi-coding-agent";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, isAbsolute, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  DEFAULT_CLAUDE_MODEL,
+  DEFAULT_CODEX_EXECUTABLE,
+  DEFAULT_CODEX_MODEL,
   DEFAULT_IDLE_TIMEOUT_MINUTES,
   DEFAULT_MAX_CONCURRENT,
+  DEFAULT_NATIVE_REASONING_EFFORT,
   DEFAULT_TOOLS,
   ROLE_AGENT_FILES,
   SUBAGENT_TOOL_NAMES,
   THINKING_LEVELS,
 } from "./constants.ts";
 import { deriveName, splitCommand } from "./format.ts";
+import { expandUserPath } from "./paths.ts";
 import type {
+  NativeHarnessSettings,
   ParsedStartArgs,
+  ReasoningEffort,
   RoleModelSpec,
   SessionThinkingLevel,
+  SubagentHarness,
   SubagentLimits,
   SubagentRoleDiagnostic,
   SubagentRoleLoadResult,
@@ -341,6 +349,91 @@ function parseOpenInHerdr(
   return false;
 }
 
+function parseHarnessSettings(
+  settings: SubagentSettings,
+  diagnostics: SubagentRoleDiagnostic[],
+): Record<"claude" | "codex", NativeHarnessSettings> {
+  const defaults: Record<"claude" | "codex", NativeHarnessSettings> = {
+    claude: {
+      model: DEFAULT_CLAUDE_MODEL,
+      reasoningEffort: DEFAULT_NATIVE_REASONING_EFFORT,
+    },
+    codex: {
+      executable: expandUserPath(DEFAULT_CODEX_EXECUTABLE),
+      model: DEFAULT_CODEX_MODEL,
+      reasoningEffort: DEFAULT_NATIVE_REASONING_EFFORT,
+    },
+  };
+  const rawHarnesses = settings.harnesses;
+  if (rawHarnesses === undefined) {
+    return defaults;
+  }
+  if (!rawHarnesses || typeof rawHarnesses !== "object" || Array.isArray(rawHarnesses)) {
+    diagnostics.push({
+      level: "warning",
+      message: "Ignored invalid subagents.harnesses value; using native harness defaults.",
+    });
+    return defaults;
+  }
+
+  for (const harness of ["claude", "codex"] as const) {
+    const raw = (rawHarnesses as Record<string, unknown>)[harness];
+    if (raw === undefined) {
+      continue;
+    }
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+      diagnostics.push({
+        level: "warning",
+        message: `Ignored invalid subagents.harnesses.${harness} value; using defaults.`,
+      });
+      continue;
+    }
+    const value = raw as Record<string, unknown>;
+    if (value.model !== undefined) {
+      if (typeof value.model === "string" && value.model.trim()) {
+        defaults[harness].model = value.model.trim();
+      } else {
+        diagnostics.push({
+          level: "warning",
+          message: `Ignored invalid subagents.harnesses.${harness}.model value.`,
+        });
+      }
+    }
+    if (value.reasoningEffort !== undefined) {
+      if (
+        typeof value.reasoningEffort === "string" &&
+        ["low", "medium", "high", "xhigh", "max"].includes(value.reasoningEffort)
+      ) {
+        defaults[harness].reasoningEffort = value.reasoningEffort as ReasoningEffort;
+      } else {
+        diagnostics.push({
+          level: "warning",
+          message: `Ignored invalid subagents.harnesses.${harness}.reasoningEffort value; using ${DEFAULT_NATIVE_REASONING_EFFORT}.`,
+        });
+      }
+    }
+    if (value.executable !== undefined) {
+      if (typeof value.executable === "string" && value.executable.trim()) {
+        const executable = expandUserPath(value.executable.trim());
+        if (isAbsolute(executable)) {
+          defaults[harness].executable = executable;
+        } else {
+          diagnostics.push({
+            level: "warning",
+            message: `Ignored relative subagents.harnesses.${harness}.executable value; using the default.`,
+          });
+        }
+      } else {
+        diagnostics.push({
+          level: "warning",
+          message: `Ignored invalid subagents.harnesses.${harness}.executable value; using the default.`,
+        });
+      }
+    }
+  }
+  return defaults;
+}
+
 function parseLimits(
   settings: SubagentSettings,
   diagnostics: SubagentRoleDiagnostic[],
@@ -398,6 +491,7 @@ export function loadSubagentRoles(options: RoleLoadOptions = {}): SubagentRoleLo
     diagnostics,
     limits: parseLimits(settingsResult.settings, diagnostics),
     openInHerdr: parseOpenInHerdr(settingsResult.settings, diagnostics),
+    harnesses: parseHarnessSettings(settingsResult.settings, diagnostics),
   };
 }
 
@@ -405,7 +499,23 @@ export function parseStartArgs(
   input: string,
   rolesByName: Map<string, SubagentRole>,
 ): ParsedStartArgs | null {
-  const taskInput = input.trim();
+  let taskInput = input.trim();
+  if (!taskInput) {
+    return null;
+  }
+
+  let harness: SubagentHarness | undefined;
+  const harnessMatch = /^--harness=([^\s]+)(?:\s+|$)/u.exec(taskInput);
+  if (harnessMatch) {
+    const value = harnessMatch[1];
+    if (value !== "pi" && value !== "claude" && value !== "codex") {
+      throw new Error(
+        `Unknown sub-agent harness "${value}". Supported harnesses: pi, claude, codex.`,
+      );
+    }
+    harness = value;
+    taskInput = taskInput.slice(harnessMatch[0].length).trim();
+  }
   if (!taskInput) {
     return null;
   }
@@ -416,7 +526,7 @@ export function parseStartArgs(
     const task = taskInput.slice(colonIndex + 1).trim();
     if (name && task) {
       const role = rolesByName.get(name.toLowerCase());
-      return role ? { name: role.name, task, role } : { name, task };
+      return role ? { name: role.name, task, role, harness } : { name, task, harness };
     }
   }
 
@@ -430,11 +540,13 @@ export function parseStartArgs(
       name: role.name,
       task: rest,
       role,
+      harness,
     };
   }
 
   return {
     name: deriveName(taskInput),
     task: taskInput,
+    harness,
   };
 }

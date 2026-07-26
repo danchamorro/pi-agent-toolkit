@@ -183,6 +183,15 @@ describe("loadSubagentRoles", () => {
     assert.match(result.diagnostics[0]?.message ?? "", /unknown sub-agent role "missing"/);
   });
 
+  it("accepts max thinking in role files", () => {
+    writeCustomRole(
+      "max-thinker.md",
+      roleFixture("max-thinker").replace("thinking: high", "thinking: max"),
+    );
+    const result = loadSubagentRoles({ agentDir });
+    assert.equal(result.roles.find((role) => role.name === "max-thinker")?.thinking, "max");
+  });
+
   it("defaults concurrency and idle limits when settings omit them", () => {
     const result = loadSubagentRoles({ agentDir });
     assert.equal(result.limits.maxConcurrent, 5);
@@ -212,6 +221,36 @@ describe("loadSubagentRoles", () => {
     });
     assert.equal(invalid.openInHerdr, false);
     assert.ok(invalid.diagnostics.some((diagnostic) => /openInHerdr/u.test(diagnostic.message)));
+  });
+
+  it("parses native harness defaults and diagnoses invalid settings", () => {
+    const defaults = loadSubagentRoles({ agentDir });
+    assert.equal(defaults.harnesses.claude.model, "claude-opus-5");
+    assert.equal(defaults.harnesses.claude.reasoningEffort, "high");
+    assert.equal(defaults.harnesses.codex.model, "gpt-5.6-sol");
+    assert.match(defaults.harnesses.codex.executable ?? "", /\/\.local\/bin\/codex$/u);
+
+    const configured = loadSubagentRoles({
+      agentDir,
+      settings: {
+        harnesses: {
+          claude: { model: "custom-claude", reasoningEffort: "max" },
+          codex: {
+            executable: "relative/codex",
+            model: "custom-codex",
+            reasoningEffort: "minimal",
+          },
+        },
+      },
+    });
+    assert.equal(configured.harnesses.claude.model, "custom-claude");
+    assert.equal(configured.harnesses.claude.reasoningEffort, "max");
+    assert.equal(configured.harnesses.codex.model, "custom-codex");
+    assert.equal(configured.harnesses.codex.reasoningEffort, "high");
+    assert.ok(
+      configured.diagnostics.some((diagnostic) => /reasoningEffort/u.test(diagnostic.message)),
+    );
+    assert.ok(configured.diagnostics.some((diagnostic) => /relative/u.test(diagnostic.message)));
   });
 
   it("ignores invalid limit values with diagnostics and keeps safe defaults", () => {
@@ -276,6 +315,21 @@ describe("parseStartArgs", () => {
 
   it("returns null when a role is named without a task", () => {
     assert.equal(parseStartArgs("scout", buildRoles()), null);
+  });
+
+  it("parses only a leading harness flag before role and name handling", () => {
+    const role = parseStartArgs("--harness=claude scout: map the repo", buildRoles());
+    assert.equal(role?.harness, "claude");
+    assert.equal(role?.role?.name, "scout");
+    assert.equal(role?.task, "map the repo");
+
+    const taskFlag = parseStartArgs("scout map --harness=codex later", buildRoles());
+    assert.equal(taskFlag?.harness, undefined);
+    assert.equal(taskFlag?.task, "map --harness=codex later");
+    assert.throws(
+      () => parseStartArgs("--harness=unknown inspect", buildRoles()),
+      /Supported harnesses: pi, claude, codex/u,
+    );
   });
 
   it("does not treat a far-away colon as a name separator", () => {

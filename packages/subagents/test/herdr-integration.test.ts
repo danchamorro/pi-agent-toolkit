@@ -20,7 +20,7 @@ import {
   type CoordinationPaths,
 } from "../coordination.ts";
 import { writeHerdrStopControl } from "../herdr-controls.ts";
-import type { SubagentLaunchConfig } from "../launch-config.ts";
+import type { PiLaunchConfig } from "../launch-config.ts";
 
 const realHerdrIt =
   process.env.PI_SUBAGENTS_REAL_HERDR === "1" && process.env.PI_SUBAGENTS_REAL_MODEL ? it : it.skip;
@@ -207,7 +207,7 @@ function createRuntime(
   recordId: string,
   name: string,
   autoExit: boolean,
-): { controller: HerdrSessionController; launch: SubagentLaunchConfig } {
+): { controller: HerdrSessionController; launch: PiLaunchConfig } {
   const parentSessionId = `integration-${randomUUID()}`;
   const controller = new HerdrSessionController({ parentSessionId });
   controllers.push(controller);
@@ -219,12 +219,14 @@ function createLaunch(
   recordId: string,
   name: string,
   autoExit: boolean,
-): SubagentLaunchConfig {
+): PiLaunchConfig {
   const modelName = process.env.PI_SUBAGENTS_REAL_MODEL;
   assert.ok(modelName);
   const slash = modelName.indexOf("/");
   assert.ok(slash > 0);
   return {
+    harness: "pi",
+    backend: "herdr",
     recordId,
     parentSessionId,
     name,

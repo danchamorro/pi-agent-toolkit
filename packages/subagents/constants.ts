@@ -11,6 +11,7 @@ export const THINKING_LEVELS = new Set<SessionThinkingLevel>([
   "medium",
   "high",
   "xhigh",
+  "max",
 ]);
 export const MAX_ACTIVITY_LENGTH = 220;
 export const ROLE_AGENT_FILES = ["planner.md", "reviewer.md", "scout.md", "worker.md"] as const;
@@ -23,3 +24,8 @@ export const DEFAULT_MAX_CONCURRENT = 5;
 // Idle auto-stop is opt-in (0 disables it) so background work is never killed
 // unless the user asks for it. Override with `subagents.idleTimeoutMinutes`.
 export const DEFAULT_IDLE_TIMEOUT_MINUTES = 0;
+
+export const DEFAULT_CLAUDE_MODEL = "claude-opus-5";
+export const DEFAULT_CODEX_MODEL = "gpt-5.6-sol";
+export const DEFAULT_CODEX_EXECUTABLE = "~/.local/bin/codex";
+export const DEFAULT_NATIVE_REASONING_EFFORT = "high";

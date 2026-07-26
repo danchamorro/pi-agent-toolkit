@@ -1,5 +1,55 @@
 # @danchamorro/pi-subagents Changelog
 
+## Unreleased
+
+### Added
+
+- Added explicit `pi`, `claude`, and `codex` harness selection while preserving
+  Pi as the default and Herdr as an optional Pi-only transport.
+- Added native Claude Code 2.1.219+ execution through the optional Agent SDK,
+  subscription-auth preflight, exact model/effort validation, feedback, and
+  bounded cleanup.
+- Added a pinned Codex CLI 0.145.0 app-server client with authenticated model
+  discovery, dynamic feedback tools, bounded JSON-RPC, and process-tree cleanup.
+- Added native harness settings, model/runtime status metadata, legacy
+  persistence migration, and a host-aware natural-language harness routing
+  skill in the toolkit setup (the skill is not part of the npm tarball).
+
+### Changed
+
+- Split Pi system-prompt composition from harness-neutral child instructions
+  without changing existing Pi prompt output.
+- Added `max` to Pi thinking-level validation and reject unsupported native
+  `off` or `minimal` effort instead of clamping.
+- Kept native tool authority explicit: Pi role tool allowlists do not apply to
+  native harnesses, Claude denies `Agent` and `Task`, and Codex relies on its
+  no-nested-agent instruction rather than a native tool allowlist.
+- Let the optional Claude Agent SDK resolve its declared Anthropic and MCP SDK
+  peers instead of duplicating them as direct dependencies, and document its
+  non-SPDX license metadata and native platform install footprint.
+
+### Fixed
+
+- Fixed native context percentages using cumulative token usage, which could
+  display values above 100%; status now uses current Claude context telemetry
+  and the latest Codex model-call usage against each context window.
+- Persist native executable and session-id display metadata so interrupted
+  records retain their diagnostics after reload while legacy records still load.
+- Guard Codex notification callbacks so handler failures close the app-server
+  instead of escaping process callbacks or skipping cleanup.
+
+### Security
+
+- Native Claude uses `bypassPermissions`; native Codex uses `approvalPolicy:
+  never` and `danger-full-access`. The selected cwd is an execution anchor, not
+  a sandbox or trust check; callers remain responsible for choosing a trusted
+  directory.
+- Claude subscription launches reject and strip provider, endpoint, and
+  credential environment overrides that could change the backend or billing
+  source, and require first-party API authentication. Native credentials,
+  session objects, and transcripts are never persisted; only diagnostic session
+  ids are retained.
+
 ## 0.8.0 - 2026-07-25
 
 ### Added

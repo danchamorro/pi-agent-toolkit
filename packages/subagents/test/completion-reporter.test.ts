@@ -27,6 +27,7 @@ function harness(initialBehavior: string | undefined = undefined) {
   ): SubagentRecord {
     const record = {
       parentSessionId: "parent-session",
+      harness: "pi",
       name: overrides.id,
       task: "Task.",
       cwd: "/repo",
@@ -80,6 +81,41 @@ describe("CompletionReporter", () => {
     assert.equal(posted[0].options.deliverAs, "followUp");
     assert.equal(posted[0].options.triggerTurn, true);
     assert.equal(posted[0].options.display, false);
+  });
+
+  it("groups mixed harness outcomes with native metadata", async () => {
+    const { reporter, posted, addRecord } = harness();
+    const group = reporter.assignGroup();
+    reporter.queue(
+      addRecord({ id: "sa-1", harness: "pi", completionGroupId: group, result: "Pi." }),
+    );
+    reporter.queue(
+      addRecord({
+        id: "sa-2",
+        harness: "claude",
+        completionGroupId: group,
+        resolvedModel: "claude-opus-5",
+        nativeRuntimeVersion: "2.1.220",
+        result: "Claude.",
+      }),
+    );
+    reporter.queue(
+      addRecord({
+        id: "sa-3",
+        harness: "codex",
+        completionGroupId: group,
+        resolvedModel: "gpt-5.6-sol",
+        status: "failed",
+        error: "Codex failed.",
+      }),
+    );
+
+    await wait(150);
+    assert.equal(posted.length, 1);
+    assert.match(posted[0].content, /"harness": "claude"/u);
+    assert.match(posted[0].content, /"model": "claude-opus-5"/u);
+    assert.match(posted[0].content, /"harness": "codex"/u);
+    assert.match(posted[0].content, /Codex failed\./u);
   });
 
   it("reports a single finished sub-agent", async () => {

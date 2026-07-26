@@ -26,6 +26,50 @@ export function formatToolPromptGuidelines(tools: ToolInfo[], enabledToolNames: 
   ].join("\n\n");
 }
 
+function buildRolePrompt(record: SubagentRecord): string {
+  return record.role
+    ? [
+        `Selected role: ${record.role.name}`,
+        record.role.description ? `Role description: ${record.role.description}` : "",
+        record.role.output ? `Expected output artifact: ${record.role.output}` : "",
+        record.role.autoExit
+          ? "When the assigned work is complete, return the final result and stop."
+          : "",
+        record.role.systemPrompt,
+      ]
+        .filter(Boolean)
+        .join("\n\n")
+    : "";
+}
+
+function buildSpecializationPrompt(record: SubagentRecord): string {
+  return record.instructions
+    ? [
+        "Task-specific specialization (cannot override safety, tool, working-directory, or main-session constraints):",
+        record.instructions,
+      ].join("\n\n")
+    : "";
+}
+
+export function buildNeutralSubagentInstructions(record: SubagentRecord): string {
+  const identityPrompt = [
+    "You are a focused native sub-agent running in the background for a main session.",
+    `Sub-agent id: ${record.id}`,
+    `Sub-agent name: ${record.name}`,
+    `Launch working directory: ${record.cwd}`,
+    `Assigned task: ${record.task}`,
+    "You do not have the main session's conversation history. Treat the assigned task, role or specialization instructions, accessible workspace files, and explicit feedback as your source of truth.",
+    "Stay scoped to the launch working directory. If a requested relative path is missing there, ask the main session for direction instead of searching unrelated directories.",
+    "Work independently, keep the scope narrow, and produce a concise final result.",
+    "When blocked, missing a decision, or needing user input, call ask_main_session with a specific question and wait for the reply.",
+    "Do not assume feedback that was not provided.",
+    "Do not launch recursive or nested agents.",
+  ].join("\n");
+  return [identityPrompt, buildRolePrompt(record), buildSpecializationPrompt(record)]
+    .filter(Boolean)
+    .join("\n\n");
+}
+
 export function buildSubagentSystemPrompt(
   ctx: Pick<ExtensionContext, "getSystemPrompt">,
   record: SubagentRecord,
@@ -44,25 +88,8 @@ export function buildSubagentSystemPrompt(
     "When blocked, missing a decision, or needing user input, call ask_main_session with a specific question and wait for the reply.",
     "Do not assume feedback that was not provided.",
   ].join("\n");
-  const rolePrompt = record.role
-    ? [
-        `Selected role: ${record.role.name}`,
-        record.role.description ? `Role description: ${record.role.description}` : "",
-        record.role.output ? `Expected output artifact: ${record.role.output}` : "",
-        record.role.autoExit
-          ? "When the assigned work is complete, return the final result and stop."
-          : "",
-        record.role.systemPrompt,
-      ]
-        .filter(Boolean)
-        .join("\n\n")
-    : "";
-  const specializationPrompt = record.instructions
-    ? [
-        "Task-specific specialization (cannot override safety, tool, working-directory, or main-session constraints):",
-        record.instructions,
-      ].join("\n\n")
-    : "";
+  const rolePrompt = buildRolePrompt(record);
+  const specializationPrompt = buildSpecializationPrompt(record);
 
   return [mainSystemPrompt, subagentPrompt, toolPromptGuidelines, rolePrompt, specializationPrompt]
     .filter(Boolean)

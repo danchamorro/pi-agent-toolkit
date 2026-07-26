@@ -20,6 +20,7 @@ const RECOVERABLE_RECORD_TTL_MS = 4 * 60 * 60 * 1000;
 export type PersistedSubagentRecord = {
   id: string;
   parentSessionId: string;
+  harness?: SubagentRecord["harness"];
   name: string;
   task: string;
   cwd: string;
@@ -38,6 +39,10 @@ export type PersistedSubagentRecord = {
     requestedAt: number;
   };
   contextUsage?: SubagentRecord["contextUsage"];
+  resolvedModel?: string;
+  nativeRuntimeVersion?: string;
+  nativeExecutable?: string;
+  nativeSessionId?: string;
 };
 
 export function getSubagentRunsDir(agentDir = getAgentDir()): string {
@@ -103,6 +108,7 @@ function toPersistedRecord(record: SubagentRecord): PersistedSubagentRecord {
   return {
     id: record.id,
     parentSessionId: record.parentSessionId,
+    harness: record.harness,
     name: record.name,
     task: record.task,
     cwd: record.cwd,
@@ -123,6 +129,10 @@ function toPersistedRecord(record: SubagentRecord): PersistedSubagentRecord {
         }
       : undefined,
     contextUsage: record.contextUsage,
+    resolvedModel: record.resolvedModel,
+    nativeRuntimeVersion: record.nativeRuntimeVersion,
+    nativeExecutable: record.nativeExecutable,
+    nativeSessionId: record.nativeSessionId,
   };
 }
 
@@ -136,6 +146,7 @@ function fromPersistedRecord(
   return {
     id: persisted.id,
     parentSessionId: persisted.parentSessionId,
+    harness: persisted.harness ?? "pi",
     name: persisted.name,
     task: persisted.task,
     cwd: persisted.cwd,
@@ -148,6 +159,10 @@ function fromPersistedRecord(
     result: persisted.result,
     error: persisted.error,
     contextUsage: persisted.contextUsage,
+    resolvedModel: persisted.resolvedModel,
+    nativeRuntimeVersion: persisted.nativeRuntimeVersion,
+    nativeExecutable: persisted.nativeExecutable,
+    nativeSessionId: persisted.nativeSessionId,
     feedbackSerial: 0,
     toolCalls: new Map(),
     notifyOnCompletion: true,
@@ -191,7 +206,8 @@ function validatePersistedRecord(value: unknown): PersistedSubagentRecord | unde
     typeof record.status !== "string" ||
     typeof record.startedAt !== "number" ||
     typeof record.lastActivityAt !== "number" ||
-    typeof record.activity !== "string"
+    typeof record.activity !== "string" ||
+    (record.harness !== undefined && !["pi", "claude", "codex"].includes(record.harness))
   ) {
     return undefined;
   }

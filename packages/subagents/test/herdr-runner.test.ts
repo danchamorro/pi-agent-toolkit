@@ -21,7 +21,7 @@ import {
   type CoordinationPaths,
 } from "../coordination.ts";
 import type { HerdrChild } from "../herdr.ts";
-import type { SubagentLaunchConfig } from "../launch-config.ts";
+import type { PiLaunchConfig } from "../launch-config.ts";
 
 let testDir = "";
 
@@ -262,8 +262,10 @@ describe("runHerdrSubagent", () => {
   });
 });
 
-function createLaunch(): SubagentLaunchConfig {
+function createLaunch(): PiLaunchConfig {
   return {
+    harness: "pi",
+    backend: "herdr",
     recordId: "sa-1",
     parentSessionId: "parent-session",
     name: "scout",
@@ -279,7 +281,7 @@ function createLaunch(): SubagentLaunchConfig {
   };
 }
 
-function createPaths(launch: SubagentLaunchConfig): CoordinationPaths {
+function createPaths(launch: PiLaunchConfig): CoordinationPaths {
   return createCoordinationPaths({
     parentSessionId: launch.parentSessionId,
     recordId: launch.recordId,

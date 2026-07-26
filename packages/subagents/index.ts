@@ -4,6 +4,7 @@
  * Commands:
  * - /subagent start <task> - start a background sub-agent.
  * - /subagent start <role> <task> - start a role-specific background sub-agent.
+ * - /subagent start --harness=<pi|claude|codex> [role] <task> - select a native harness.
  * - /subagent agents - list bundled and custom sub-agent roles.
  * - /subagent list - show known sub-agents.
  * - /subagent view [id|role] - show sub-agent run or role details.
@@ -19,12 +20,14 @@
  * Shortcut: none.
  *
  * Runs sub-agents in fresh in-process Pi sessions by default, or optionally as
- * fully interactive isolated Pi sessions in one parent-owned Herdr session. On
+ * fully interactive isolated Pi sessions in one parent-owned Herdr session.
+ * Explicit Claude and Codex launches use their native authenticated harnesses
+ * under the same parent lifecycle. On
  * cmux, one helper surface hosts the Herdr client while all children live in
  * Herdr tabs. Children do not inherit the main conversation transcript, can ask the parent for
  * feedback, use bundled or custom roles, and report through one compact status
  * widget and grouped completion path. Concurrency and idle auto-stop remain
- * shared across both backends.
+ * shared across every harness and backend.
  */
 
 import {
@@ -41,9 +44,12 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { type Api, type Model } from "@earendil-works/pi-ai";
 import { Text } from "@earendil-works/pi-tui";
+import { runClaudeSubagent } from "./claude-runner.ts";
 import { CmuxHerdrHostController, detectCmuxEnvironment } from "./cmux.ts";
+import { runCodexSubagent } from "./codex-runner.ts";
 import { HerdrSessionController } from "./herdr.ts";
-import { runHerdrSubagent, type HerdrTerminalResult } from "./herdr-runner.ts";
+import { runHerdrSubagent } from "./herdr-runner.ts";
+import { resolveHarnessEffort, type HarnessTerminalResult } from "./harness.ts";
 import { CompletionReporter } from "./completion-reporter.ts";
 import { writeHerdrFeedbackResponse, writeHerdrStopControl } from "./herdr-controls.ts";
 import { FEEDBACK_MESSAGE_TYPE, SUBAGENT_MESSAGE_TYPE, SUBAGENT_TOOL_NAMES } from "./constants.ts";
@@ -57,11 +63,18 @@ import {
   singleLine,
   splitCommand,
 } from "./format.ts";
-import { createSubagentLaunchConfig, type SubagentLaunchConfig } from "./launch-config.ts";
+import {
+  createNativeLaunchConfig,
+  createSubagentLaunchConfig,
+  type NativeLaunchConfig,
+  type PiLaunchConfig,
+  type SubagentLaunchConfig,
+} from "./launch-config.ts";
 import { formatPathForDisplay, resolveSubagentCwd } from "./paths.ts";
 import { SubagentStore } from "./record-store.ts";
 import { ReloadSafeTimer } from "./reload-safe-timer.ts";
 import {
+  buildNeutralSubagentInstructions,
   buildSubagentSystemPrompt,
   createSubagentResourceLoader,
   formatToolPromptGuidelines,
@@ -93,10 +106,12 @@ import type {
   FeedbackRequest,
   FeedbackRequestDetails,
   ParsedStartArgs,
+  ReasoningEffort,
   SessionThinkingLevel,
   StartSubagentDetails,
   StatusMessageOptions,
   SubagentControlDetails,
+  SubagentHarness,
   SubagentRecord,
   SubagentRole,
 } from "./types.ts";
@@ -164,12 +179,25 @@ export function shouldCloseIdleHerdrRuntime(
   );
 }
 
+export async function prepareHerdrLaunch(
+  record: Pick<SubagentRecord, "backend" | "externalLaunchAbort" | "status">,
+  cleanup?: Promise<void>,
+): Promise<AbortController | undefined> {
+  await cleanup;
+  if (isFinishedStatus(record.status)) return undefined;
+  const abortController = new AbortController();
+  record.externalLaunchAbort = abortController;
+  record.backend = "herdr";
+  return abortController;
+}
+
 export default function (pi: ExtensionAPI) {
   const roleRegistry = loadSubagentRoles();
   const roles = roleRegistry.roles;
   const roleDiagnostics = roleRegistry.diagnostics;
   const limits = roleRegistry.limits;
   const openInHerdr = roleRegistry.openInHerdr;
+  const harnessSettings = roleRegistry.harnesses;
   const rolesByName = new Map(roles.map((role) => [role.name.toLowerCase(), role]));
   const store = new SubagentStore(rolesByName);
 
@@ -212,8 +240,21 @@ export default function (pi: ExtensionAPI) {
   }
 
   function beginParentSession(ctx: ExtensionContext): void {
+    const previousRecords = [...store.values()];
     if (!store.beginParentSession(ctx.sessionManager.getSessionId())) {
       return;
+    }
+    for (const record of previousRecords) {
+      if (!isFinishedStatus(record.status)) {
+        record.status = "interrupted";
+        record.terminalState = "interrupted";
+        record.finishedAt = Date.now();
+        record.pendingFeedback?.cancel("The parent Pi session changed before feedback arrived.");
+        markActivity(record, "Interrupted because the parent Pi session changed.");
+        store.persistNow(record);
+      }
+      record.externalLaunchAbort?.abort();
+      void record.session?.abort().catch(() => undefined);
     }
     reporter.reset();
     const previousHerdr = detachHerdrRuntime();
@@ -398,6 +439,62 @@ export default function (pi: ExtensionAPI) {
     );
   }
 
+  function requestMainSessionFeedback(
+    record: SubagentRecord,
+    rawQuestion: string,
+    rawContext?: string,
+    signal?: AbortSignal,
+  ): Promise<{ requestId: string; status: FeedbackRequestDetails["status"]; text: string }> {
+    const question = rawQuestion.trim();
+    const context = rawContext?.trim();
+    const requestId = `${record.id}-feedback-${++record.feedbackSerial}`;
+    if (record.pendingFeedback) {
+      return Promise.resolve({
+        requestId,
+        status: "cancelled",
+        text: `Sub-agent ${record.id} already has a pending feedback request. Wait for its reply before asking another question.`,
+      });
+    }
+
+    return new Promise((resolve) => {
+      let settled = false;
+      const settle = (status: FeedbackRequestDetails["status"], text: string) => {
+        if (settled) return;
+        settled = true;
+        signal?.removeEventListener("abort", abortHandler);
+        if (record.pendingFeedback?.id === requestId) record.pendingFeedback = undefined;
+        if (record.status !== "stopped" && record.status !== "failed" && status === "answered") {
+          record.status = "running";
+        }
+        markActivity(record, status === "answered" ? "Received feedback from main session." : text);
+        store.persistNow(record);
+        updateStatusWidget();
+        resolve({ requestId, status, text });
+      };
+      const abortHandler = () =>
+        settle("cancelled", "The feedback request was cancelled because the sub-agent stopped.");
+
+      record.status = "waiting for feedback";
+      markActivity(record, `Waiting for feedback: ${question}`);
+      record.pendingFeedback = {
+        id: requestId,
+        question,
+        context,
+        requestedAt: Date.now(),
+        resolve: (feedback) => settle("answered", feedback),
+        cancel: (reason) => settle("cancelled", reason),
+      };
+      store.persistNow(record);
+      if (signal?.aborted) {
+        abortHandler();
+        return;
+      }
+      signal?.addEventListener("abort", abortHandler, { once: true });
+      postFeedbackRequest(record, record.pendingFeedback);
+      updateStatusWidget();
+    });
+  }
+
   function createAskMainSessionTool(
     record: SubagentRecord,
   ): ToolDefinition<typeof AskMainSessionParams, FeedbackRequestDetails> {
@@ -414,69 +511,21 @@ export default function (pi: ExtensionAPI) {
         "Wait for the returned feedback before continuing.",
       ],
       parameters: AskMainSessionParams,
-      execute(_toolCallId, params, signal) {
-        const question = params.question.trim();
-        const context = params.context?.trim();
-        const requestId = `${record.id}-feedback-${++record.feedbackSerial}`;
-
-        return new Promise((resolve) => {
-          let settled = false;
-          const settle = (status: FeedbackRequestDetails["status"], text: string) => {
-            if (settled) {
-              return;
-            }
-            settled = true;
-            signal?.removeEventListener("abort", abortHandler);
-            if (record.pendingFeedback?.id === requestId) {
-              record.pendingFeedback = undefined;
-            }
-            if (record.status !== "stopped" && record.status !== "failed") {
-              record.status = status === "answered" ? "running" : record.status;
-            }
-            markActivity(
-              record,
-              status === "answered" ? "Received feedback from main session." : text,
-            );
-            store.persistNow(record);
-            updateStatusWidget();
-            resolve({
-              content: [{ type: "text", text }],
-              details: {
-                requestId,
-                subagentId: record.id,
-                status,
-              },
-            });
-          };
-
-          const abortHandler = () => {
-            settle(
-              "cancelled",
-              "The feedback request was cancelled because the sub-agent stopped.",
-            );
-          };
-
-          record.status = "waiting for feedback";
-          markActivity(record, `Waiting for feedback: ${question}`);
-          record.pendingFeedback = {
-            id: requestId,
-            question,
-            context,
-            requestedAt: Date.now(),
-            resolve: (feedback: string) => settle("answered", feedback),
-            cancel: (reason: string) => settle("cancelled", reason),
-          };
-          store.persistNow(record);
-
-          if (signal?.aborted) {
-            abortHandler();
-            return;
-          }
-
-          signal?.addEventListener("abort", abortHandler, { once: true });
-          postFeedbackRequest(record, record.pendingFeedback);
-          updateStatusWidget();
-        });
+      async execute(_toolCallId, params, signal) {
+        const feedback = await requestMainSessionFeedback(
+          record,
+          params.question,
+          params.context,
+          signal,
+        );
+        return {
+          content: [{ type: "text", text: feedback.text }],
+          details: {
+            requestId: feedback.requestId,
+            subagentId: record.id,
+            status: feedback.status,
+          },
+        };
       },
     };
   }
@@ -546,19 +595,52 @@ export default function (pi: ExtensionAPI) {
     ctx: ExtensionContext,
     record: SubagentRecord,
   ): SubagentLaunchConfig {
+    if (record.harness !== "pi") {
+      const settings = harnessSettings[record.harness];
+      const effort = resolveHarnessEffort(
+        record.harness,
+        record.requestedReasoningEffort ?? settings.reasoningEffort,
+      );
+      return createNativeLaunchConfig({
+        record,
+        settings,
+        effort,
+        neutralInstructions: buildNeutralSubagentInstructions(record),
+      });
+    }
+
     const tools = getSubagentTools(record);
     const toolPromptGuidelines = getSubagentToolPromptGuidelines(tools);
     return createSubagentLaunchConfig({
       record,
-      model: resolveSubagentModel(ctx, record.role),
-      thinkingLevel: record.role?.thinking ?? (pi.getThinkingLevel() as SessionThinkingLevel),
+      model: resolveSubagentModel(ctx, record.role, record.requestedModel),
+      thinkingLevel:
+        record.requestedReasoningEffort ??
+        record.role?.thinking ??
+        (pi.getThinkingLevel() as SessionThinkingLevel),
       tools,
       systemPrompt: buildSubagentSystemPrompt(ctx, record, toolPromptGuidelines),
       openInHerdr,
     });
   }
 
-  function resolveSubagentModel(ctx: ExtensionContext, role?: SubagentRole): Model<Api> {
+  function resolveSubagentModel(
+    ctx: ExtensionContext,
+    role?: SubagentRole,
+    requestedModel?: string,
+  ): Model<Api> {
+    if (requestedModel) {
+      const slashIndex = requestedModel.indexOf("/");
+      if (slashIndex <= 0 || slashIndex === requestedModel.length - 1) {
+        throw new Error(`Pi model must use provider/model format: ${requestedModel}`);
+      }
+      const model = ctx.modelRegistry.find(
+        requestedModel.slice(0, slashIndex),
+        requestedModel.slice(slashIndex + 1),
+      );
+      if (!model) throw new Error(`Pi model ${requestedModel} is not configured.`);
+      return model;
+    }
     if (!role?.model) {
       if (!ctx.model) {
         throw new Error("No active model selected.");
@@ -577,9 +659,12 @@ export default function (pi: ExtensionAPI) {
 
   function createSubagentRecord(parsed: ParsedStartArgs, ctx: ExtensionContext): SubagentRecord {
     const cwd = parsed.cwd ?? ctx.cwd;
+    const harness = parsed.harness ?? "pi";
+    if (parsed.reasoningEffort) resolveHarnessEffort(harness, parsed.reasoningEffort);
     const record: SubagentRecord = {
       id: store.nextId(),
       parentSessionId: ctx.sessionManager.getSessionId(),
+      harness,
       name: parsed.name,
       task: parsed.task,
       instructions: parsed.instructions,
@@ -594,7 +679,16 @@ export default function (pi: ExtensionAPI) {
       notifyOnCompletion: parsed.notifyOnCompletion ?? true,
       reportCompletionToMain: parsed.reportCompletionToMain ?? false,
       completionGroupId: parsed.completionGroupId,
+      requestedModel: parsed.model,
+      requestedReasoningEffort: parsed.reasoningEffort,
+      toolPolicy: harness === "pi" ? "pi-allowlist" : "native-broad-authority",
     };
+    if (record.role && record.toolPolicy === "native-broad-authority") {
+      addExternalDiagnostic(
+        record,
+        `${record.harness} native runs use broad tool authority; role tool allowlist (${record.role.tools.join(", ")}) is not mechanically enforced.`,
+      );
+    }
     store.add(record);
     updateStatusWidget(ctx);
 
@@ -602,7 +696,12 @@ export default function (pi: ExtensionAPI) {
       postStatusMessage(
         [
           `Started sub-agent ${record.name} (${record.id}).`,
+          `Harness: ${record.harness}`,
           record.role ? `Role: ${record.role.name}` : "",
+          record.requestedModel ? `Model: ${record.requestedModel}` : "",
+          record.toolPolicy === "native-broad-authority"
+            ? "Tool policy: native-broad-authority (role tool allowlists are diagnostic only)."
+            : "",
           `Cwd: ${formatPathForDisplay(record.cwd)}`,
           `Task: ${record.task}`,
         ]
@@ -623,26 +722,26 @@ export default function (pi: ExtensionAPI) {
       record.launchToken = launch.launchToken;
     } catch (error) {
       finishExternalSubagent(record, {
-        kind: "terminal",
         status: "failed",
         error: messageFromUnknownError(error),
       });
       return;
     }
 
+    record.resolvedModel =
+      launch.harness === "pi" ? `${launch.model.provider}/${launch.model.id}` : launch.model;
+    store.persistNow(record);
+    if (launch.harness !== "pi") {
+      await runNativeSubagent(record, launch);
+      return;
+    }
     if (!launch.openInHerdr) {
       await runInProcessSubagent(record, ctx, launch);
       return;
     }
 
-    if (herdrCleanupPromise) {
-      await herdrCleanupPromise;
-    }
-    if (isFinishedStatus(record.status)) {
-      return;
-    }
-    record.backend = "herdr";
-    record.externalLaunchAbort = new AbortController();
+    const herdrAbort = await prepareHerdrLaunch(record, herdrCleanupPromise);
+    if (!herdrAbort) return;
     herdrController ??= new HerdrSessionController({
       parentSessionId: launch.parentSessionId,
     });
@@ -653,7 +752,7 @@ export default function (pi: ExtensionAPI) {
     const terminal = await runHerdrSubagent({
       launch,
       controller: herdrController,
-      beforeDispatchSignal: record.externalLaunchAbort.signal,
+      beforeDispatchSignal: herdrAbort.signal,
       async onServerReady(sessionName) {
         if (cmuxHostController) {
           await cmuxHostController.launchHost(sessionName);
@@ -754,13 +853,65 @@ export default function (pi: ExtensionAPI) {
       return;
     }
 
+    finishExternalSubagent(record, {
+      status: terminal.status,
+      result: terminal.result,
+      error: terminal.error,
+      contextUsage: terminal.contextUsage,
+    });
+  }
+
+  async function runNativeSubagent(
+    record: SubagentRecord,
+    launch: NativeLaunchConfig,
+  ): Promise<void> {
+    const abortController = new AbortController();
+    record.externalLaunchAbort = abortController;
+    record.backend = launch.backend;
+    record.status = "running";
+    markActivity(record, `Starting ${launch.harness} native harness.`);
+    store.persistNow(record);
+    updateStatusWidget();
+    const callbacks = {
+      activity(text: string, usage?: SubagentRecord["contextUsage"]) {
+        if (usage) record.contextUsage = usage;
+        markActivity(record, text);
+        store.persistNow(record);
+        updateStatusWidget();
+      },
+      async askMainSession(question: string, context?: string): Promise<string> {
+        const feedback = await requestMainSessionFeedback(
+          record,
+          question,
+          context,
+          abortController.signal,
+        );
+        if (feedback.status !== "answered") throw new Error(feedback.text);
+        return feedback.text;
+      },
+    };
+    let terminal: HarnessTerminalResult;
+    try {
+      terminal =
+        launch.harness === "claude"
+          ? await runClaudeSubagent(launch, callbacks, abortController.signal)
+          : await runCodexSubagent(launch, callbacks, abortController.signal);
+    } catch (error) {
+      terminal = {
+        status: abortController.signal.aborted ? "stopped" : "failed",
+        error: messageFromUnknownError(error),
+      };
+    } finally {
+      abortController.abort();
+      record.externalLaunchAbort = undefined;
+    }
     finishExternalSubagent(record, terminal);
   }
 
   async function runInProcessSubagent(
     record: SubagentRecord,
     ctx: ExtensionContext,
-    launch: SubagentLaunchConfig,
+    launch: PiLaunchConfig,
   ): Promise<void> {
     try {
       record.backend = "in-process";
@@ -854,11 +1005,12 @@ export default function (pi: ExtensionAPI) {
     record.dispatchState = undefined;
   }
 
-  function finishExternalSubagent(record: SubagentRecord, terminal: HerdrTerminalResult): void {
-    if (terminal.kind !== "terminal") {
-      return;
-    }
+  function finishExternalSubagent(record: SubagentRecord, terminal: HarnessTerminalResult): void {
     record.contextUsage = terminal.contextUsage ?? record.contextUsage;
+    record.resolvedModel = terminal.resolvedModel ?? record.resolvedModel;
+    record.nativeSessionId = terminal.nativeSessionId ?? record.nativeSessionId;
+    record.nativeRuntimeVersion = terminal.nativeRuntimeVersion ?? record.nativeRuntimeVersion;
+    record.nativeExecutable = terminal.nativeExecutable ?? record.nativeExecutable;
     if (isFinishedStatus(record.status)) {
       clearExternalRecordState(record);
       store.persistNow(record);
@@ -881,7 +1033,9 @@ export default function (pi: ExtensionAPI) {
           ? "Failed."
           : terminal.status === "stopped"
             ? "Stopped."
-            : "Interrupted because the Herdr child tab closed.",
+            : record.backend === "herdr"
+              ? "Interrupted because the Herdr child tab closed."
+              : "Interrupted because the native harness ended unexpectedly.",
     );
     store.persistNow(record);
     updateStatusWidget();
@@ -902,7 +1056,13 @@ export default function (pi: ExtensionAPI) {
 
   async function startSubagent(args: string, ctx: ExtensionCommandContext): Promise<void> {
     beginParentSession(ctx);
-    const parsed = parseStartArgs(args, rolesByName);
+    let parsed: ParsedStartArgs | null;
+    try {
+      parsed = parseStartArgs(args, rolesByName);
+    } catch (error) {
+      ctx.ui.notify(messageFromUnknownError(error), "warning");
+      return;
+    }
     if (!parsed) {
       ctx.ui.notify("Usage: /subagent start <task> or /subagent start <role> <task>", "warning");
       return;
@@ -930,6 +1090,9 @@ export default function (pi: ExtensionAPI) {
       instructions?: string;
       name?: string;
       cwd?: string;
+      harness?: SubagentHarness;
+      model?: string;
+      reasoning_effort?: ReasoningEffort;
     },
     ctx: ExtensionContext,
   ): StartSubagentDetails {
@@ -939,6 +1102,17 @@ export default function (pi: ExtensionAPI) {
       return {
         status: "error",
         error: "task is required.",
+        availableRoles: availableRoleNames(),
+      };
+    }
+
+    const harness = params.harness ?? "pi";
+    try {
+      if (params.reasoning_effort) resolveHarnessEffort(harness, params.reasoning_effort);
+    } catch (error) {
+      return {
+        status: "error",
+        error: messageFromUnknownError(error),
         availableRoles: availableRoleNames(),
       };
     }
@@ -979,6 +1153,9 @@ export default function (pi: ExtensionAPI) {
         instructions: params.instructions?.trim() || undefined,
         role,
         cwd: cwdResult.cwd,
+        harness,
+        model: params.model?.trim() || undefined,
+        reasoningEffort: params.reasoning_effort,
         notifyOnStart: false,
         notifyOnCompletion: false,
         reportCompletionToMain: true,
@@ -1009,6 +1186,23 @@ export default function (pi: ExtensionAPI) {
     markActivity(record, stopReason);
     store.persistNow(record);
     updateStatusWidget();
+
+    if (record.backend === "claude-sdk" || record.backend === "codex-app-server") {
+      record.externalLaunchAbort?.abort();
+      if (record.completion) {
+        await Promise.race([
+          record.completion.catch(() => undefined),
+          delay(HERDR_GRACEFUL_STOP_TIMEOUT_MS),
+        ]);
+      }
+      reporter.flush();
+      return detailsForControl(
+        "stop",
+        "stopped",
+        record,
+        `Stopped sub-agent ${record.name} (${record.id}).`,
+      );
+    }
 
     try {
       await record.session?.abort();
@@ -1316,6 +1510,7 @@ export default function (pi: ExtensionAPI) {
               "- /subagent start <task>",
               "- /subagent start <name>: <task>",
               "- /subagent start <role> <task>",
+              "- /subagent start --harness=<pi|claude|codex> [role] <task>",
               "- /subagent agents",
               "- /subagent list",
               "- /subagent view [id|role]",
@@ -1334,7 +1529,7 @@ export default function (pi: ExtensionAPI) {
     name: "start_subagent",
     label: "Start Subagent",
     description:
-      "Start an in-process background Pi sub-agent for delegated work. " +
+      "Start a background Pi, Claude Code, or Codex sub-agent for delegated work. Pi is the default. " +
       "Create a task-specific specialization with instructions, or use an optional configured role preset. " +
       "The tool returns after launch so the main session stays interruptible while the sub-agent runs.",
     promptSnippet: `Launch a task-specialized background sub-agent and return control immediately. Optional role presets: ${availableRoleNames().join(", ")}.`,
@@ -1542,6 +1737,20 @@ export default function (pi: ExtensionAPI) {
       activeRecords.map(async (record) => {
         if (record.backend === "herdr") {
           await stopHerdrSubagentRecord(record, "The main Pi session shut down.");
+        } else if (record.backend === "claude-sdk" || record.backend === "codex-app-server") {
+          record.status = "interrupted";
+          record.terminalState = "interrupted";
+          record.finishedAt = Date.now();
+          record.pendingFeedback?.cancel("The Pi session shut down before feedback arrived.");
+          markActivity(record, "Interrupted because the main session shut down.");
+          store.persistNow(record);
+          record.externalLaunchAbort?.abort();
+          if (record.completion) {
+            await Promise.race([
+              record.completion.catch(() => undefined),
+              delay(HERDR_GRACEFUL_STOP_TIMEOUT_MS),
+            ]);
+          }
         } else {
           try {
             await record.session?.abort();

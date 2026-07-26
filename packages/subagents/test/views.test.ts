@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { formatRoleDetails, formatRoleList, formatSubagentList } from "../views.ts";
+import {
+  formatRecordDetails,
+  formatRoleDetails,
+  formatRoleList,
+  formatSubagentList,
+} from "../views.ts";
 import type { SubagentRecord, SubagentRole } from "../types.ts";
 
 function role(overrides: Partial<SubagentRole> & Pick<SubagentRole, "name">): SubagentRole {
@@ -28,6 +33,7 @@ function record(
   return {
     id: overrides.id,
     parentSessionId: overrides.parentSessionId ?? "parent-session",
+    harness: overrides.harness ?? "pi",
     name: overrides.name,
     task: overrides.task ?? "Map the package source.",
     cwd: overrides.cwd ?? "/repo",
@@ -51,6 +57,8 @@ function record(
     notifyOnCompletion: overrides.notifyOnCompletion ?? false,
     reportCompletionToMain: overrides.reportCompletionToMain ?? false,
     completionGroupId: overrides.completionGroupId,
+    toolPolicy: overrides.toolPolicy,
+    externalDiagnostics: overrides.externalDiagnostics,
   };
 }
 
@@ -89,6 +97,23 @@ describe("subagent views", () => {
     assert.match(output, /Tools: read, bash, edit, ask_main_session/);
     assert.match(output, /Source: custom, overridden/);
     assert.match(output, /Start: \/subagent start custom-review <task>/);
+  });
+
+  it("shows when a native role tool allowlist is diagnostic only", () => {
+    const output = formatRecordDetails(
+      record({
+        id: "sa-1",
+        name: "worker",
+        harness: "codex",
+        toolPolicy: "native-broad-authority",
+        externalDiagnostics: [
+          "codex native runs use broad tool authority; role tool allowlist (read, bash) is not mechanically enforced.",
+        ],
+      }),
+    );
+
+    assert.match(output, /Tool policy: native-broad-authority/u);
+    assert.match(output, /Diagnostic: codex native runs use broad tool authority/u);
   });
 
   it("prioritizes feedback requests above running and recent subagents", () => {

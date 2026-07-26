@@ -1,9 +1,10 @@
 # @danchamorro/pi-subagents
 
 Background sub-agents for Pi that run focused tasks while the main session
-stays in control. They use fresh in-process sessions by default and can
-optionally run fully interactive child Pi sessions in one isolated Herdr
-session.
+stays in control. Pi remains the default harness through fresh in-process
+sessions or optional interactive Herdr children. Explicit launches can instead
+use the user's native Claude Code or Codex CLI subscription login while keeping
+the same Pi-owned lifecycle, controls, and completion path.
 
 This package adds a practical delegation layer to Pi. You can start a scout to
 map unfamiliar code, ask a planner for an implementation plan, run a reviewer
@@ -26,6 +27,7 @@ burning the main session's remaining context.
 - [Custom Agents](#custom-agents)
 - [Role Settings](#role-settings)
 - [Session Limits](#session-limits)
+- [Native Claude and Codex Harnesses](#native-claude-and-codex-harnesses)
 - [Interactive Herdr Session](#interactive-herdr-session)
 - [User Commands](#user-commands)
 - [Main-Agent Tools](#main-agent-tools)
@@ -40,7 +42,10 @@ burning the main session's remaining context.
 - **Fresh context for every child session.** Sub-agents run as new Pi sessions
   with a task-specific system prompt instead of inheriting the full parent
   transcript.
-- **Safe default plus interactive Herdr mode.** Sub-agents run in-process by
+- **Pi stays the default.** Calls without `harness` retain the existing
+  in-process or Herdr behavior. Explicit `claude` and `codex` launches use the
+  native authenticated tools without routing through Pi's model registry.
+- **Safe default plus interactive Herdr mode.** Pi sub-agents run in-process by
   default. Opt-in Herdr mode launches real isolated Pi TUIs in one owned Herdr
   session while preserving the same parent controls and completion reporting.
   On cmux, one helper surface shows the complete Herdr UI.
@@ -198,7 +203,7 @@ Role files support these fields:
 |---|---|
 | `name` | Role name used by `/subagent start <role> <task>` and `start_subagent.role`. |
 | `description` | Short role description shown in `/subagent agents`. |
-| `tools` | Maximum Pi tools requested by that role. The child receives only tools also active in the parent; `ask_main_session` is added automatically. |
+| `tools` | Maximum Pi tools requested by that role. Pi children receive only tools also active in the parent; `ask_main_session` is added automatically. Native harnesses do not apply this Pi allowlist. |
 | `model` | Optional `provider/model` override. If omitted, the child uses the active model. |
 | `thinking` | Optional thinking level override, including `off`. |
 | `auto-exit` | Tells the role to return a final result when the task is done. |
@@ -282,9 +287,9 @@ Supported override fields are:
 
 | Field | Meaning |
 |---|---|
-| `model` | Optional `provider/model` model override for that role. |
-| `thinking` | Optional thinking level override, including `off`. |
-| `tools` | Optional tool allowlist as an array or comma-separated string. |
+| `model` | Optional Pi `provider/model` override for that role. Native harnesses ignore role model fields. |
+| `thinking` | Optional Pi thinking level override, including `off`. Native harnesses use their own effort setting. |
+| `tools` | Optional Pi tool allowlist as an array or comma-separated string. Native harnesses ignore it. |
 
 Invalid override values are ignored with a warning and the role keeps its last
 valid value. Unknown role names are also reported in `/subagent agents`, which
@@ -312,6 +317,96 @@ Each active sub-agent is a full background model session, so the concurrency cap
 guards against runaway cost and provider rate limits. Idle auto-stop is opt-in
 so background work is never killed unless you ask for it. Invalid values are
 ignored with a warning in `/subagent agents` and the default is used.
+
+## Native Claude and Codex Harnesses
+
+Native harnesses are explicit and local-only. They are not Herdr transports and
+do not use Pi model providers.
+
+```json
+{
+  "subagents": {
+    "harnesses": {
+      "claude": {
+        "model": "claude-opus-5",
+        "reasoningEffort": "high"
+      },
+      "codex": {
+        "executable": "~/.local/bin/codex",
+        "model": "gpt-5.6-sol",
+        "reasoningEffort": "high"
+      }
+    }
+  }
+}
+```
+
+Claude requires Claude Code 2.1.219 or newer, the optional
+`@anthropic-ai/claude-agent-sdk` 0.3.220 dependency, and an authenticated
+Claude subscription from `claude auth status` on the first-party API. Provider,
+endpoint, and credential environment overrides (including `ANTHROPIC_API_KEY`)
+must be unset so the launch cannot silently change backend or billing source;
+they are also stripped from the preflight and SDK child environments. Claude
+runs with the native `claude_code` prompt, adaptive thinking, the requested effort, and
+`bypassPermissions`. Role Pi tool allowlists do not constrain native tools.
+Claude mechanically denies the native `Agent` and `Task` tools. The configured
+model must appear in Claude's initialization model catalog; no fallback model
+is configured or accepted.
+
+Codex requires the configured executable to be an absolute executable path and
+exactly Codex CLI 0.145.0 while app-server remains experimental. Every child
+owns one `codex app-server --stdio` process and ephemeral thread. The client
+validates ChatGPT authentication, `model/list`, and advertised effort values
+before dispatch. It uses `approvalPolicy: "never"` and
+`sandbox: "danger-full-access"`; unexpected approval requests are declined.
+The app-server protocol is bounded, fail-closed, and pinned to the observed
+0.145.0 method shapes. Role Pi tool allowlists do not constrain Codex's native
+tools; the child prompt forbids nested agents, but that restriction is not a
+Codex tool allowlist.
+
+Both native harnesses have broad filesystem and command authority under the
+user's native configuration. The selected cwd is an execution anchor, not a
+sandbox or trust check, so the caller remains responsible for selecting a
+trusted directory. Claude subscription routing is experimental for the local
+user's own login and must not be published without a separate current
+Anthropic terms review. The pinned SDK does not declare an open-source SPDX
+license: its package metadata says `SEE LICENSE IN README.md`, and that README
+points to Anthropic's Commercial Terms. It adds about 4.1 MB itself plus a
+roughly 257 MB native platform package when installed. npm resolves its declared
+Anthropic and MCP SDK peers transitively when the optional Agent SDK is
+installed; this package depends directly only on Zod for its feedback schema.
+
+Supported native reasoning efforts are `low`, `medium`, `high`, `xhigh`, and
+`max`. `off` and `minimal` are rejected rather than rounded. The pinned Codex
+0.145.0 catalog advertises those five values for `gpt-5.6-sol` (plus native
+`ultra`, which this uniform public API does not expose). The pinned Claude SDK
+exposes those five values and the selected model catalog is checked at launch.
+
+Both adapters expose `ask_main_session`: Claude through an in-process SDK MCP
+tool, Codex through the app-server's experimental dynamic-tool request. Status
+uses each native runtime's current context snapshot rather than cumulative token
+usage, so compaction can reduce the displayed percentage. Stop, reload, and
+shutdown cancel pending feedback and terminate native resources.
+
+Examples:
+
+```text
+/subagent start --harness=claude reviewer Review the current diff.
+/subagent start --harness=codex worker Implement the requested change.
+```
+
+```ts
+start_subagent({
+  harness: "claude",
+  role: "reviewer",
+  task: "Review the current diff.",
+});
+```
+
+The `pi-agent-toolkit` repository also contains a host-aware personal routing
+skill for natural-language selection. That skill is installed by the toolkit's
+setup process and does not ship in this npm package. The extension itself still
+defaults every omitted `harness` to Pi.
 
 ## Interactive Herdr Session
 
@@ -370,7 +465,9 @@ The package registers one slash command namespace: `/subagent`.
 | `/subagent` | Shows current sub-agent status. |
 | `/subagent help` | Lists available sub-agent commands. |
 | `/subagent agents` | Lists bundled and custom roles, tools, model, thinking settings, source, and warnings. |
-| `/subagent start <task>` | Starts a generic background sub-agent using the current model and thinking level. |
+| `/subagent start <task>` | Starts a generic Pi background sub-agent using the current model and thinking level. |
+| `/subagent start --harness=claude [role] <task>` | Starts a native Claude Code child. The flag must lead the start arguments. |
+| `/subagent start --harness=codex [role] <task>` | Starts a native Codex app-server child. The flag must lead the start arguments. |
 | `/subagent start <role> <task>` | Starts a role-specific background sub-agent. |
 | `/subagent start <name>: <task>` | Starts a named sub-agent; if `<name>` matches a role, that role is used. |
 | `/subagent list` | Lists all known active and recent sub-agents. |
@@ -395,6 +492,10 @@ the other repo" without typing slash commands.
 | `reply_subagent` | Replies to a waiting feedback request. If exactly one sub-agent is waiting, the id can be omitted. |
 | `ask_main_session` | Child-only tool that lets a sub-agent ask the main session for a decision, missing path, credential, or preference. |
 
+`start_subagent` accepts `harness`, `model`, and `reasoning_effort` in addition
+to the existing fields. Missing `harness` means `pi`. Explicit native model or
+effort values override harness settings and never cause cross-harness fallback.
+
 The main agent can omit `role` and pass ephemeral `instructions` that define a
 sub-agent's perspective, scope, and expected output for one run. These
 instructions specialize the child without creating a persistent role or
@@ -416,11 +517,14 @@ the child runs, and the full result remains available through
 1. The package registers `/subagent`, parent controls, renderers, and lifecycle
    handlers in [index.ts](index.ts#L1).
 2. Each record is owned by the exact parent Pi session id. Lightweight recovery
-   metadata lives under that session's directory, so concurrent same-cwd
-   sessions cannot see or overwrite each other's `sa-N` records.
-3. The shared launch configuration resolves cwd, model, thinking, tools, task,
-   and the task-specific system prompt once for both execution backends.
-4. The default backend creates a fresh `SessionManager.inMemory(...)` child in
+   metadata, including native harness, executable, and session id display
+   fields, lives under that session's directory, so concurrent same-cwd sessions
+   cannot see or overwrite each other's `sa-N` records. Credentials, native
+   session objects, and conversation transcripts are never persisted.
+3. A discriminated launch configuration separates the user-facing harness from
+   its execution backend. Only Pi resolves Pi models, tools, prompt guidelines,
+   and `openInHerdr`; native adapters receive harness-neutral child instructions.
+4. The default Pi backend creates a fresh `SessionManager.inMemory(...)` child in
    the parent process. It does not persist the child conversation.
 5. With Herdr enabled, the package starts a parent-owned named Herdr server,
    creates a workspace/tab for the child, and uses Herdr's `agent start` with an
@@ -438,7 +542,9 @@ the child runs, and the full result remains available through
 8. The status widget refreshes while work is active and keeps recent terminal
    records visible. Tool-launched results still flow through one grouped hidden
    completion report.
-9. On completion, failure, stop, or interruption, the parent records final
+9. Native Claude and Codex children normalize activity, context usage, feedback,
+   cancellation, and terminal results into the same record and reporter path.
+10. On completion, failure, stop, or interruption, the parent records final
    status, cancels pending feedback, and removes private run artifacts. After
    the final interactive child reaches a terminal state, it stops/deletes the
    named Herdr session and closes its optional cmux host.
@@ -540,6 +646,14 @@ node --test packages/subagents/test/herdr-integration.test.ts
 The harness uses a unique named Herdr session, never touches the default
 session, and stops/deletes every session and workspace it creates.
 
+Native completion, feedback, and stop smoke tests are also opt-in because they
+consume subscription usage:
+
+```bash
+PI_SUBAGENTS_REAL_CLAUDE=1 node --test packages/subagents/test/native-live.test.ts
+PI_SUBAGENTS_REAL_CODEX=1 node --test packages/subagents/test/native-live.test.ts
+```
+
 Recommended validation before committing package changes:
 
 ```bash
@@ -556,10 +670,13 @@ developing this package from a checkout.
 
 ## Current Scope
 
-- In-process execution remains the default. Interactive Herdr mode is opt-in
-  and requires Herdr 0.7.5 or newer.
-- Recovery metadata is scoped to the owning parent Pi session. Full in-process
-  child conversations are not persisted.
+- Pi in-process execution remains the default. Interactive Herdr mode is Pi-only,
+  opt-in, and requires Herdr 0.7.5 or newer.
+- Native Claude and Codex are explicit, local, non-resumable harnesses. No
+  requested native launch falls back to Pi or another model.
+- Recovery metadata is scoped to the owning parent Pi session and retains native
+  executable/session-id display fields. Full child conversations, credentials,
+  and resumable native session objects are not persisted.
 - External child JSONL and coordination files are private and deleted
   immediately after bounded result extraction. Transcript retention and
   automatic orphan adoption are not supported.
@@ -589,7 +706,10 @@ These boundaries keep the feature predictable while the package matures.
 | [herdr-runner.ts](herdr-runner.ts#L1) | Child artifacts, dispatch boundary, coordination supervision, result extraction, and cleanup. |
 | [cmux.ts](cmux.ts#L1) | Optional focus-safe single-surface host for the Herdr client. |
 | [coordination.ts](coordination.ts#L1), [herdr-controls.ts](herdr-controls.ts#L1) | Private atomic file protocol and token-scoped parent controls. |
-| [launch-config.ts](launch-config.ts#L1) | Shared resolved launch decisions used by both execution backends. |
+| [launch-config.ts](launch-config.ts#L1) | Discriminated Pi, Claude, and Codex launch decisions. |
+| [harness.ts](harness.ts#L1) | Shared native runner terminal, callback, and effort-mapping contract. |
+| [claude-runner.ts](claude-runner.ts#L1) | Claude Code version/auth/model preflight, Agent SDK streaming, feedback, and cleanup. |
+| [codex-app-server.ts](codex-app-server.ts#L1), [codex-runner.ts](codex-runner.ts#L1) | Bounded Codex JSON-RPC process client and native adapter. |
 | [agents/](agents/) | Bundled role prompts for planner, scout, reviewer, and worker. |
 | [roles.ts](roles.ts#L1) | Built-in/custom role loading, settings overrides and limits, frontmatter validation, and `/subagent start` argument parsing. |
 | [record-store.ts](record-store.ts#L1) | In-memory sub-agent record store: id allocation, lookups, recovery loading, and debounced/eager persistence scheduling. |
