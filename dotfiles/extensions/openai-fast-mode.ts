@@ -2,8 +2,8 @@
  * OpenAI Fast Mode Extension
  *
  * Adds `/fast on|off|status` for subscription-backed OpenAI Codex models.
- * Fast mode starts disabled and sends `service_tier: "priority"` only for
- * documented GPT-5.4 through GPT-5.6 model families.
+ * Fast mode starts disabled and requests roughly 1.5x speed at 2.5x ChatGPT
+ * credit usage for GPT-5.5/5.6, or 2x credit usage for GPT-5.4.
  */
 
 import type {
@@ -11,9 +11,17 @@ import type {
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 
+const FAST_MODE_MODELS = new Set([
+  "gpt-5.4",
+  "gpt-5.4-mini",
+  "gpt-5.5",
+  "gpt-5.6-luna",
+  "gpt-5.6-sol",
+  "gpt-5.6-terra",
+]);
+
 const supportsFastMode = (ctx: ExtensionContext) =>
-  ctx.model?.provider === "openai-codex" &&
-  /^gpt-5\.(?:4|5|6)(?:$|-)/.test(ctx.model.id);
+  ctx.model?.provider === "openai-codex" && FAST_MODE_MODELS.has(ctx.model.id);
 
 export default function (pi: ExtensionAPI) {
   let enabled = false;
@@ -21,7 +29,7 @@ export default function (pi: ExtensionAPI) {
   const updateStatus = (ctx: ExtensionContext) => {
     ctx.ui.setStatus(
       "openai-fast-mode",
-      enabled && supportsFastMode(ctx) ? "fast" : undefined,
+      enabled && supportsFastMode(ctx) ? "fast requested" : undefined,
     );
   };
 
@@ -57,7 +65,7 @@ export default function (pi: ExtensionAPI) {
       updateStatus(ctx);
       const available = supportsFastMode(ctx);
       ctx.ui.notify(
-        `Fast mode: ${enabled ? (available ? "on" : "unavailable for current model") : "off"}`,
+        `Fast mode: ${enabled ? (available ? "requested" : "unavailable for current model") : "off"}`,
         enabled && !available ? "warning" : "info",
       );
     },

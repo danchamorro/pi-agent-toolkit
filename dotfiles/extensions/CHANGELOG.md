@@ -7,10 +7,12 @@ All notable changes to extensions in `~/.pi/agent/extensions/`.
 ### openai-fast-mode.ts
 
 - Added an opt-in `/fast` toggle for subscription-backed OpenAI Codex models
-  that requests OpenAI's priority service tier for supported GPT-5.4 through
-  GPT-5.6 model families.
-- Kept Fast mode disabled by default because faster responses consume credits
-  at a higher rate.
+  that requests OpenAI's priority service tier for the current supported
+  GPT-5.4 through GPT-5.6 model IDs.
+- Kept Fast mode disabled by default and clarified its roughly 1.5x speed,
+  2x GPT-5.4 credit rate, and 2.5x GPT-5.5/GPT-5.6 credit rate.
+- Labelled the footer as `fast requested` because final routing remains
+  controlled by OpenAI.
 
 ## 2026-07-26
 
