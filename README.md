@@ -6,7 +6,7 @@ skills, configs, safety guardrails, and installable packages. This is a
 public backup and reference for how I organize my own agent environment,
 not a universal starter kit intended to be cloned unchanged by everyone.
 
-Includes 27 extensions, 62 skills, 1 prompt template, 1 theme,
+Includes 28 extensions, 62 skills, 1 prompt template, 1 theme,
 8 installable Pi packages, MCP server configurations, and safety guardrails.
 It also tracks 2 custom sub-agent roles for local use with the subagents
 package.
@@ -168,7 +168,7 @@ pi install git:github.com/DietrichGebert/ponytail
 | `pi-diff-review` | Native diff review window for Pi. Adds a `/diff-review` command that opens changed files in a Monaco diff editor and turns review notes into a prompt back in Pi. | [badlogic/pi-diff-review](https://github.com/badlogic/pi-diff-review) |
 | `ponytail` | Lazy senior developer mode for Pi. Adds `/ponytail` controls, prompt injection, and simplification-focused skills. | [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail) |
 
-### Extensions (27)
+### Extensions (28)
 
 All extensions live in `dotfiles/extensions/`.
 
@@ -189,6 +189,7 @@ All extensions live in `dotfiles/extensions/`.
 | `exa-search-tool.ts` | Registers Exa as a semantic web search tool |
 | `file-search/` | Registers `fd` and `rg` as first-class file-name and exact-text search tools |
 | `exa-enforce.ts` | Enforces Exa over ad-hoc web search methods |
+| `openai-fast-mode.ts` | Adds an opt-in `/fast` toggle for supported subscription-backed OpenAI Codex models |
 | `tilldone.ts` | Task list management with progress tracking |
 | `tools.ts` | Custom tool registrations |
 

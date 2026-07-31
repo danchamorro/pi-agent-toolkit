@@ -2,6 +2,16 @@
 
 All notable changes to extensions in `~/.pi/agent/extensions/`.
 
+## 2026-07-30
+
+### openai-fast-mode.ts
+
+- Added an opt-in `/fast` toggle for subscription-backed OpenAI Codex models
+  that requests OpenAI's priority service tier for supported GPT-5.4 through
+  GPT-5.6 model families.
+- Kept Fast mode disabled by default because faster responses consume credits
+  at a higher rate.
+
 ## 2026-07-26
 
 ### subagents package

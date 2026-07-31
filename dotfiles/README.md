@@ -10,7 +10,7 @@ directory into the appropriate agent paths. External skills are tracked separate
 
 ```
 dotfiles/
-  extensions/ ............. 27 extensions (.ts files and subdirectories)
+  extensions/ ............. 28 extensions (.ts files and subdirectories)
   agents/ ................. Custom sub-agent roles (-> ~/.pi/agent/agents/)
   agent-skills/ ........... Pi-only skills        (-> ~/.pi/agent/skills/)
   personal-skills/ ........ Personal skills       (-> ~/.agents/skills/<category>/<skill> and ~/.claude/skills/<skill>)
@@ -78,7 +78,7 @@ operations.
 
 ## Extensions
 
-See the [root README Extensions section](../README.md#extensions-27) for the
+See the [root README Extensions section](../README.md#extensions-28) for the
 full list with descriptions.
 
 ## Safety guardrails (Damage Control)
