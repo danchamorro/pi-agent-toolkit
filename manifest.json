@@ -44,7 +44,7 @@
     }
   ],
   "packages": [
-    "npm:@danchamorro/pi-subagents",
+    "npm:pi-subagents",
     "npm:@danchamorro/pi-agent-modes",
     "npm:@danchamorro/pi-prompt-enhancer",
     "npm:pi-design-deck",

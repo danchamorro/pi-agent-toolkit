@@ -140,7 +140,7 @@ npm run update:packages   # Pi packages from manifest.json
 This setup installs eight Pi packages via `manifest.json`:
 
 ```bash
-pi install npm:@danchamorro/pi-subagents
+pi install npm:pi-subagents
 pi install npm:@danchamorro/pi-agent-modes
 pi install npm:@danchamorro/pi-prompt-enhancer
 pi install npm:pi-design-deck
@@ -158,10 +158,14 @@ pi install git:github.com/DietrichGebert/ponytail
 | [agent-modes](packages/agent-modes) | Switch between code, architect, debug, ask, and review modes with enforced tool restrictions, bash allowlists, and per-mode model assignment | [![npm](https://img.shields.io/npm/v/@danchamorro/pi-agent-modes)](https://www.npmjs.com/package/@danchamorro/pi-agent-modes) |
 | [prompt-enhancer](packages/prompt-enhancer) | Rewrite prompts to be clearer and more actionable before sending | [![npm](https://img.shields.io/npm/v/@danchamorro/pi-prompt-enhancer)](https://www.npmjs.com/package/@danchamorro/pi-prompt-enhancer) |
 
+`@danchamorro/pi-subagents` remains published for existing users but is no
+longer installed by this setup.
+
 **Also installed as part of this setup:**
 
 | Package | Description | Source |
 |---|---|---|
+| `pi-subagents` | Delegate work through single, parallel, chained, background, and forked-context Pi sub-agents. Bundles the `pi-subagents` orchestration skill. | [nicobailon/pi-subagents](https://github.com/nicobailon/pi-subagents) |
 | `pi-design-deck` | Present multi-slide visual decision decks with high-fidelity previews. Bundles the `design-deck` skill used in this setup. | [nicobailon/pi-design-deck](https://github.com/nicobailon/pi-design-deck) |
 | `pi-annotate` | Visual browser annotation for AI-assisted UI debugging. Adds `/annotate` plus companion Chrome extension tooling. | [nicobailon/pi-annotate](https://github.com/nicobailon/pi-annotate) |
 | `@narumitw/pi-goal` | Goal-driven task completion for Pi. Adds `/goal` mode plus `goal_complete` for verifiable long-running work. | [narumiruna/pi-extensions](https://github.com/narumiruna/pi-extensions) |
@@ -262,7 +266,7 @@ roots. Unmanaged and third-party directories are reported and left in place.
 | `engineering` | `post-mortem` | Produce engineering root-cause writeups after fixed and validated bugs |
 | `planning` | `plan-reviewer` | Review implementation plans for evidence, trackability, dependencies, risks, and validation before execution |
 | `engineering` | `scrutinize` | Outsider-perspective review of plans, PRs, diffs, and code changes |
-| `engineering` | `subagents` | Route delegation through host-supported mechanisms; in Pi, keep generic requests on Pi and honor explicit Claude Code or Codex harness requests |
+| `engineering` | `subagents` | Route delegation through host-supported mechanisms; in Pi, defer orchestration to the installed `pi-subagents` package |
 | `developer-workflow` | `sql-specialist` | Write, review, explain, and optimize SQL queries, schemas, DDL, ERDs, and execution plans |
 | `docs-communication` | `technical-docs` | Technical documentation standards |
 | `engineering` | `test-author` | Create or update targeted tests using project-native conventions and validation |
@@ -278,13 +282,14 @@ roots. Unmanaged and third-party directories are reported and left in place.
 |-------|-------------|
 | `exa-search` | Semantic web search via Exa API |
 
-**Package-provided skills** (7, installed via Pi packages):
+**Package-provided skills** (8, installed via Pi packages):
 
 Installed automatically when these packages are present in
 `manifest.json`.
 
 | Skill | Source |
 |-------|--------|
+| `pi-subagents` | [`npm:pi-subagents`](https://github.com/nicobailon/pi-subagents) |
 | `design-deck` | [`npm:pi-design-deck`](https://github.com/nicobailon/pi-design-deck) |
 | `ponytail` | [`git:github.com/DietrichGebert/ponytail`](https://github.com/DietrichGebert/ponytail) |
 | `ponytail-review` | [`git:github.com/DietrichGebert/ponytail`](https://github.com/DietrichGebert/ponytail) |
@@ -317,7 +322,7 @@ Not committed to this repo. Maintained by their original authors.
 
 Custom sub-agent roles live in `dotfiles/agents/` and are installed to
 `~/.pi/agent/agents/`. These are user-managed role prompts consumed by
-`@danchamorro/pi-subagents`; they are not bundled into the npm package.
+`pi-subagents`; they are not bundled into the npm package.
 
 | Role | Description |
 |------|-------------|
@@ -387,7 +392,7 @@ it into the live agent directories:
 | Component | Repo-owned source | Installed or linked to | Notes |
 |---|---|---|---|
 | Extension | `dotfiles/extensions/*.ts` or `dotfiles/extensions/<name>/` | `~/.pi/agent/extensions/` | Add the required top-level JSDoc block and update `dotfiles/extensions/CHANGELOG.md`. |
-| Custom sub-agent role | `dotfiles/agents/<role>.md` | `~/.pi/agent/agents/<role>.md` | Use for user-managed role prompts discovered by `@danchamorro/pi-subagents`. |
+| Custom sub-agent role | `dotfiles/agents/<role>.md` | `~/.pi/agent/agents/<role>.md` | Use for user-managed role prompts discovered by `pi-subagents`. |
 | Pi-only skill | `dotfiles/agent-skills/<skill>/` | `~/.pi/agent/skills/<skill>/` | Use for workflows that depend on Pi-only tools or UI. |
 | Personal skill | `dotfiles/personal-skills/<category>/<skill>/` | `~/.agents/skills/<category>/<skill>/` and `~/.claude/skills/<skill>/` | Use for skills shared by Pi and Claude Code. These are not installed into `~/.pi/agent/skills/`. |
 | Prompt template | `dotfiles/prompts/<prompt>.md` | `~/.pi/agent/prompts/` | Keep reusable prompts here instead of scattering local copies. |
