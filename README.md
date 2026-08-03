@@ -6,8 +6,8 @@ skills, configs, safety guardrails, and installable packages. This is a
 public backup and reference for how I organize my own agent environment,
 not a universal starter kit intended to be cloned unchanged by everyone.
 
-Includes 28 extensions, 62 skills, 1 prompt template, 1 theme,
-8 installable Pi packages, MCP server configurations, and safety guardrails.
+Includes 28 extensions, 61 skills, 1 prompt template, 1 theme,
+6 installable Pi packages, MCP server configurations, and safety guardrails.
 It also tracks 2 custom sub-agent roles for local use with the subagents
 package.
 
@@ -137,14 +137,12 @@ npm run update:packages   # Pi packages from manifest.json
 
 ### Packages (installable via pi)
 
-This setup installs eight Pi packages via `manifest.json`:
+This setup installs six Pi packages via `manifest.json`:
 
 ```bash
 pi install npm:pi-subagents
 pi install npm:@danchamorro/pi-agent-modes
 pi install npm:@danchamorro/pi-prompt-enhancer
-pi install npm:pi-design-deck
-pi install npm:pi-annotate
 pi install npm:@narumitw/pi-goal
 pi install git:https://github.com/badlogic/pi-diff-review
 pi install git:github.com/DietrichGebert/ponytail
@@ -166,8 +164,6 @@ longer installed by this setup.
 | Package | Description | Source |
 |---|---|---|
 | `pi-subagents` | Delegate work through single, parallel, chained, background, and forked-context Pi sub-agents. Bundles the `pi-subagents` orchestration skill. | [nicobailon/pi-subagents](https://github.com/nicobailon/pi-subagents) |
-| `pi-design-deck` | Present multi-slide visual decision decks with high-fidelity previews. Bundles the `design-deck` skill used in this setup. | [nicobailon/pi-design-deck](https://github.com/nicobailon/pi-design-deck) |
-| `pi-annotate` | Visual browser annotation for AI-assisted UI debugging. Adds `/annotate` plus companion Chrome extension tooling. | [nicobailon/pi-annotate](https://github.com/nicobailon/pi-annotate) |
 | `@narumitw/pi-goal` | Goal-driven task completion for Pi. Adds `/goal` mode plus `goal_complete` for verifiable long-running work. | [narumiruna/pi-extensions](https://github.com/narumiruna/pi-extensions) |
 | `pi-diff-review` | Native diff review window for Pi. Adds a `/diff-review` command that opens changed files in a Monaco diff editor and turns review notes into a prompt back in Pi. | [badlogic/pi-diff-review](https://github.com/badlogic/pi-diff-review) |
 | `ponytail` | Lazy senior developer mode for Pi. Adds `/ponytail` controls, prompt injection, and simplification-focused skills. | [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail) |
@@ -282,7 +278,7 @@ roots. Unmanaged and third-party directories are reported and left in place.
 |-------|-------------|
 | `exa-search` | Semantic web search via Exa API |
 
-**Package-provided skills** (8, installed via Pi packages):
+**Package-provided skills** (7, installed via Pi packages):
 
 Installed automatically when these packages are present in
 `manifest.json`.
@@ -290,7 +286,6 @@ Installed automatically when these packages are present in
 | Skill | Source |
 |-------|--------|
 | `pi-subagents` | [`npm:pi-subagents`](https://github.com/nicobailon/pi-subagents) |
-| `design-deck` | [`npm:pi-design-deck`](https://github.com/nicobailon/pi-design-deck) |
 | `ponytail` | [`git:github.com/DietrichGebert/ponytail`](https://github.com/DietrichGebert/ponytail) |
 | `ponytail-review` | [`git:github.com/DietrichGebert/ponytail`](https://github.com/DietrichGebert/ponytail) |
 | `ponytail-audit` | [`git:github.com/DietrichGebert/ponytail`](https://github.com/DietrichGebert/ponytail) |
