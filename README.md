@@ -6,8 +6,8 @@ skills, configs, safety guardrails, and installable packages. This is a
 public backup and reference for how I organize my own agent environment,
 not a universal starter kit intended to be cloned unchanged by everyone.
 
-Includes 28 extensions, 61 skills, 1 prompt template, 1 theme,
-6 installable Pi packages, MCP server configurations, and safety guardrails.
+Includes 23 extensions, 61 skills, 1 prompt template, 1 theme,
+9 installable Pi packages, MCP server configurations, and safety guardrails.
 It also tracks 2 custom sub-agent roles for local use with the subagents
 package.
 
@@ -137,13 +137,16 @@ npm run update:packages   # Pi packages from manifest.json
 
 ### Packages (installable via pi)
 
-This setup installs six Pi packages via `manifest.json`:
+This setup installs nine Pi packages via `manifest.json`:
 
 ```bash
 pi install npm:pi-subagents
 pi install npm:@danchamorro/pi-agent-modes
 pi install npm:@danchamorro/pi-prompt-enhancer
 pi install npm:@narumitw/pi-goal
+pi install npm:@juicesharp/rpiv-todo
+pi install npm:@juicesharp/rpiv-ask-user-question
+pi install npm:pi-web-access
 pi install git:https://github.com/badlogic/pi-diff-review
 pi install git:github.com/DietrichGebert/ponytail
 ```
@@ -165,10 +168,13 @@ longer installed by this setup.
 |---|---|---|
 | `pi-subagents` | Delegate work through single, parallel, chained, background, and forked-context Pi sub-agents. Bundles the `pi-subagents` orchestration skill. | [nicobailon/pi-subagents](https://github.com/nicobailon/pi-subagents) |
 | `@narumitw/pi-goal` | Goal-driven task completion for Pi. Adds `/goal` mode plus `goal_complete` for verifiable long-running work. | [narumiruna/pi-extensions](https://github.com/narumiruna/pi-extensions) |
+| `@juicesharp/rpiv-todo` | Live todo panel for Pi with dependency tracking and task state that survives `/reload` and compaction. | [juicesharp/rpiv-mono](https://github.com/juicesharp/rpiv-mono/tree/main/packages/rpiv-todo) |
+| `@juicesharp/rpiv-ask-user-question` | Structured questionnaire for clarifying decisions with typed options, previews, notes, and free-text answers. | [juicesharp/rpiv-mono](https://github.com/juicesharp/rpiv-mono/tree/main/packages/rpiv-ask-user-question) |
+| `pi-web-access` | Web search, content extraction, GitHub repository access, PDF extraction, and video understanding. | [nicobailon/pi-web-access](https://github.com/nicobailon/pi-web-access) |
 | `pi-diff-review` | Native diff review window for Pi. Adds a `/diff-review` command that opens changed files in a Monaco diff editor and turns review notes into a prompt back in Pi. | [badlogic/pi-diff-review](https://github.com/badlogic/pi-diff-review) |
 | `ponytail` | Lazy senior developer mode for Pi. Adds `/ponytail` controls, prompt injection, and simplification-focused skills. | [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail) |
 
-### Extensions (28)
+### Extensions (23)
 
 All extensions live in `dotfiles/extensions/`.
 
@@ -186,9 +192,7 @@ All extensions live in `dotfiles/extensions/`.
 
 | Extension | What it does |
 |-----------|-------------|
-| `exa-search-tool.ts` | Registers Exa as a semantic web search tool |
 | `file-search/` | Registers `fd` and `rg` as first-class file-name and exact-text search tools |
-| `exa-enforce.ts` | Enforces Exa over ad-hoc web search methods |
 | `openai-fast-mode.ts` | Adds an opt-in `/fast` toggle for supported subscription-backed OpenAI Codex models |
 | `tilldone.ts` | Task list management with progress tracking |
 | `tools.ts` | Custom tool registrations |
@@ -206,12 +210,9 @@ All extensions live in `dotfiles/extensions/`.
 | `review.ts` | Code review: PR review, branch diffs, uncommitted changes |
 | `session-breakdown.ts` | Session cost/usage analytics with calendar heatmap |
 | `find-session.ts` | Search past Pi sessions with LLM ranking and one-step resume |
-| `todos.ts` | File-based todo management |
 | `term-notify.ts` | Desktop notifications on agent completion (cmux + OSC 777) |
-| `qna-interactive.ts` | Structured Q&A mode |
 | `question-mode.ts` | Read-only question mode (no file changes) |
 | `clean-sessions.ts` | Prunes old, low-value session files |
-| `inventory.ts` | Reopens Pi's startup-style resource inventory as a tabbed TUI overlay with scope grouping and descriptions |
 | `uv.ts` | Intercepts pip/python calls and redirects to uv |
 
 **Terminal integration:**
@@ -271,12 +272,6 @@ roots. Unmanaged and third-party directories are reported and left in place.
 | `engineering` | `thermos` | Launch both thermo-nuclear review subagents in parallel |
 | `developer-workflow` | `whats-new` | Git changelog generation between branches |
 | `media` | `youtube-video-context` | YouTube transcript, summary, and video context extraction via summarize CLI with Codex and local Whisper fallback |
-
-**Pi-only skills** (1, committed to this repo):
-
-| Skill | Description |
-|-------|-------------|
-| `exa-search` | Semantic web search via Exa API |
 
 **Package-provided skills** (7, installed via Pi packages):
 

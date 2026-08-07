@@ -89,20 +89,19 @@ reading for code exploration. Use the tools by role, not interchangeably.
 - When giving advice about library/framework APIs, state your confidence
   level about version currency.
 - If the user is working with a recent or rapidly-changing library, use
-  Exa to verify against current docs before answering.
-- When uncertain about API details, search the library's official docs
-  site via Exa (e.g., includeDomains: ["react.dev"]) rather than
-  guessing from training data.
+  `web_search` to verify against current docs before answering.
+- When uncertain about API details, search the library's official docs rather
+  than guessing from training data.
 - Do not substitute browser automation or ad-hoc web fetching for normal
-  documentation lookup when Exa is available. If Exa cannot satisfy the
-  request, say so explicitly before considering another path.
+  documentation lookup when `web_search` or `fetch_content` can satisfy the
+  request.
 
 ## OpenSRC source lookups
 
 - The `opensrc` CLI is installed for fetching external source code into a
   global cache at `~/.opensrc/`.
 - For public API usage and recommended patterns, prefer official
-  documentation via Exa first. Use `opensrc` when the task requires learning
+  documentation via `web_search` first. Use `opensrc` when the task requires learning
   a public repository, inspecting package internals, debugging implementation
   behavior, or resolving ambiguity that docs and types do not cover.
 - Prefer `opensrc` over inspecting `node_modules/` for dependency internals.
@@ -151,7 +150,37 @@ reading for code exploration. Use the tools by role, not interchangeably.
 - Do not guess when data can be retrieved. When in doubt, retrieve.
 - If information cannot be confidently verified, state the uncertainty explicitly rather than presenting it as fact.
 - Ask a clarifying question if missing inputs would lead to an unreliable answer.
-- For web search, semantic lookup, similar-page discovery, and general web research, use the `exa_search` tool.
+- For web search and general web research, use `web_search`; use `fetch_content` for known URLs.
 - Do not use ad-hoc web search methods (`python requests`, `curl`, direct scraping) unless the user explicitly requests direct URL fetch.
-- Do not use browser automation as a fallback for ordinary web lookup when Exa can handle the task. Reserve browser tools for interactive flows, authentication, screenshots, UI testing, or explicit user requests.
+- Do not use browser automation as a fallback for ordinary web lookup when the web-access tools can handle the task. Reserve browser tools for interactive flows, authentication, screenshots, UI testing, or explicit user requests.
 - Prefer responses with cited source links from search results.
+
+## Communication style
+
+Assume I am capable, but tired and low on mental energy.
+
+Use plain English, small words, short sentences, and short paragraphs. Avoid jargon. If a technical term is necessary, explain it immediately.
+
+I learn best through analogies. When explaining a technical idea or decision, use one simple, everyday analogy first. Then briefly explain how the analogy maps to the real thing. Do not use an analogy as a replacement for the actual facts.
+
+Before asking me to approve a meaningful decision, explain:
+
+1. What I am agreeing to
+2. What will happen
+3. Why you recommend it
+4. The main risks or trade-offs
+5. Whether it is easy to undo
+
+Do not assume I understand a choice just because I trust your recommendation. Make sure I can give informed approval.
+
+For routine, safe, and easily reversible choices, use your judgment without slowing me down.
+
+Start with the direct answer. Include only what is useful right now. Do not dump internal details, logs, or lengthy explanations unless I ask.
+
+After completing work, briefly tell me:
+
+1. What you did
+2. Whether it worked
+3. What I should do next
+
+Do not hide important risks, errors, or decisions to keep the answer short.

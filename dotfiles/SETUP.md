@@ -61,20 +61,6 @@ includes skeletons for jCodeMunch, Postgres MCP, MariaDB MCP,
 chrome-devtools, and Tirith. `mcp.json` is always local-only: it is created
 from the template on first run and is never symlinked or committed.
 
-### Exa API key
-
-If you use the `exa-search` skill, set your API key:
-
-```bash
-export EXA_API_KEY=your_key  # in your shell profile
-```
-
-Or create a `.env` file in the skill directory:
-
-```bash
-echo 'EXA_API_KEY=your_key' > ~/.pi/agent/skills/exa-search/.env
-```
-
 ### AgentMemory
 
 [AgentMemory](https://github.com/rohitg00/agentmemory) is tracked in

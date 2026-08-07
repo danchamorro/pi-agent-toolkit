@@ -129,7 +129,7 @@ Scan pipeline configs for service references not visible in application code:
 - `.github/workflows/*.yml`: `uses:` actions, secrets references
 - `.gitlab-ci.yml`, `.circleci/config.yml`, `Jenkinsfile`
 
-## Phase 2: Verify CLI existence with Exa
+## Phase 2: Verify CLI existence with web search
 
 This phase is mandatory. Do not determine CLI status from memory or training data.
 
@@ -147,22 +147,20 @@ All four criteria must be met:
 
 ### Verification procedure
 
-For **every** service identified in Phase 1, call `exa_search` with the `answer`
-endpoint:
+For **every** service identified in Phase 1, call `web_search`:
 
 ```
-exa_search endpoint=answer query="Does [SERVICE_NAME] have an official CLI tool?"
+web_search({ query: "Does [SERVICE_NAME] have an official CLI tool? Include its name, install command, and official source links." })
 ```
 
-This returns the CLI name, install command, and source links. If the answer is
-ambiguous or uncertain, follow up with a targeted doc-site search:
+If the answer is ambiguous or uncertain, follow up with a targeted doc-site
+search:
 
 ```
-exa_search endpoint=search query="[SERVICE_NAME] CLI"
-  includeDomains=["official-docs-domain.com"]
+web_search({ query: "[SERVICE_NAME] official CLI", domainFilter: ["official-docs-domain.com"] })
 ```
 
-Do not mark any service as "No CLI" without first running an Exa query for it.
+Do not mark any service as "No CLI" without first running a web search for it.
 Even services that seem unlikely to have a CLI (auth providers, email services,
 newer startups) should be verified. CLI tooling is expanding rapidly and assumptions
 from training data are frequently wrong.

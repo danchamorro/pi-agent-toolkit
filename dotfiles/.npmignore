@@ -15,8 +15,5 @@ pi-debug.log
 # Dependencies
 node_modules/
 
-# Skill secrets
-agent-skills/exa-search/.env
-
 # OS artifacts
 .DS_Store

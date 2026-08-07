@@ -1,6 +1,6 @@
 ---
 name: youtube-video-context
-description: "Use this skill whenever the user gives a YouTube URL and asks to summarize, digest, analyze, extract transcript/context, decide whether a video is worth watching, or understand what a video is about. Prefer the summarize CLI for YouTube/video context instead of web search. Use Codex as the default summarize backend when possible, and use the local Whisper large-v3 model for transcription fallback. Do not use this for ordinary web pages; the user prefers Exa for webpage research."
+description: "Use this skill whenever the user gives a YouTube URL and asks to summarize, digest, analyze, extract transcript/context, decide whether a video is worth watching, or understand what a video is about. Prefer the summarize CLI for YouTube/video context instead of web search. Use Codex as the default summarize backend when possible, and use the local Whisper large-v3 model for transcription fallback. Do not use this for ordinary web pages; use the installed web-access tools for webpage research."
 compatibility: "Requires the summarize CLI. Best local fallback requires yt-dlp, ffmpeg, tesseract, whisper-cpp, and SUMMARIZE_WHISPER_CPP_MODEL_PATH pointing to ggml-large-v3.bin."
 ---
 
@@ -8,7 +8,7 @@ compatibility: "Requires the summarize CLI. Best local fallback requires yt-dlp,
 
 Use this skill to turn YouTube videos into grounded, LLM-readable context. The preferred tool is the `summarize` CLI because it uses a transcript-first YouTube pipeline and can fall back to local audio transcription when captions are missing.
 
-The user prefers this workflow for YouTube videos, but prefers Exa for ordinary webpages.
+The user prefers this workflow for YouTube videos, but prefers the installed web-access tools for ordinary webpages.
 
 ## Default assumptions
 

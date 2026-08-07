@@ -2,6 +2,32 @@
 
 All notable changes to extensions in `~/.pi/agent/extensions/`.
 
+## 2026-08-02
+
+### question-mode.ts
+
+- Replaced the archived Exa search tool with the `web_search` and
+  `fetch_content` tools in the read-only allowlist.
+
+### todos.ts
+
+- Archived the file-based todo extension in favor of the tracked
+  `@juicesharp/rpiv-todo` Pi package.
+
+### qna-interactive.ts
+
+- Archived the custom Q&A extension in favor of the tracked
+  `@juicesharp/rpiv-ask-user-question` Pi package.
+
+### exa-search-tool.ts, exa-enforce.ts, exa-search skill
+
+- Archived the custom Exa search extensions and Pi-only skill in favor of the
+  tracked `pi-web-access` Pi package.
+
+### inventory.ts
+
+- Archived the unused resource inventory extension.
+
 ## 2026-07-30
 
 ### openai-fast-mode.ts

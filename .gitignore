@@ -36,9 +36,6 @@ dotfiles/sessions/
 # Dotfiles debug logs
 dotfiles/pi-debug.log
 
-# Dotfiles skill secrets
-dotfiles/agent-skills/exa-search/.env
-
 # Python artifacts
 __pycache__/
 .venv/

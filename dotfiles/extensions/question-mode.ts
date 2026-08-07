@@ -13,7 +13,7 @@
 import type { ExtensionAPI, ExtensionContext, ToolCallEventResult } from "@earendil-works/pi-coding-agent";
 import { Key, truncateToWidth } from "@earendil-works/pi-tui";
 
-const QUESTION_MODE_TOOLS = ["read", "grep", "find", "ls", "mcp", "exa_search"] as const;
+const QUESTION_MODE_TOOLS = ["read", "grep", "find", "ls", "mcp", "web_search", "fetch_content"] as const;
 const FALLBACK_TOOLS = ["read", "bash", "edit", "write"] as const;
 const ACTIVE_CONTEXT = `[QUESTION MODE ACTIVE]
 You are answering a user question in strict read-only mode.
