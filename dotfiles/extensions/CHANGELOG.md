@@ -2,6 +2,13 @@
 
 All notable changes to extensions in `~/.pi/agent/extensions/`.
 
+## 2026-08-06
+
+### btw.ts, control.ts, loop.ts
+
+- Updated in-memory resource loaders and provider header handling for Pi 0.84,
+  including safe removal of nullable header-deletion markers before compaction.
+
 ## 2026-08-02
 
 ### question-mode.ts

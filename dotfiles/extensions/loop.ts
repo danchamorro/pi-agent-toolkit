@@ -8,7 +8,7 @@
 
 import { Type } from "typebox";
 import { complete } from "@earendil-works/pi-ai/compat";
-import type { Api, Model, UserMessage } from "@earendil-works/pi-ai";
+import type { Api, Model, ProviderHeaders, UserMessage } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { compact } from "@earendil-works/pi-coding-agent";
 import { Container, type SelectItem, SelectList, Text } from "@earendil-works/pi-tui";
@@ -42,6 +42,15 @@ Use plain text only, no quotes, no punctuation, no prefix.
 Form should be "breaks when ...", "loops until ...", "stops on ...", "runs until ...", or similar.
 Use the best form that makes sense for the loop condition.
 `;
+
+function toRequestHeaders(headers: ProviderHeaders | undefined): Record<string, string> | undefined {
+	if (!headers) return undefined;
+	const result: Record<string, string> = {};
+	for (const [key, value] of Object.entries(headers)) {
+		if (value !== null) result[key] = value;
+	}
+	return Object.keys(result).length > 0 ? result : undefined;
+}
 
 function buildPrompt(mode: LoopMode, condition?: string): string {
 	switch (mode) {
@@ -88,7 +97,7 @@ function getConditionText(mode: LoopMode, condition?: string): string {
 
 async function selectSummaryModel(
 	ctx: ExtensionContext,
-): Promise<{ model: Model<Api>; apiKey: string; headers?: Record<string, string> } | null> {
+): Promise<{ model: Model<Api>; apiKey: string; headers?: ProviderHeaders } | null> {
 	if (!ctx.model) return null;
 
 	if (ctx.model.provider === "anthropic") {
@@ -410,7 +419,14 @@ export default function loopExtension(pi: ExtensionAPI): void {
 			.join("\n\n");
 
 		try {
-			const compaction = await compact(event.preparation, ctx.model, auth.apiKey!, auth.headers, instructionParts, event.signal);
+			const compaction = await compact(
+				event.preparation,
+				ctx.model,
+				auth.apiKey!,
+				toRequestHeaders(auth.headers),
+				instructionParts,
+				event.signal,
+			);
 			return { compaction };
 		} catch (error) {
 			if (ctx.hasUI) {

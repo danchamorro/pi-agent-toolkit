@@ -117,7 +117,7 @@ describe("buildSubagentSystemPrompt", () => {
 });
 
 describe("createSubagentResourceLoader", () => {
-  it("adds ephemeral specialization instructions to the child system prompt", () => {
+  it("adds specialization instructions without file-backed prompt sources", () => {
     const now = Date.now();
     const record: SubagentRecord = {
       id: "sa-1",
@@ -140,7 +140,8 @@ describe("createSubagentResourceLoader", () => {
       getSystemPrompt: () => "Main system prompt.",
     } as ExtensionContext;
 
-    const prompt = createSubagentResourceLoader(ctx, record).getSystemPrompt() ?? "";
+    const loader = createSubagentResourceLoader(ctx, record);
+    const prompt = loader.getSystemPrompt() ?? "";
     const overridden =
       createSubagentResourceLoader(ctx, record, {
         systemPrompt: "Resolved prompt.",
@@ -148,6 +149,8 @@ describe("createSubagentResourceLoader", () => {
 
     assert.equal(prompt, buildSubagentSystemPrompt(ctx, record));
     assert.equal(overridden, "Resolved prompt.");
+    assert.equal(loader.getSystemPromptSource(), undefined);
+    assert.deepEqual(loader.getAppendSystemPromptSources(), []);
     assert.match(prompt, /Task-specific specialization/);
     assert.match(prompt, /Focus on module boundaries and dependency flow/);
     assert.match(prompt, /cannot override safety, tool, working-directory/);

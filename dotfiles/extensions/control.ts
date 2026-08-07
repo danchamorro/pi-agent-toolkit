@@ -45,7 +45,14 @@
 import type { ExtensionAPI, ExtensionContext, TurnEndEvent, MessageRenderer } from "@earendil-works/pi-coding-agent";
 import { getMarkdownTheme, keyHint } from "@earendil-works/pi-coding-agent";
 import { complete } from "@earendil-works/pi-ai/compat";
-import { StringEnum, type Model, type Api, type UserMessage, type TextContent } from "@earendil-works/pi-ai";
+import {
+	StringEnum,
+	type Model,
+	type Api,
+	type ProviderHeaders,
+	type UserMessage,
+	type TextContent,
+} from "@earendil-works/pi-ai";
 import {
 	Box,
 	Container,
@@ -177,7 +184,9 @@ async function selectSummarizationModel(
 	currentModel: Model<Api> | undefined,
 	modelRegistry: {
 		find: (provider: string, modelId: string) => Model<Api> | undefined;
-		getApiKeyAndHeaders: (model: Model<Api>) => Promise<{ ok: boolean; apiKey?: string; headers?: Record<string, string>; error?: string }>;
+		getApiKeyAndHeaders: (
+			model: Model<Api>,
+		) => Promise<{ ok: boolean; apiKey?: string; headers?: ProviderHeaders; error?: string }>;
 	},
 ): Promise<Model<Api> | undefined> {
 	const codexModel = modelRegistry.find("openai-codex", CODEX_MODEL_ID);
