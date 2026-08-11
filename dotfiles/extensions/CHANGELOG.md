@@ -4,6 +4,12 @@ All notable changes to extensions in `~/.pi/agent/extensions/`.
 
 ## 2026-08-11
 
+### tilldone.ts
+
+- Archived the hard-gated task-discipline extension in favor of the tracked
+  `@juicesharp/rpiv-todo` Pi package. The two systems competed for agent
+  attention and UI without sharing state.
+
 ### openai-fast-mode.ts
 
 - Removed the opt-in `/fast` Codex priority-tier extension and its tests.

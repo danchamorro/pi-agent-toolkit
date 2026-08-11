@@ -191,7 +191,6 @@ All extensions live in `dotfiles/extensions/`.
 | Extension | What it does |
 |-----------|-------------|
 | `file-search/` | Registers `fd` and `rg` as first-class file-name and exact-text search tools |
-| `tilldone.ts` | Task list management with progress tracking |
 | `tools.ts` | Custom tool registrations |
 
 **UI and session management:**
