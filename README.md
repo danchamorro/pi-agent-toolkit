@@ -137,13 +137,12 @@ npm run update:packages   # Pi packages from manifest.json
 
 ### Packages (installable via pi)
 
-This setup installs nine Pi packages via `manifest.json`:
+This setup installs eight Pi packages via `manifest.json`:
 
 ```bash
 pi install npm:pi-subagents
 pi install npm:@danchamorro/pi-agent-modes
 pi install npm:@danchamorro/pi-prompt-enhancer
-pi install npm:@narumitw/pi-goal
 pi install npm:@juicesharp/rpiv-todo
 pi install npm:@juicesharp/rpiv-ask-user-question
 pi install npm:pi-web-access
@@ -167,7 +166,6 @@ longer installed by this setup.
 | Package | Description | Source |
 |---|---|---|
 | `pi-subagents` | Delegate work through single, parallel, chained, background, and forked-context Pi sub-agents. Bundles the `pi-subagents` orchestration skill. | [nicobailon/pi-subagents](https://github.com/nicobailon/pi-subagents) |
-| `@narumitw/pi-goal` | Goal-driven task completion for Pi. Adds `/goal` mode plus `goal_complete` for verifiable long-running work. | [narumiruna/pi-extensions](https://github.com/narumiruna/pi-extensions) |
 | `@juicesharp/rpiv-todo` | Live todo panel for Pi with dependency tracking and task state that survives `/reload` and compaction. | [juicesharp/rpiv-mono](https://github.com/juicesharp/rpiv-mono/tree/main/packages/rpiv-todo) |
 | `@juicesharp/rpiv-ask-user-question` | Structured questionnaire for clarifying decisions with typed options, previews, notes, and free-text answers. | [juicesharp/rpiv-mono](https://github.com/juicesharp/rpiv-mono/tree/main/packages/rpiv-ask-user-question) |
 | `pi-web-access` | Web search, content extraction, GitHub repository access, PDF extraction, and video understanding. | [nicobailon/pi-web-access](https://github.com/nicobailon/pi-web-access) |
@@ -193,7 +191,6 @@ All extensions live in `dotfiles/extensions/`.
 | Extension | What it does |
 |-----------|-------------|
 | `file-search/` | Registers `fd` and `rg` as first-class file-name and exact-text search tools |
-| `openai-fast-mode.ts` | Adds an opt-in `/fast` toggle for supported subscription-backed OpenAI Codex models |
 | `tilldone.ts` | Task list management with progress tracking |
 | `tools.ts` | Custom tool registrations |
 

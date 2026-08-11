@@ -2,6 +2,12 @@
 
 All notable changes to extensions in `~/.pi/agent/extensions/`.
 
+## 2026-08-11
+
+### openai-fast-mode.ts
+
+- Removed the opt-in `/fast` Codex priority-tier extension and its tests.
+
 ## 2026-08-06
 
 ### btw.ts, control.ts, loop.ts

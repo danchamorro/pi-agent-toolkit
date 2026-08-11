@@ -47,7 +47,6 @@
     "npm:pi-subagents",
     "npm:@danchamorro/pi-agent-modes",
     "npm:@danchamorro/pi-prompt-enhancer",
-    "npm:@narumitw/pi-goal",
     "npm:@juicesharp/rpiv-todo",
     "npm:@juicesharp/rpiv-ask-user-question",
     "npm:pi-web-access",
