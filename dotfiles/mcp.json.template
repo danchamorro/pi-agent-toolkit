@@ -29,6 +29,8 @@
       "args": [
         "--from",
         "iflow-mcp_mariadb-mariadb-server",
+        "--with",
+        "asyncmy==0.2.10",
         "mariadb-server"
       ],
       "env": {

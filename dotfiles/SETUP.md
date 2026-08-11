@@ -285,6 +285,8 @@ Add your database connection under `mcpServers` in `mcp.json`:
       "args": [
         "--from",
         "iflow-mcp_mariadb-mariadb-server",
+        "--with",
+        "asyncmy==0.2.10",
         "mariadb-server"
       ],
       "env": {
@@ -302,6 +304,7 @@ Add your database connection under `mcpServers` in `mcp.json`:
 }
 ```
 
+- `asyncmy==0.2.10`: Avoids an upstream connection-pool incompatibility
 - `MCP_READ_ONLY=true`: Enforces read-only SQL mode in the MCP server
 - Prefer a dedicated read-only DB user instead of `root`
 - Use `127.0.0.1` for host-local databases when the MCP runs via `uvx`

@@ -110,7 +110,7 @@ is never committed:
 | [jCodeMunch](https://github.com/jgravelle/jcodemunch-mcp) | Code indexing, symbol search, context-aware edit prep. Auto-indexes on session start. | `uvx jcodemunch-mcp` |
 | [codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp) | Graph-backed architecture, call tracing, Cypher-style code queries. Runs lazily and indexes on demand. | `codebase-memory-mcp` |
 | [Postgres MCP](https://github.com/crystaldba/postgres-mcp) | Read-only PostgreSQL access. Runs in Docker with `--access-mode=restricted`. Uses `"lifecycle": "lazy"`. | `docker run crystaldba/postgres-mcp` |
-| [MariaDB MCP](https://github.com/MariaDB/mcp) | Read-only MariaDB or MySQL access. Runs via `uvx` with a local connection and optional `MCP_READ_ONLY=true`. | `uvx --from iflow-mcp_mariadb-mariadb-server mariadb-server` |
+| [MariaDB MCP](https://github.com/MariaDB/mcp) | Read-only MariaDB or MySQL access. Runs via `uvx` with a local connection and optional `MCP_READ_ONLY=true`. | `uvx --from iflow-mcp_mariadb-mariadb-server --with asyncmy==0.2.10 mariadb-server` |
 | [chrome-devtools](https://github.com/nicobailon/chrome-devtools-mcp) | Browser automation via Chrome DevTools Protocol. | `npx chrome-devtools-mcp@latest` |
 | [Tirith](https://tirith.sh/) | Local security checks for commands, URLs, pasted content, files, directories, and MCP configs. | `tirith mcp-server` |
 
